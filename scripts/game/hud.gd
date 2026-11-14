@@ -1,0 +1,180 @@
+class_name Hud
+extends CanvasLayer
+## A sparse HUD: first-light countdown, hull and boost bars, speed, the intro card and the end
+## screens. Everything is made in code so there are no scene resources to keep in step.
+
+var root := Control.new()
+var timer_label := Label.new()
+var speed_label := Label.new()
+var kills_label := Label.new()
+var hull_back := ColorRect.new()
+var hull_fill := ColorRect.new()
+var boost_back := ColorRect.new()
+var boost_fill := ColorRect.new()
+var center := Label.new()
+var sub := Label.new()
+var hint := Label.new()
+var warn := Label.new()
+var intro_time := 7.0
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	layer = 5
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(root)
+
+	_label(timer_label, 26, Color(0.85, 0.88, 0.95, 0.9))
+	timer_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	timer_label.offset_top = 22
+	timer_label.offset_left = -200
+	timer_label.offset_right = 200
+	timer_label.offset_bottom = 66
+	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_label(speed_label, 40, Color(0.9, 0.93, 1.0, 0.92))
+	speed_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	speed_label.offset_left = -240
+	speed_label.offset_top = -92
+	speed_label.offset_right = -36
+	speed_label.offset_bottom = -30
+	speed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	_label(kills_label, 18, Color(0.75, 0.78, 0.85, 0.75))
+	kills_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	kills_label.offset_left = -240
+	kills_label.offset_top = -36
+	kills_label.offset_right = -36
+	kills_label.offset_bottom = -10
+	kills_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	for pair in [[hull_back, hull_fill, 0], [boost_back, boost_fill, 1]]:
+		var back: ColorRect = pair[0]
+		var fill: ColorRect = pair[1]
+		back.color = Color(0.0, 0.0, 0.0, 0.55)
+		back.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+		back.offset_left = 36
+		back.offset_right = 36 + 260
+		back.offset_top = -72 + int(pair[2]) * 30
+		back.offset_bottom = -72 + int(pair[2]) * 30 + 16
+		fill.position = Vector2(2, 2)
+		fill.size = Vector2(256, 12)
+		back.add_child(fill)
+		root.add_child(back)
+	hull_fill.color = Color(0.86, 0.22, 0.2, 0.95)
+	boost_fill.color = Color(0.3, 0.75, 0.95, 0.95)
+	var hl := Label.new()
+	_label(hl, 14, Color(0.8, 0.82, 0.9, 0.7))
+	hl.text = "HULL"
+	hl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	hl.offset_left = 36
+	hl.offset_right = 200
+	hl.offset_top = -94
+	hl.offset_bottom = -74
+	root.add_child(hl)
+	var bl := Label.new()
+	_label(bl, 14, Color(0.8, 0.82, 0.9, 0.7))
+	bl.text = "BOOST"
+	bl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	bl.offset_left = 36
+	bl.offset_right = 200
+	bl.offset_top = -64
+	bl.offset_bottom = -44
+	root.add_child(bl)
+
+	_label(center, 64, Color(0.95, 0.9, 0.9, 1.0))
+	center.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	center.offset_left = -600
+	center.offset_right = 600
+	center.offset_top = -120
+	center.offset_bottom = -30
+	center.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label(sub, 24, Color(0.85, 0.87, 0.92, 0.9))
+	sub.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	sub.offset_left = -600
+	sub.offset_right = 600
+	sub.offset_top = -20
+	sub.offset_bottom = 100
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label(hint, 16, Color(0.75, 0.78, 0.86, 0.7))
+	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	hint.offset_left = -400
+	hint.offset_right = 400
+	hint.offset_top = -190
+	hint.offset_bottom = -140
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label(warn, 20, Color(1.0, 0.35, 0.3, 0.95))
+	warn.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	warn.offset_left = -300
+	warn.offset_right = 300
+	warn.offset_top = 64
+	warn.offset_bottom = 104
+	warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for l in [timer_label, speed_label, kills_label, center, sub, hint, warn]:
+		root.add_child(l)
+	show_intro()
+
+
+func _label(l: Label, size: int, color: Color) -> void:
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	l.add_theme_constant_override("shadow_offset_x", 2)
+	l.add_theme_constant_override("shadow_offset_y", 2)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func show_intro() -> void:
+	center.text = "HOLLOW HOURS"
+	sub.text = "Survive until first light."
+	hint.text = "W / S  throttle and brake     A / D  steer     SPACE  handbrake     SHIFT  boost\nThrow them off with a slide. Run them down. Stay out of the dark."
+	intro_time = 7.0
+
+
+func update_hud(game: GameSim, latched: int, delta: float) -> void:
+	var left := maxf(0.0, GameSim.NIGHT_LENGTH - game.time)
+	if game.phase == GameSim.Phase.DAWN:
+		timer_label.text = "FIRST LIGHT"
+	else:
+		timer_label.text = "FIRST LIGHT IN  %d:%02d" % [int(left) / 60, int(left) % 60]
+	speed_label.text = "%d km/h" % int(game.car.speed() * 3.6)
+	kills_label.text = "RUN DOWN  %d" % game.kills
+	hull_fill.size.x = 256.0 * clampf(game.hull / GameSim.MAX_HULL, 0.0, 1.0)
+	boost_fill.size.x = 256.0 * clampf(game.gauge, 0.0, 1.0)
+	boost_fill.color = Color(0.3, 0.75, 0.95, 0.95) if not game.dry else Color(0.5, 0.5, 0.55, 0.8)
+	hull_fill.color = Color(0.86, 0.22, 0.2, 0.95) if game.hull > 30.0 else Color(1.0, 0.12, 0.1, 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.015))
+	warn.text = "SOMETHING IS ON THE CAR" if latched > 0 else ""
+	if intro_time > 0.0:
+		intro_time -= delta
+		var a := clampf(intro_time / 2.0, 0.0, 1.0)
+		center.modulate.a = a
+		sub.modulate.a = a
+		hint.modulate.a = a
+		if intro_time <= 0.0 and game.phase == GameSim.Phase.PLAYING:
+			center.text = ""
+			sub.text = ""
+			hint.text = ""
+			center.modulate.a = 1.0
+			sub.modulate.a = 1.0
+			hint.modulate.a = 1.0
+
+
+func show_end(phase: int, game: GameSim) -> void:
+	center.modulate.a = 1.0
+	sub.modulate.a = 1.0
+	hint.modulate.a = 1.0
+	intro_time = 0.0
+	if phase == GameSim.Phase.WRECKED:
+		center.text = "WRECKED"
+		sub.text = "They have it.  You lasted %d:%02d and ran down %d." % [int(game.time) / 60, int(game.time) % 60, game.kills]
+	else:
+		center.text = "FIRST LIGHT"
+		sub.text = "You made it.  Hull %d%%,  %d run down." % [int(game.hull), game.kills]
+	hint.text = "R  to go again"
+
+
+func clear_end() -> void:
+	center.text = ""
+	sub.text = ""
+	hint.text = ""

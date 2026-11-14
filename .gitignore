@@ -1,0 +1,8 @@
+.godot/
+build/
+*.import~
+.DS_Store
+tools/audio/out/
+tools/blender/__pycache__/
+tools/blender/previews/
+node_modules/

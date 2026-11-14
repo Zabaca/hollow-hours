@@ -140,6 +140,21 @@ Sound: `ELEVENLABS_API_KEY=... bun tools/audio/generate.ts [name ...]` buys only
 `engine.wav`, `skid.wav`, the crash, wreck, slam, sputter, stomp and splat recordings are copied from
 its `game/audio/` unchanged.
 
+## Tuning knobs
+
+Everything below is a constant to edit; none of it has been balanced by playing.
+
+- Pack and creature: `scripts/sim/pack_sim.gd` (sprint speed in `spawn_one`, `LEAP_TIME`, `MAX_LEAP`,
+  `RUNDOWN_SPEED`, notice range, the 45 s "restless" ramp, `pack_size_for`), `scripts/sim/game_sim.gd`
+  (`NIGHT_LENGTH`, `CLAW_DPS`, crash damage).
+- Look: `scripts/game/atmosphere.gd` (fog density and colour, glow, moon, rain amount), headlights in
+  `scripts/game/car_view.gd` (`light_energy`, `spot_angle`), lamp brightness in `scripts/game/city.gd`
+  (the `energy *= 0.32` factor), the wet shader parameters in `scripts/game/city.gd` and
+  `shaders/wet_ground.gdshader`.
+- Feel: hit-stop and shake amounts are in `main.gd` `_on_event`; the screen shader is
+  `shaders/screen_fx.gdshader`.
+- F3 in game switches High and Low (SDFGI, SSR, SSAO, MSAA, TAA); fog stays on.
+
 ## Known rough
 
 See the report that came with this build; the short list: nothing has been run in the engine;

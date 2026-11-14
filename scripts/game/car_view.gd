@@ -198,7 +198,7 @@ func sync(game: GameSim, world: SimWorld, pos: Vector2, angle: float, delta: flo
 		if wheel["skidding"]:
 			var wp := car.body.to_world(wheel["local"])
 			var p3 := GM.to3(wp, 0.0)
-			var key := i - 2
+			var key: int = int(i) - 2
 			if p3.distance_to(last_mark_pos[key]) > 0.5:
 				last_mark_pos[key] = p3
 				var v := car.body.velocity_at(wp)

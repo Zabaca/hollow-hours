@@ -68,6 +68,7 @@ func _test_shake_off() -> void:
 	g2.slot = 0
 	g2.state = GauntSim.State.LATCHED
 	sim2.pack.gaunts.append(g2)
+	sim2.car.body.position = Vector2(-30, 0.3)  # the gap between the van and the bus
 	sim2.car.body.velocity = Vector2(20, 0)
 	_run(sim2, 4.0, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
 	_check(g2.state == GauntSim.State.LATCHED, "driving straight does not shake it off")
@@ -110,7 +111,6 @@ func _test_no_wall_walking() -> void:
 
 func _test_nav_round_building() -> void:
 	var sim := _sim()
-	var from := Vector2(-44.0, 24.0)  # inside the NW tower's lot edge
 	var a := Vector2(-60.0, 24.0)  # on the west road
 	var b := Vector2(-3.0, 24.0)  # on the central road, the tower block between
 	_check(not sim.world.line_clear(a, b), "the line between the roads is blocked by buildings")
@@ -121,8 +121,6 @@ func _test_nav_round_building() -> void:
 		if not sim.world.line_clear(path[i], path[i + 1], 0.3):
 			clear = false
 	_check(clear, "every leg of that route is clear of buildings")
-	if from.x > 0:
-		pass
 
 
 func _test_dawn() -> void:

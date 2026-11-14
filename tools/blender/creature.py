@@ -6,7 +6,7 @@ with needle teeth, two pale eyes, a bony crest, forearms longer than a man's, th
 hand, digitigrade hind legs and a whip tail. About 2 m long nose to rump, 0.85 m at the shoulder.
 
 Coordinates: Blender Z up, +X forward, +Y left; the glTF exporter keeps +X forward for Godot.
-Rig: 31 bones. Clips (30 fps): idle, stalk, sprint, pounce, latch, thrown, dead.
+Rig: 27 bones. Clips (30 fps): idle, stalk, sprint, pounce, latch, thrown, dead.
 Poses are written as ABSOLUTE elevation deltas per bone from the rest pose (positive = the
 bone's tip swings counterclockwise seen from the left, i.e. forward/up for limbs that hang
 down) plus optional yaw and roll; the script turns them into local bone rotations.

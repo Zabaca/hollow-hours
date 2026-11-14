@@ -59,7 +59,7 @@ func play(clip: String, speed: float = 1.0, blend: float = 0.15) -> void:
 		return
 	if current != clip:
 		current = clip
-		anim.play(anim_names[clip], blend, speed)
+		anim.play(anim_names[clip], blend)
 	anim.speed_scale = speed
 
 

@@ -63,8 +63,6 @@ func reset() -> void:
 func take_events() -> Array:
 	var out := events
 	events = []
-	for e in pack.take_events():
-		out.append(e)
 	return out
 
 
@@ -164,13 +162,14 @@ func step(dt: float, controls: Dictionary) -> void:
 	if phase != Phase.WRECKED:
 		pack.step(dt, car, c)
 		kills = pack.kills
-		for e in pack.events:
+		for e in pack.take_events():
 			if e["type"] == "roadkill":
 				gauge = minf(1.0, gauge + BOOST["roadkill"])
 			elif e["type"] == "latch":
 				damage(6.0, "pounce")
 			elif e["type"] == "claw":
 				damage(CLAW_DPS * 0.7, "claws")
+			events.append(e)
 	if hull <= 0.0 and phase != Phase.WRECKED:
 		phase = Phase.WRECKED
 		events.append({"type": "wrecked"})

@@ -164,6 +164,7 @@ func _make_rain() -> void:
 	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	sm.vertex_color_use_as_albedo = true
+	sm.albedo_texture = GM.soft_dot()
 	sm.albedo_color = Color(0.8, 0.88, 1.0, 1.0)
 	sq.material = sm
 	splash.draw_pass_1 = sq

@@ -674,8 +674,8 @@ def street_scene(g, protos):
         box(g, "trim", sx - 0.2, sy - 0.2, 4.4, sx + 0.2, sy + 0.2, 5.6)
         post(sx, sy, 0.2, "signal")
     # police tape / barriers at one mouth
-    for k in range(4):
-        barrier(g, 64.0 - 3.5 + k * 3.2, 24.5, 0.0)
+    for k in range(3):
+        barrier(g, 62.5 + k * 3.2, 24.5 + (k % 2) * 3.0, 0.0)
     LAYOUT["creature_spawns"] += [dict(x=-66, y=30), dict(x=66, y=-30), dict(x=-30, y=52), dict(x=30, y=-52), dict(x=0, y=40), dict(x=0, y=-40), dict(x=-64, y=-6), dict(x=64, y=6)]
 
 

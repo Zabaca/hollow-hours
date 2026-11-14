@@ -9,8 +9,10 @@ ported from Roadkill's `car.js`, the city and the creature (the "Gaunt") were mo
 animated in Blender for this project, and the sound is regenerated plus a few of Roadkill's own
 recordings.
 
-> Status: written and checked without Godot running (macOS first-launch hold). Syntax is checked
-> with `gdparse`; nothing here has been run in the engine yet. See "First run" and "Known rough".
+> Status: first run done on 2026-11-14 in an sbx sandbox (Godot 4.7.2 Linux, no GPU): the import is clean,
+> `car_test` and `pack_test` pass, the main scene starts and plays headless and under the compatibility
+> renderer, and Windows, Linux and macOS exports build. It has not been seen on a GPU: Forward+ (fog, SSR,
+> SDFGI, the real look) has never rendered. See "Software rendering" and "Known rough".
 
 ## Controls
 
@@ -99,9 +101,24 @@ command from anywhere with `--path` pointing at this folder.
    and quits; `--low` starts on the Low graphics preset; `--write-movie` is Godot's Movie Maker
    (a PNG sequence).
 
+## Probe and software rendering
+
+`godot --headless --path . res://tests/probe.tscn` drives the autopilot round the town through the sim
+for 70 seconds and prints position, speed, hull, creature states and events each second.
+
+On a machine with no GPU (the sbx sandboxes) only the compatibility renderer is usable: Forward+ on Mesa's
+lavapipe did not get a frame out in 400 s inside a 1 GB sandbox. Compatibility has no volumetric fog, SSR,
+SDFGI or SSAO, at most 8 lights per object (so the headlights and most lamps drop out of the ground), and no
+screen-space AA, so those frames are much darker and flatter than a GPU run will be:
+
+```
+xvfb-run -a -s "-screen 0 800x450x24" godot --rendering-method gl_compatibility --rendering-driver opengl3 \
+  --resolution 640x360 --path . --write-movie /tmp/frames/f.png --fixed-fps 30 --quit-after 1500 -- --low --demo
+```
+
 ## Export
 
-Export templates are not installed on this Mac yet. Install them once (about 1 GB download):
+The exports have been built once, in a Linux sandbox with the 4.7.2 templates (Windows `.exe` 116 MB, macOS zip 66 MB, Linux 81 MB); the Windows one is copied to `build/windows/` (git-ignored). Export templates are not installed on this Mac yet. Install them once (about 1 GB download):
 
 ```
 mkdir -p "$HOME/Library/Application Support/Godot/export_templates/4.7.2.stable"
@@ -157,7 +174,8 @@ Everything below is a constant to edit; none of it has been balanced by playing.
 
 ## Known rough
 
-See the report that came with this build; the short list: nothing has been run in the engine;
-the creature animations were checked only as still frames; difficulty and the pack's numbers are
-guesses to tune by hand; the audio was never listened to; Windows export has no icon or version
-resource.
+Never seen on a GPU (Forward+ look, fog, headlight beams, SDFGI and the wet shader's reflections are
+unjudged); the creature animations have been seen only as Blender stills and as software-rendered
+frames; difficulty and the pack's numbers are guesses to tune by hand (the autopilot loses about a
+third of its hull to crashes in a minute and is wrecked by one pack; a pack takes a car that has stopped
+in under ten seconds); the audio was never listened to; Windows export has no icon or version resource.

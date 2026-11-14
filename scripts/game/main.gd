@@ -29,6 +29,9 @@ var shot_at := 6.0
 var shot_taken := false
 var started_ms := 0
 var route_i := 0
+var stuck_t := 0.0
+var reverse_t := 0.0
+var reverse_turn := 1.0
 var threat := 0.0
 var ended := false
 
@@ -88,9 +91,9 @@ func _apply_viewport() -> void:
 
 # ----------------------------------------------------------------------------- input
 
-func _controls() -> Dictionary:
+func _controls(delta: float) -> Dictionary:
 	if demo:
-		return _autopilot()
+		return _autopilot(delta)
 	return {
 		"throttle": Input.get_axis("brake", "accelerate"),
 		"turn": Input.get_axis("steer_right", "steer_left"),
@@ -100,15 +103,28 @@ func _controls() -> Dictionary:
 
 
 ## A pure-pursuit driver round the town, for footage and for checking the game without hands.
-func _autopilot() -> Dictionary:
+func _autopilot(delta: float) -> Dictionary:
 	var car := game.car
+	# Jammed against something: back out for a moment, steering away.
+	if reverse_t > 0.0:
+		reverse_t -= delta
+		return {"throttle": -1.0, "turn": -reverse_turn, "handbrake": false, "boost": false}
+	stuck_t = stuck_t + delta if (car.speed() < 1.0 and game.time > 2.0) else 0.0
+	if stuck_t > 1.2:
+		stuck_t = 0.0
+		reverse_t = 1.3
+		reverse_turn = 1.0 if randf() < 0.5 else -1.0
+	# Something on the car: do what a player would, slide and swerve until it lets go.
+	if game.pack.latched().size() > 0:
+		var flip := 1.0 if int(game.time / 0.7) % 2 == 0 else -1.0
+		return {"throttle": 1.0, "turn": flip, "handbrake": true, "boost": false}
 	var target: Vector2 = DEMO_ROUTE[route_i]
 	if car.body.position.distance_to(target) < 9.0:
 		route_i = (route_i + 1) % DEMO_ROUTE.size()
 		target = DEMO_ROUTE[route_i]
 	var want := (target - car.body.position).angle()
 	var err := angle_difference(car.body.angle, want)
-	var throttle := 0.9 if absf(err) < 0.5 else 0.45
+	var throttle := 0.7 if absf(err) < 0.5 else 0.4
 	return {"throttle": throttle, "turn": clampf(err * 2.4, -1.0, 1.0), "handbrake": false, "boost": false}
 
 
@@ -158,7 +174,7 @@ func _physics_process(delta: float) -> void:
 		return
 	prev_pos = game.car.body.position
 	prev_angle = game.car.body.angle
-	game.step(delta, _controls())
+	game.step(delta, _controls(delta))
 	for e in game.take_events():
 		_on_event(e)
 	if not ended and game.phase != GameSim.Phase.PLAYING:

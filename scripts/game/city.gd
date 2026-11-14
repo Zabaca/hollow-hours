@@ -157,6 +157,7 @@ func _add_fires() -> void:
 		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 		mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 		mat.vertex_color_use_as_albedo = true
+		mat.albedo_texture = GM.soft_dot()
 		mat.albedo_color = Color(1, 0.6, 0.25, 1)
 		q.material = mat
 		p.draw_pass_1 = q

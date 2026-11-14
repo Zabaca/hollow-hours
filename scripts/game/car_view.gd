@@ -101,13 +101,14 @@ func _spray() -> void:
 		pm.color_ramp = gt
 		p.process_material = pm
 		var q := QuadMesh.new()
-		q.size = Vector2(0.45, 0.45)
+		q.size = Vector2(0.4, 0.4)
 		var m := StandardMaterial3D.new()
+		m.albedo_texture = GM.soft_dot()
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 		m.vertex_color_use_as_albedo = true
-		m.albedo_color = Color(1, 1, 1, 1)
+		m.albedo_color = Color(0.85, 0.9, 1.0, 0.35)
 		q.material = m
 		p.draw_pass_1 = q
 		p.amount_ratio = 0.0

@@ -8,7 +8,7 @@ enum Phase { PLAYING, WRECKED, DAWN }
 
 const NIGHT_LENGTH := 300.0  # seconds until first light
 const MAX_HULL := 100.0
-const CLAW_DPS := 5.0  # hull per second per creature clinging to the car
+const CLAW_DPS := 3.0  # hull per second per creature clinging to the car
 const BOOST := CarSim.BOOST
 const GRAB := PackSim.GRAB_DRAG * PackSim.GAUNT_MASS / 80.0  # N per (m/s) per clinging creature
 
@@ -166,7 +166,7 @@ func step(dt: float, controls: Dictionary) -> void:
 			if e["type"] == "roadkill":
 				gauge = minf(1.0, gauge + BOOST["roadkill"])
 			elif e["type"] == "latch":
-				damage(6.0, "pounce")
+				damage(4.0, "pounce")
 			elif e["type"] == "claw":
 				damage(CLAW_DPS * 0.7, "claws")
 			events.append(e)

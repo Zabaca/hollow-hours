@@ -18,6 +18,21 @@ static func apply(obj: Object, props: Dictionary) -> void:
 		obj.set(k, props[k])
 
 
+## A soft round dot (white, fading to clear at the rim) for particle quads, so they are not squares.
+static func soft_dot() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	t.width = 64
+	t.height = 64
+	return t
+
+
 static func damp(rate: float, delta: float) -> float:
 	return 1.0 - exp(-rate * delta)
 

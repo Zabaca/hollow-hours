@@ -106,7 +106,7 @@ func notice_range(car: CarSim) -> float:
 # ----------------------------------------------------------------------------- director
 
 
-func spawn_one(car: CarSim, min_dist: float = 48.0) -> GauntSim:
+func spawn_one(car: CarSim, min_dist: float = 60.0) -> GauntSim:
 	var cands: Array = []
 	for s in world.spawns:
 		var d := (s as Vector2).distance_to(car.body.position)
@@ -289,7 +289,8 @@ func _lurk(g: GauntSim, dt: float, car: CarSim) -> void:
 	# The night grows restless: after a while the lurkers come looking whether they heard the car or not.
 	if time > 45.0 and g.t > 25.0:
 		g.alert = true
-	var noticed := d < notice_range(car) or (g.alert and d < 90.0)
+	# Nothing hunts in the first twenty seconds: time to get out of the first street.
+	var noticed := time > 20.0 and (d < notice_range(car) or (g.alert and d < 90.0))
 	if noticed:
 		if d <= 22.0 or (car.speed() < 3.0 and d < 40.0):
 			g.set_state(GauntSim.State.HUNT)

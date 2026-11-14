@@ -57,7 +57,7 @@ func _check_run(ref: Dictionary, run: Dictionary) -> Dictionary:
 	var every: int = int(ref["every"])
 	var car := CarSim.from_id(String(run["car"]))
 	var wear: Dictionary = CarSim.FRESH
-	if run["wear"] != null:
+	if run.get("wear") != null:
 		wear = run["wear"]
 	var is_crash: bool = run["kind"] == "crash"
 	if is_crash:

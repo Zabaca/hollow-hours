@@ -1,6 +1,7 @@
 class_name InputSetup
 extends RefCounted
-## The controls, made in code so no project.godot input block has to be kept in step.
+## The controls, made in code so no project.godot input block has to be kept in step. Also gives the
+## menus' accept and cancel actions the gamepad's A and B.
 
 static func ensure() -> void:
 	_action("accelerate", [_key(KEY_W), _key(KEY_UP), _axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)])
@@ -14,6 +15,9 @@ static func ensure() -> void:
 	_action("fullscreen", [_key(KEY_F11)])
 	_action("quality", [_key(KEY_F3)])
 	_action("mute", [_key(KEY_M)])
+	# The menus: this engine build leaves the gamepad's A and B off ui_accept and ui_cancel.
+	_action("ui_accept", [_button(JOY_BUTTON_A)])
+	_action("ui_cancel", [_button(JOY_BUTTON_B)])
 
 
 static func _action(name: String, events: Array) -> void:

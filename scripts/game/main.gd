@@ -3,7 +3,7 @@ extends Node3D
 ##
 ## Command line (after `--`): `--demo` lets an autopilot drive; `--shot=/path.png` saves a frame
 ## and quits after `--shot-at=SECONDS` (default 6) of real time; `--low` starts on the low
-## graphics preset. Example (with a window, not --headless):
+## graphics preset; `--no-hud` hides the HUD (for key-art frames). Example (with a window, not --headless):
 ##   godot --path . -- --demo --shot=/tmp/hollow.png --shot-at=8
 
 const DEMO_ROUTE := [
@@ -19,11 +19,12 @@ var cam: ChaseCamera
 var fx: FX
 var audio: AudioMix
 var hud: Hud
+var pause_menu: PauseMenu
 var views := {}  # creature id -> GauntView
 var prev_pos := Vector2.ZERO
 var prev_angle := 0.0
-var paused := false
 var demo := false
+var no_hud := false
 var shot_path := ""
 var shot_at := 6.0
 var shot_game := -1.0
@@ -50,7 +51,8 @@ var ended := false
 
 func _ready() -> void:
 	InputSetup.ensure()
-	Settings.apply_preset(true)
+	Settings.boot()
+	Session.parse_args()
 	var args := OS.get_cmdline_user_args()
 	for a in args:
 		if a == "--demo":
@@ -59,6 +61,8 @@ func _ready() -> void:
 			Settings.apply_preset(false)
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
+		elif a == "--no-hud":
+			no_hud = true
 		elif a == "--cam-log":
 			cam_log = true
 		elif a == "--audio-log":
@@ -75,6 +79,8 @@ func _ready() -> void:
 			shot_game = float(a.trim_prefix("--shot-game="))
 		elif a.begins_with("--shot-at="):
 			shot_at = float(a.trim_prefix("--shot-at="))
+	if Session.screen != "":
+		shot_path = ""  # --screen=pause takes its own shot, from the pause menu
 	get_window().title = "Hollow Hours"
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 
@@ -103,12 +109,41 @@ func _ready() -> void:
 	add_child(audio)
 	hud = Hud.new()
 	add_child(hud)
+	hud.visible = not no_hud
+	pause_menu = PauseMenu.new()
+	add_child(pause_menu)
+	pause_menu.resumed.connect(_apply_graphics)
+	pause_menu.quit_to_menu.connect(_quit_to_menu)
 	atmos.lightning.connect(_on_lightning)
 	_apply_viewport()
 	prev_pos = game.car.body.position
 	prev_angle = game.car.body.angle
 	fx.fade_to(0.0)
 	started_ms = Time.get_ticks_msec()
+	if Session.screen.begins_with("pause"):
+		# --screen=pause: a frame of the pause menu over the game, for screenshots
+		get_tree().create_timer(8.0).timeout.connect(_open_pause)
+
+
+func _apply_graphics() -> void:
+	atmos.apply_quality()
+	_apply_viewport()
+
+
+func _open_pause() -> void:
+	pause_menu.open(audio)
+
+
+func _quit_to_menu() -> void:
+	Engine.time_scale = 1.0
+	get_tree().paused = false
+	get_tree().change_scene_to_file(Session.TITLE_SCENE)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not demo and event.is_action_pressed("pause") and not event.is_echo():
+		get_viewport().set_input_as_handled()
+		_open_pause()
 
 
 func _apply_viewport() -> void:
@@ -176,17 +211,11 @@ func _poll_actions() -> void:
 		return
 	if Input.is_action_just_pressed("restart"):
 		_restart()
-	if Input.is_action_just_pressed("pause"):
-		paused = not paused
-		hud.center.text = "PAUSED" if paused else ""
-		hud.sub.text = ""
 	if Input.is_action_just_pressed("fullscreen"):
-		var w := get_window()
-		w.mode = Window.MODE_WINDOWED if w.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+		Settings.set_fullscreen(DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN)
 	if Input.is_action_just_pressed("quality"):
-		Settings.apply_preset(not Settings.high)
-		atmos.apply_quality()
-		_apply_viewport()
+		Settings.set_graphics(not Settings.high)
+		_apply_graphics()
 	if Input.is_action_just_pressed("mute"):
 		audio.toggle_mute()
 
@@ -215,8 +244,6 @@ func _restart() -> void:
 # ----------------------------------------------------------------------------- the step
 
 func _physics_process(delta: float) -> void:
-	if paused:
-		return
 	prev_pos = game.car.body.position
 	prev_angle = game.car.body.angle
 	tick_started_us = Time.get_ticks_usec()
@@ -289,7 +316,7 @@ func _take_shot() -> void:
 # ----------------------------------------------------------------------------- events
 
 func _on_lightning(delay: float) -> void:
-	await get_tree().create_timer(delay).timeout
+	await get_tree().create_timer(delay, false).timeout
 	audio.play("thunder", -4.0 - delay, 1.0, "Ambience")
 
 

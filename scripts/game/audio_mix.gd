@@ -42,26 +42,44 @@ func _ready() -> void:
 		(p as AudioStreamPlayer).play()
 
 
-func _buses() -> void:
-	for n in ["SFX", "Car", "Ambience", "Music"]:
+## Make the buses once per run (a scene change builds a new AudioMix, and the title makes them
+## before any AudioMix exists). Voice is empty for now; the radio's filter goes on it later.
+static func ensure_buses() -> void:
+	if AudioServer.get_bus_index("SFX") >= 0:
+		return
+	for n in ["SFX", "Car", "Ambience", "Music", "Voice"]:
 		var i := AudioServer.bus_count
 		AudioServer.add_bus()
 		AudioServer.set_bus_name(i, n)
 		AudioServer.set_bus_send(i, "Master")
-	sfx_bus = AudioServer.get_bus_index("SFX")
 	var rv := AudioEffectReverb.new()
 	rv.room_size = 0.4
 	rv.damping = 0.6
 	rv.wet = 0.14
 	rv.dry = 1.0
-	AudioServer.add_bus_effect(sfx_bus, rv)
-	lowpass = AudioEffectLowPassFilter.new()
-	lowpass.cutoff_hz = 20500.0
-	AudioServer.add_bus_effect(AudioServer.get_bus_index("Car"), lowpass)
+	AudioServer.add_bus_effect(AudioServer.get_bus_index("SFX"), rv)
+	var lp := AudioEffectLowPassFilter.new()
+	lp.cutoff_hz = 20500.0
+	AudioServer.add_bus_effect(AudioServer.get_bus_index("Car"), lp)
 	var comp := AudioEffectCompressor.new()
 	comp.threshold = -12.0
 	comp.ratio = 3.0
 	AudioServer.add_bus_effect(0, comp)
+
+
+func _buses() -> void:
+	ensure_buses()
+	sfx_bus = AudioServer.get_bus_index("SFX")
+	lowpass = AudioServer.get_bus_effect(AudioServer.get_bus_index("Car"), 0)
+
+
+## The pause menu is up: the car, the hunt and the creatures go quiet and the music drops.
+## update_mix puts everything back on the first frame after resume.
+func enter_pause() -> void:
+	for p in [engine, skid, road, heart, claws, roof]:
+		(p as AudioStreamPlayer).volume_db = -80.0
+	music_a.volume_db -= 12.0
+	music_b.volume_db = -80.0
 
 
 func _loop(file: String, bus: String, db: float) -> AudioStreamPlayer:

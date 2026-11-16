@@ -11,8 +11,8 @@ const WIDTH := 560.0
 
 const ACTION_NAMES := [
 	["accelerate", "Throttle"], ["brake", "Brake and reverse"], ["steer_left", "Steer left"],
-	["steer_right", "Steer right"], ["handbrake", "Handbrake"], ["boost", "Boost"], ["restart", "Restart"],
-	["pause", "Pause"], ["fullscreen", "Fullscreen"], ["quality", "Graphics high or low"], ["mute", "Mute"],
+	["steer_right", "Steer right"], ["handbrake", "Handbrake"], ["boost", "Boost"], ["restart", "Restart (Survive the Night)"],
+	["pause", "Pause"], ["fullscreen", "Fullscreen"], ["quality", "Graphics high or low"], ["mute", "Mute"], ["map", "Map"],
 ]
 const PAD_BUTTONS := {
 	JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X", JOY_BUTTON_Y: "Y", JOY_BUTTON_BACK: "Back",
@@ -115,7 +115,7 @@ func _build_controls() -> void:
 	column.add_child(indent)
 	for h in ["", "KEYBOARD", "GAMEPAD"]:
 		var l := MenuStyle.label(h, 15, MenuStyle.DIM, 600, 6)
-		l.custom_minimum_size = Vector2([262.0, 170.0, 160.0][head.get_child_count()], 30)
+		l.custom_minimum_size = Vector2([310.0, 170.0, 160.0][head.get_child_count()], 30)
 		head.add_child(l)
 	for pair in ACTION_NAMES:
 		var name_l := MenuStyle.label(String(pair[1]), 22, MenuStyle.BONE, 500, 2)

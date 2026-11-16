@@ -53,10 +53,12 @@ func focused_text() -> String:
 
 
 const SETTINGS_FILE := "user://settings_nav_test.json"
+const SAVE_FILE := "user://save_nav_test.json"
 
 
 func _initialize() -> void:
 	Settings.file_path = SETTINGS_FILE
+	Session.save_path = SAVE_FILE  # none: New Game starts the story straight away
 	var title: Node = load("res://scenes/title.tscn").instantiate()
 	root.add_child(title)
 	current_scene = title
@@ -99,7 +101,7 @@ func run() -> void:
 	ck(focused_text() == "New Game", "back at New Game", focused_text())
 	await press_joy(JOY_BUTTON_A)
 	await create_timer(2.5).timeout
-	ck(current_scene.name == "Main", "New Game enters the round", str(current_scene.name))
+	ck(current_scene.name == "Main", "New Game enters the story", str(current_scene.name))
 	await create_timer(1.0).timeout
 	ck(not paused, "not paused in play")
 	await press_joy(JOY_BUTTON_START)
@@ -112,6 +114,8 @@ func run() -> void:
 	await press_key(KEY_ESCAPE)
 	ck(paused, "Esc pauses")
 	await press_joy(JOY_BUTTON_DPAD_DOWN)
+	ck(focused_text() == "Map", "the story's pause menu has a Map row after Resume", focused_text())
+	await press_joy(JOY_BUTTON_DPAD_DOWN)
 	await press_joy(JOY_BUTTON_A)
 	await create_timer(0.3).timeout
 	ck(focused_text() == "Master", "Settings opens inside pause", focused_text())
@@ -119,11 +123,13 @@ func run() -> void:
 	await create_timer(0.2).timeout
 	ck(paused and focused_text() == "Settings", "Esc closes settings only, still paused", focused_text())
 	await press_joy(JOY_BUTTON_DPAD_DOWN)
+	ck(focused_text() == "Restart mission", "down to Restart mission", focused_text())
+	await press_joy(JOY_BUTTON_DPAD_DOWN)
 	ck(focused_text() == "Quit to menu", "down to Quit to menu", focused_text())
 	await press_joy(JOY_BUTTON_A)
 	await create_timer(1.5).timeout
 	ck(current_scene.name == "Title" and not paused, "Quit to menu returns to the title, unpaused", "%s paused=%s" % [current_scene.name, paused])
-	for p in [SETTINGS_FILE, SETTINGS_FILE + ".tmp"]:
+	for p in [SETTINGS_FILE, SETTINGS_FILE + ".tmp", SAVE_FILE, SAVE_FILE + ".tmp"]:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(p)
 	print("menu_nav_test: %d failed" % fails)

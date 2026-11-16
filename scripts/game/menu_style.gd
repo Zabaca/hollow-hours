@@ -52,3 +52,42 @@ static func rule(width: float, alpha: float = 0.9) -> ColorRect:
 	r.custom_minimum_size = Vector2(width, 2)
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return r
+
+
+## The dark left side of a screen that carries a menu: black at the left edge fading out by 55% of the width.
+static func left_shade() -> TextureRect:
+	var g := Gradient.new()
+	g.set_color(0, Color(0.0, 0.0, 0.0, 0.92))
+	g.set_color(1, Color(0.0, 0.0, 0.0, 0.0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill_from = Vector2(0.0, 0.0)
+	gt.fill_to = Vector2(1.0, 0.0)
+	var left := TextureRect.new()
+	left.texture = gt
+	left.stretch_mode = TextureRect.STRETCH_SCALE
+	left.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	left.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	left.anchor_right = 0.55
+	left.offset_right = 0.0
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return left
+
+
+## A screen heading: the title in the display face over the short accent rule.
+static func heading(text: String, px: int = 64, tracking: int = 14) -> Control:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	var title := label(text, px, BONE, 300, tracking)
+	title.custom_minimum_size.y = 70
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_left", 30)
+	pad.add_child(title)
+	col.add_child(pad)
+	var holder := Control.new()
+	holder.custom_minimum_size.y = 34
+	var r := rule(72)
+	r.position = Vector2(30, 6)
+	holder.add_child(r)
+	col.add_child(holder)
+	return col

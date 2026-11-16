@@ -21,3 +21,9 @@ Nits:
 - story_data.gd's spawn note says hunters stay at least `clear` from the car, but _make's jitter makes the real guarantee about clear minus 1.7 m. The `clear` key is also unused by any mission.
 - The final step's two priority lines (end_vera, end_ruck) must keep their order in the radio queue: priority lines go ahead of normal ones but stay in order among themselves. Check this when the radio queue lands.
 - _spawn_hunting now draws one rng value per creature, so seeded replays of the pharmacy spawn changed. Nothing pins them.
+
+## From slice 3 (missions on screen)
+
+- The ending is a stub: on story_complete the presenter shows a "First light" card and returns to the title after 9 s. Slice 4 replaces it (the closing lines, the pull-back, the credits roll).
+- Subtitles come through LineFeed (say, current, changed); the Radio plugs in at merge. The fail line stays on screen while the fail menu holds the tree paused, because the feed pauses with it.
+- Sky: the story lightens the sky with MissionSim.dawn_amount() at 0.04 per second; the first light of the ending is slice 4's.

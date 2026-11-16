@@ -21,6 +21,7 @@ func _ready() -> void:
 	_test_script()
 	_test_places()
 	_test_new_game()
+	_test_start_story_at()
 	_test_hold()
 	_test_alarm()
 	_test_run_down_count()
@@ -224,6 +225,18 @@ func _test_new_game() -> void:
 	_check(sim.mission.objective_text() == obj[0]["text"] and sim.hull == GameSim.MAX_HULL, "the objective reads back and the hull is full")
 	var blip: Array = sim.mission.blips()
 	_check(blip.size() == 1 and blip[0]["kind"] == "objective" and blip[0]["place"] == "shop", "the shop is the objective's blip")
+
+
+func _test_start_story_at() -> void:
+	for i in 3:
+		var sim := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
+		sim.start_story_at(i)
+		var e := sim.take_events()
+		var started := _of(e, "mission_started")
+		var start_id: String = StoryData.MISSIONS[i]["start"]
+		var at: Vector2 = StoryData.place_pos(start_id if start_id != "" else "safe_start")
+		_check(started.size() >= 1 and started.back()["number"] == i + 1 and sim.car.body.position.distance_to(at) < 0.5, "a developer flag starts mission %d directly, with the car at its start" % (i + 1), str(started.size()))
+		_check(sim.mission.objective()["kind"] == "reach" or sim.mission.objective()["kind"] == "hold", "and its first objective is up")
 
 
 func _test_hold() -> void:

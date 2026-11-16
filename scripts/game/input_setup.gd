@@ -15,6 +15,7 @@ static func ensure() -> void:
 	_action("fullscreen", [_key(KEY_F11)])
 	_action("quality", [_key(KEY_F3)])
 	_action("mute", [_key(KEY_M)])
+	_action("map", [_key(KEY_TAB), _button(JOY_BUTTON_BACK)])
 	# The menus: this engine build leaves the gamepad's A and B off ui_accept and ui_cancel.
 	_action("ui_accept", [_button(JOY_BUTTON_A)])
 	_action("ui_cancel", [_button(JOY_BUTTON_B)])

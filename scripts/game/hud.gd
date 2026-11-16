@@ -16,6 +16,9 @@ var sub := Label.new()
 var hint := Label.new()
 var warn := Label.new()
 var intro_time := 7.0
+var story := false
+var hull_label := Label.new()
+var boost_label := Label.new()
 
 
 func _ready() -> void:
@@ -64,7 +67,7 @@ func _ready() -> void:
 		root.add_child(back)
 	hull_fill.color = Color(0.86, 0.22, 0.2, 0.95)
 	boost_fill.color = Color(0.3, 0.75, 0.95, 0.95)
-	var hl := Label.new()
+	var hl := hull_label
 	_label(hl, 14, Color(0.8, 0.82, 0.9, 0.7))
 	hl.text = "HULL"
 	hl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -73,7 +76,7 @@ func _ready() -> void:
 	hl.offset_top = -94
 	hl.offset_bottom = -74
 	root.add_child(hl)
-	var bl := Label.new()
+	var bl := boost_label
 	_label(bl, 14, Color(0.8, 0.82, 0.9, 0.7))
 	bl.text = "BOOST"
 	bl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -125,6 +128,27 @@ func _label(l: Label, size: int, color: Color) -> void:
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+## The story's HUD: the first-light countdown and the intro card give way to the objective and radar
+## (StoryHud), and the hull and boost bars move to the right of the radar in the corner.
+func use_story_layout() -> void:
+	story = true
+	timer_label.visible = false
+	kills_label.visible = false
+	intro_time = 0.0
+	center.text = ""
+	sub.text = ""
+	hint.text = ""
+	warn.offset_top = 176  # below the objective, its hold bar and the timers
+	warn.offset_bottom = 216
+	var shift := StoryHud.RADAR_SIZE + 26.0
+	for c in [hull_back, boost_back]:
+		c.offset_left += shift
+		c.offset_right += shift
+	for c in [hull_label, boost_label]:
+		c.offset_left += shift
+		c.offset_right += shift
+
+
 func show_intro() -> void:
 	center.text = "HOLLOW HOURS"
 	sub.text = "Survive until first light."
@@ -145,7 +169,7 @@ func update_hud(game: GameSim, latched: int, delta: float) -> void:
 	boost_fill.color = Color(0.3, 0.75, 0.95, 0.95) if not game.dry else Color(0.5, 0.5, 0.55, 0.8)
 	hull_fill.color = Color(0.86, 0.22, 0.2, 0.95) if game.hull > 30.0 else Color(1.0, 0.12, 0.1, 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.015))
 	warn.text = "SOMETHING IS ON THE CAR" if latched > 0 else ""
-	if intro_time > 0.0:
+	if intro_time > 0.0 and not story:
 		intro_time -= delta
 		var a := clampf(intro_time / 2.0, 0.0, 1.0)
 		center.modulate.a = a

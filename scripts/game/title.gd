@@ -1,7 +1,8 @@
 extends Control
 ## The first scene: the title over its key art, with rain, a slow push-in, an occasional flash of
 ## lightning with thunder, and the tension music underneath. New Game, Continue (greyed until
-## there is a save), Settings, Credits, Quit. Keyboard, gamepad and mouse all work.
+## there is a save; it says which mission is next), Survive the Night (once the story has been finished),
+## Settings, Credits, Quit. Keyboard, gamepad and mouse all work. New Game over a save asks first.
 ##
 ## A game flag on the command line (see Session) skips all of this and goes straight into the round.
 
@@ -18,6 +19,7 @@ var title_block := Control.new()
 var menu_rows: Array[MenuRow] = []
 var panel: Control
 var focus_after_panel: MenuRow
+var save := {}  # the save on disk when the menu was built, {} for none
 
 var flash_amount := 0.0:
 	set(v):
@@ -42,7 +44,7 @@ func _ready() -> void:
 		_enter_game.call_deferred(false)
 		return
 	Session.parse_args()
-	if Session.screen.begins_with("pause"):
+	if Session.screen.begins_with("pause") or Session.screen in Session.STORY_SCREENS:
 		_enter_game.call_deferred(false)
 		return
 	InputSetup.ensure()
@@ -112,9 +114,14 @@ func _build_menu() -> void:
 	column.custom_minimum_size.x = 440.0
 	column.add_theme_constant_override("separation", 4)
 	add_child(column)
+	save = SaveStore.load_save(Session.save_path)
 	var new_game := _item("New Game", _new_game)
-	var cont := _item("Continue", func() -> void: pass)
-	cont.set_enabled(false)
+	var cont := _item("Continue", _continue)
+	cont.set_enabled(not save.is_empty())
+	if not save.is_empty():
+		cont.note = "Mission %d" % (StoryData.mission_index(str(save["next"])) + 1) if str(save["next"]) != "" else "Free roam"
+	if not save.is_empty() and bool(save["ending_seen"]):
+		_item("Survive the Night", _survive)
 	_item("Settings", _open_settings)
 	_item("Credits", _open_credits)
 	_item("Quit", func() -> void: get_tree().quit())
@@ -218,6 +225,8 @@ func _show_screen(name: String) -> void:
 				(panel as SettingsPanel)._build_controls()
 		"credits":
 			_open_credits()
+		"confirm":
+			_open_panel(ConfirmPanel.new(), 0.62)
 
 
 func _open_panel(p: Control, dark_width: float = 0.62) -> void:
@@ -258,7 +267,33 @@ func _close_panel() -> void:
 
 
 func _new_game() -> void:
+	if save.is_empty():
+		_start_story({})
+		return
+	var ask := ConfirmPanel.new()
+	ask.confirmed.connect(func() -> void:
+		DirAccess.remove_absolute(Session.save_path)
+		_start_story({}))
+	_open_panel(ask, 0.62)
+
+
+func _continue() -> void:
+	if not save.is_empty():
+		_start_story(save)
+
+
+func _start_story(from_save: Dictionary) -> void:
+	Session.mode = "story"
+	Session.continue_save = from_save
+	Session.mission_flag = 0
+	_enter_game(true)
+
+
+## Today's round, with its five-minute clock: the old game.
+func _survive() -> void:
 	Session.mode = "survival"
+	Session.continue_save = {}
+	Session.mission_flag = 0
 	_enter_game(true)
 
 

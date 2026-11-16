@@ -110,7 +110,7 @@ func _ready() -> void:
 		hud.use_story_layout()
 		presenter = StoryPresenter.new()
 		add_child(presenter)
-		presenter.setup(game, null, not no_hud)
+		presenter.setup(game, not no_hud)
 		presenter.save_path = Session.save_path
 		presenter.quit_to_menu.connect(_quit_to_menu)
 		presenter.world_reset.connect(_reset_views)

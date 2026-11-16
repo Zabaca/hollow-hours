@@ -42,7 +42,7 @@ func _ready() -> void:
 
 
 ## Make the buses once per run (a scene change builds a new AudioMix, and the title makes them
-## before any AudioMix exists). Voice is empty for now; the radio's filter goes on it later.
+## before any AudioMix exists). Radio plays on Voice, which carries the handheld-radio filter.
 static func ensure_buses() -> void:
 	if AudioServer.get_bus_index("SFX") >= 0:
 		return
@@ -64,6 +64,20 @@ static func ensure_buses() -> void:
 	comp.threshold = -12.0
 	comp.ratio = 3.0
 	AudioServer.add_bus_effect(0, comp)
+	# The Voice bus sounds like a handheld radio: 300 to 3,400 Hz and a little grit.
+	var vi := AudioServer.get_bus_index("Voice")
+	var hp := AudioEffectHighPassFilter.new()
+	hp.cutoff_hz = 300.0
+	AudioServer.add_bus_effect(vi, hp)
+	var vlp := AudioEffectLowPassFilter.new()
+	vlp.cutoff_hz = 3400.0
+	AudioServer.add_bus_effect(vi, vlp)
+	var grit := AudioEffectDistortion.new()
+	grit.mode = AudioEffectDistortion.MODE_OVERDRIVE
+	grit.pre_gain = 4.0
+	grit.drive = 0.25
+	grit.post_gain = -3.0
+	AudioServer.add_bus_effect(vi, grit)
 
 
 func _buses() -> void:

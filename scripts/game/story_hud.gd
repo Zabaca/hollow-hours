@@ -30,6 +30,7 @@ var _card_tween: Tween
 var _notice_tween: Tween
 var _objective_tween: Tween
 var _timer_low := false
+var _subtitle_id := ""
 
 
 func _ready() -> void:
@@ -221,17 +222,23 @@ func set_timers(list: Array) -> void:
 	timer_value.add_theme_color_override("font_color", MenuStyle.BONE if not _timer_low else Color(1.0, 0.3, 0.26).lerp(MenuStyle.BONE, 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)))
 
 
-## Show the line on screen now ({} for none) with its speaker in their own colour.
+## Show the radio's line now ({} for none; Radio.current_subtitle()): its speaker in their own colour,
+## wrapped text. Called every frame, so the Subtitles setting takes effect at once; the text is
+## only rebuilt when the line changes.
 func set_subtitle(cur: Dictionary) -> void:
 	if cur.is_empty() or not Settings.subtitles:
 		subtitle_panel.visible = false
 		return
-	var who: Dictionary = StoryData.SPEAKERS[cur["speaker"]]
-	speaker_label.text = String(who["name"]).to_upper()
-	speaker_label.add_theme_color_override("font_color", who["color"])
-	subtitle_label.text = _wrap(cur["text"], MenuStyle.font(500, 1), 26, 820.0)
-	subtitle_panel.visible = true
-	subtitle_panel.reset_size()
+	if String(cur["id"]) != _subtitle_id:
+		_subtitle_id = String(cur["id"])
+		speaker_label.text = String(cur["name"]).to_upper()
+		speaker_label.add_theme_color_override("font_color", cur["color"])
+		subtitle_label.text = _wrap(cur["text"], MenuStyle.font(500, 1), 26, 820.0)
+		subtitle_panel.visible = true
+		subtitle_panel.reset_size()
+	elif not subtitle_panel.visible:
+		subtitle_panel.visible = true
+		subtitle_panel.reset_size()
 
 
 ## Break `text` into lines no wider than `max_w` pixels (a Label that wraps itself sizes badly inside a container).

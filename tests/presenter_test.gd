@@ -20,7 +20,7 @@ func _ready() -> void:
 	InputSetup.ensure()
 	Session.save_path = SAVE
 	_clean()
-	_test_line_feed()
+	_test_radio_order()
 	_test_map_view()
 	_test_mission_start_on_screen()
 	_test_hold_and_timer()
@@ -103,7 +103,7 @@ func _feed(r: Rig, delta: float = DT) -> void:
 func _run(r: Rig, seconds: float) -> void:
 	for i in int(round(seconds / DT)):
 		r.game.step(DT, IDLE)
-		r.presenter.feed._process(DT)
+		r.presenter.radio.advance(DT)
 		_feed(r)
 
 
@@ -113,31 +113,45 @@ func _at(r: Rig, place: String) -> void:
 
 # ----------------------------------------------------------------------------- the pieces
 
-func _test_line_feed() -> void:
-	var feed := LineFeed.new()
-	add_child(feed)
-	var changes := [0]
-	feed.changed.connect(func() -> void: changes[0] += 1)
-	feed.say("bat_call_1")
-	_check(feed.current()["id"] == "bat_call_1" and feed.current()["speaker"] == "vera", "a line is up at once when the radio is quiet")
-	var cur: Dictionary = feed.current()
-	_check(is_equal_approx(cur["duration"], StoryData.reading_time("bat_call_1")) and cur["text"] == StoryData.subtitle("bat_call_1"), "for its reading time, as text without cue words")
-	feed.say("bat_shop")
-	feed.say("end_vera", true)
-	feed.say("end_ruck", true)
-	feed.say("bat_loaded")
-	_check(feed.current()["id"] == "bat_call_1", "the line already up is never cut off")
+## The radio, as the presenter hands it the sim's line events: one at a time, a priority line ahead of
+## the ordinary ones waiting but never before an earlier priority line, and the line speaking is not cut.
+func _test_radio_order() -> void:
+	var r := _rig()
+	var radio := r.presenter.radio
+	radio.clear()
+	_until_quiet(radio)
+	var line := func(id: String, priority: bool) -> void:
+		r.presenter.on_event({"type": "line", "id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": priority})
+	line.call("bat_call_1", false)
+	_listen(r)
+	_check(radio.current_subtitle().get("id", "") == "bat_call_1", "a line is up once the call has opened")
+	line.call("bat_shop", false)
+	line.call("end_vera", true)
+	line.call("end_ruck", true)
+	line.call("bat_loaded", false)
+	_check(radio.current_subtitle()["id"] == "bat_call_1", "the line speaking is never cut off")
 	var order: Array = []
-	for i in 40:
-		feed._process(1.0)
-		if not feed.current().is_empty() and (order.is_empty() or order.back() != feed.current()["id"]):
-			order.append(feed.current()["id"])
+	for i in 400:
+		radio.advance(0.5)
+		var id: String = radio.current_subtitle().get("id", "")
+		if id != "" and (order.is_empty() or order.back() != id):
+			order.append(id)
 	_check(order == ["bat_call_1", "end_vera", "end_ruck", "bat_shop", "bat_loaded"], "priority lines jump the queue but keep their order, one at a time", str(order))
-	_check(feed.current().is_empty() and changes[0] >= 10, "and it falls silent after the last", "changes=%d" % changes[0])
-	feed.say("bat_shop")
-	feed.clear()
-	_check(feed.current().is_empty(), "clear drops the line up and the queue")
-	feed.free()
+	_drop(r)
+
+
+## Step the radio to the end of whatever it is doing.
+func _until_quiet(radio: Radio) -> void:
+	for i in 400:
+		if not radio.is_busy():
+			return
+		radio.advance(0.5)
+
+
+## A frame's worth of the radio: past its opening squelch into the first line, then the presenter reads it.
+func _listen(r: Rig) -> void:
+	r.presenter.radio.advance(1.0)
+	_feed(r)
 
 
 func _test_map_view() -> void:
@@ -172,9 +186,10 @@ func _test_map_view() -> void:
 func _test_mission_start_on_screen() -> void:
 	var r := _rig()
 	var h := r.presenter.hud
+	_listen(r)
 	_check(h.objective_label.text == "Drive to the 24-hour shop at the gas station" and h.objective_label.visible, "the objective line shows the first step", h.objective_label.text)
 	_check(h.card_kicker.text == "MISSION 1" and h.card_title.text == "BATTERIES", "a title card opens the mission", "%s / %s" % [h.card_kicker.text, h.card_title.text])
-	_check(r.presenter.feed.current()["id"] == "bat_call_1" and h.subtitle_panel.visible and h.speaker_label.text == "VERA" and h.subtitle_label.text.replace("\n", " ").begins_with("Red car on the avenue."), "Vera's call is subtitled with her name", h.subtitle_label.text)
+	_check(r.presenter.radio.current_subtitle()["id"] == "bat_call_1" and h.subtitle_panel.visible and h.speaker_label.text == "VERA" and h.subtitle_label.text.replace("\n", " ").begins_with("Red car on the avenue."), "Vera's call is subtitled with her name", h.subtitle_label.text)
 	var blips: Array = h.radar.blips
 	_check(blips.size() == 1 and blips[0]["kind"] == "objective" and blips[0]["place"] == "shop", "the shop is the radar's amber blip")
 	_check(r.presenter.markers.shown() == 1, "and has a marker in the world")
@@ -211,11 +226,15 @@ func _test_hold_and_timer() -> void:
 
 func _test_subtitles_setting() -> void:
 	var r := _rig()
+	_listen(r)
 	_check(r.presenter.hud.subtitle_panel.visible, "subtitles are on by default")
 	var kept := Settings.subtitles
 	Settings.subtitles = false
-	r.presenter.hud.set_subtitle(r.presenter.feed.current())
-	_check(not r.presenter.hud.subtitle_panel.visible, "and the setting hides them")
+	_feed(r)
+	_check(not r.presenter.hud.subtitle_panel.visible, "the Subtitles setting hides them at once, mid-line")
+	Settings.subtitles = true
+	_feed(r)
+	_check(r.presenter.hud.subtitle_panel.visible, "and shows them again")
 	Settings.subtitles = kept
 	_drop(r)
 
@@ -241,18 +260,21 @@ func _test_fail_menu_retry_from_checkpoint() -> void:
 	var fm := r.presenter.fail_menu
 	_check(fm.is_open and get_tree().paused and fm.reason_label.text == "The car was wrecked.", "then MISSION FAILED, with the reason, and the world stops")
 	_check(fm.rows.size() == 3 and fm.rows[0].text == "Retry from checkpoint" and fm.rows[1].text == "Restart mission" and fm.rows[2].text == "Quit to menu", "offering retry from the checkpoint, restart and quit")
+	_check(r.presenter.radio.process_mode == Node.PROCESS_MODE_ALWAYS, "the radio keeps running under the fail menu, for the wreck's call")
 	var after: Array = []
-	for i in 60:
-		r.presenter.feed._process(1.0)
-		var id: String = r.presenter.feed.current().get("id", "")
+	for i in 80:
+		r.presenter.radio.advance(1.0)
+		var id: String = r.presenter.radio.current_subtitle().get("id", "")
 		if id != "" and (after.is_empty() or after.back() != id):
 			after.append(id)
-	_check(after.find("wrecked") >= 0 and after.find("wrecked") <= 1, "Vera's call goes next on the radio, ahead of the mission's other lines", str(after))
+	_check(after.back() == "wrecked" and after.size() <= 2, "the failed mission drops the calls still waiting: only Vera's wreck call plays after the line speaking", str(after))
 	fm.rows[0].activated.emit()
 	_check(not fm.is_open and not get_tree().paused and resets == 1, "retry closes the menu, starts the world again and resets the views")
+	_check(r.presenter.radio.process_mode == Node.PROCESS_MODE_PAUSABLE, "and the radio pauses with the world again")
 	_check(r.game.phase == GameSim.Phase.PLAYING and r.game.hull >= 60.0 and r.game.car.body.position.distance_to(StoryData.place_pos("shop")) < 1.0, "the car is back at the checkpoint with at least 60 hull", "hull=%.0f" % r.game.hull)
 	_feed(r)
 	_check(r.presenter.hud.objective_label.text.begins_with("Take the box to the hotel"), "on the step after it", r.presenter.hud.objective_label.text)
+	_check(r.presenter.radio.current_subtitle().is_empty() and r.presenter.radio.queued_ids().is_empty(), "and the radio is cleared: no old call plays after the retry")
 	_drop(r)
 
 

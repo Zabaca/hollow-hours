@@ -8,8 +8,9 @@ extends Node
 ## main.gd gives it each event (`on_event`) and each frame (`update`), stops stepping while the fail menu
 ## or the map holds the scene tree paused, and resets its own views on `world_reset`.
 ##
-## Subtitles come through a line feed (see LineFeed for the three members): by default a LineFeed that
-## shows each line for its reading time; a Radio that plays the audio plugs in as `feed`.
+## The radio (Radio) takes every "line" event, plays it and says what to subtitle; the HUD shows
+## `radio.current_subtitle()` every frame. A retry or restart clears it, and a failed mission drops the
+## ordinary lines still waiting, so no stale call plays after a retry.
 
 signal quit_to_menu
 signal world_reset  # a retry, restart or revert moved the car: reset the camera, the creature views, the effects
@@ -24,7 +25,7 @@ var hud: StoryHud
 var fail_menu: FailMenu
 var map_screen: MapScreen
 var markers: MarkerView
-var feed: Node
+var radio: Radio
 var save_path := SaveStore.SAVE_PATH
 var has_checkpoint := false
 var fail_text := ""
@@ -34,8 +35,7 @@ var _end_in := -1.0
 var _blips_key := ""
 
 
-## `line_feed` is the Radio when there is one; otherwise a LineFeed is made.
-func setup(g: GameSim, line_feed: Node = null, with_hud: bool = true) -> void:
+func setup(g: GameSim, with_hud: bool = true) -> void:
 	game = g
 	hud = StoryHud.new()
 	add_child(hud)
@@ -49,10 +49,8 @@ func setup(g: GameSim, line_feed: Node = null, with_hud: bool = true) -> void:
 	fail_menu.quit_to_menu.connect(_on_quit)
 	map_screen = MapScreen.new()
 	add_child(map_screen)
-	feed = line_feed if line_feed != null else LineFeed.new()
-	if feed.get_parent() == null:
-		add_child(feed)
-	feed.changed.connect(_on_feed_changed)
+	radio = Radio.new()
+	add_child(radio)
 
 
 ## True while something the presenter shows holds the world still: no pause menu on top of it.
@@ -73,7 +71,7 @@ func on_event(e: Dictionary) -> void:
 			_fail_in = -1.0
 			hud.show_card("Mission %d" % int(e["number"]), String(e["title"]))
 		"line":
-			feed.say(String(e["id"]), bool(e.get("priority", false)))
+			radio.on_event(e)
 		"checkpoint":
 			has_checkpoint = true
 			hud.notice("Checkpoint")
@@ -82,6 +80,7 @@ func on_event(e: Dictionary) -> void:
 		"mission_complete":
 			hud.show_card("Mission complete", String(e["title"]))
 		"mission_failed":
+			radio.drop_ordinary()
 			fail_text = String(e["text"])
 			_fail_in = FAIL_DELAY_WRECKED if e["reason"] == "wrecked" else FAIL_DELAY
 		"save":
@@ -90,7 +89,7 @@ func on_event(e: Dictionary) -> void:
 			_revert_in = REVERT_DELAY
 			hud.show_card("", "Wrecked", "Back to where you last saved", 1.6)
 		"retry", "roam":
-			feed.clear()
+			radio.clear()
 			hud.hide_card()
 		"story_complete":
 			_end_in = ENDING_SECONDS
@@ -107,6 +106,7 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 	if not o.is_empty():
 		text = _objective_text(o)
 	hud.set_objective(text)
+	hud.set_subtitle(radio.current_subtitle())
 	hud.set_hold(m.hold_progress())
 	hud.set_timers(m.timers_left())
 	var blips := m.blips()
@@ -120,6 +120,8 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 	if _fail_in >= 0.0:
 		_fail_in -= delta
 		if _fail_in < 0.0:
+			# The wreck's call plays on under the menu; it is the one thing that does.
+			radio.process_mode = Node.PROCESS_MODE_ALWAYS
 			fail_menu.open(fail_text, has_checkpoint)
 	if _revert_in >= 0.0:
 		_revert_in -= delta
@@ -141,10 +143,6 @@ func _objective_text(o: Dictionary) -> String:
 	return text
 
 
-func _on_feed_changed() -> void:
-	hud.set_subtitle(feed.current())
-
-
 # ----------------------------------------------------------------------------- the menus' choices
 
 func _on_retry() -> void:
@@ -158,6 +156,7 @@ func _on_restart() -> void:
 
 
 func _on_quit() -> void:
+	radio.process_mode = Node.PROCESS_MODE_PAUSABLE
 	quit_to_menu.emit()
 
 
@@ -169,7 +168,7 @@ func restart_mission() -> void:
 func _after_reset() -> void:
 	_fail_in = -1.0
 	_revert_in = -1.0
-	feed.clear()
+	radio.process_mode = Node.PROCESS_MODE_PAUSABLE
 	hud.hide_card()
 	world_reset.emit()
 

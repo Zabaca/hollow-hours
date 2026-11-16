@@ -30,6 +30,9 @@ var shot_taken := false
 var started_ms := 0
 var route_i := 0
 var stuck_t := 0.0
+var path_t := 0.0
+var path_goal := Vector2.ZERO
+var nav_path := PackedVector2Array()
 var reverse_t := 0.0
 var reverse_turn := 1.0
 var threat := 0.0
@@ -122,13 +125,27 @@ func _autopilot(delta: float) -> Dictionary:
 	if car.body.position.distance_to(target) < 9.0:
 		route_i = (route_i + 1) % DEMO_ROUTE.size()
 		target = DEMO_ROUTE[route_i]
-	var want := (target - car.body.position).angle()
+	# Follow the nav grid round buildings; go straight when the way is clear.
+	var aim := target
+	if not game.world.line_clear(car.body.position, target, 1.6):
+		path_t -= delta
+		if path_t <= 0.0 or path_goal != target:
+			path_t = 0.4
+			path_goal = target
+			nav_path = game.nav.path(car.body.position, target)
+		for p in nav_path:
+			if p.distance_to(car.body.position) > 7.0 and game.world.line_clear(car.body.position, p, 1.2):
+				aim = p
+				break
+	var want := (aim - car.body.position).angle()
 	var err := angle_difference(car.body.angle, want)
 	var throttle := 0.7 if absf(err) < 0.5 else 0.4
 	return {"throttle": throttle, "turn": clampf(err * 2.4, -1.0, 1.0), "handbrake": false, "boost": false}
 
 
 func _poll_actions() -> void:
+	if demo:
+		return
 	if Input.is_action_just_pressed("restart"):
 		_restart()
 	if Input.is_action_just_pressed("pause"):

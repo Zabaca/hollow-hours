@@ -49,9 +49,9 @@ func _lights() -> void:
 		s.spot_angle = 30.0
 		s.spot_angle_attenuation = 0.75
 		s.spot_attenuation = 0.8
-		s.light_energy = 14.0
+		s.light_energy = 34.0
 		s.light_color = Color(1.0, 0.95, 0.82)
-		s.light_volumetric_fog_energy = 3.5
+		s.light_volumetric_fog_energy = 2.2
 		s.light_specular = 1.2
 		s.shadow_enabled = true
 		s.shadow_bias = 0.04
@@ -69,6 +69,14 @@ func _lights() -> void:
 	tail.light_volumetric_fog_energy = 1.5
 	tail.position = Vector3(-2.15, 0.85, 0.0)
 	model.add_child(tail)
+	# A faint cold fill from above the cabin so whatever clings to the car can be seen.
+	var fill := OmniLight3D.new()
+	fill.light_color = Color(0.6, 0.7, 1.0)
+	fill.light_energy = 1.1
+	fill.omni_range = 6.0
+	fill.light_volumetric_fog_energy = 0.0
+	fill.position = Vector3(0.0, 3.0, 0.0)
+	model.add_child(fill)
 	reverse = OmniLight3D.new()
 	reverse.light_color = Color(1.0, 1.0, 1.0)
 	reverse.light_energy = 0.0
@@ -187,8 +195,8 @@ func sync(game: GameSim, world: SimWorld, pos: Vector2, angle: float, delta: flo
 	var flick := 1.0
 	if game.sputter > 0.0:
 		flick = 0.35 if int(Time.get_ticks_msec() / 60) % 2 == 0 else 1.0
-	head_l.light_energy = 14.0 * flick
-	head_r.light_energy = 14.0 * flick
+	head_l.light_energy = 34.0 * flick
+	head_r.light_energy = 34.0 * flick
 
 	# Spray off the tyres once moving; marks when the rear tyres slide.
 	var ratio := clampf((speed - 5.0) / 20.0, 0.0, 1.0)

@@ -45,7 +45,7 @@ func _make_environment() -> void:
 		"background_mode": Environment.BG_SKY,
 		"sky": sky,
 		"ambient_light_source": Environment.AMBIENT_SOURCE_SKY,
-		"ambient_light_energy": 0.9,
+		"ambient_light_energy": 1.5,
 		"reflected_light_source": Environment.REFLECTION_SOURCE_SKY,
 		"tonemap_mode": Environment.TONE_MAPPER_ACES,
 		"tonemap_exposure": 1.0,
@@ -57,7 +57,7 @@ func _make_environment() -> void:
 		"volumetric_fog_enabled": true,
 		"volumetric_fog_density": 0.032,
 		"volumetric_fog_albedo": Color(0.72, 0.8, 0.88),
-		"volumetric_fog_emission": Color(0.012, 0.016, 0.026),
+		"volumetric_fog_emission": Color(0.03, 0.04, 0.065),
 		"volumetric_fog_emission_energy": 1.0,
 		"volumetric_fog_anisotropy": 0.55,
 		"volumetric_fog_length": 95.0,
@@ -95,7 +95,7 @@ func _make_environment() -> void:
 func _make_lights() -> void:
 	# A faint cold moon through the cloud: just enough to give the buildings an edge.
 	moon.light_color = Color(0.45, 0.55, 0.8)
-	moon.light_energy = 0.12
+	moon.light_energy = 0.3
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 90.0
 	moon.rotation_degrees = Vector3(-52, 35, 0)
@@ -108,7 +108,7 @@ func _make_lights() -> void:
 
 
 func _make_rain() -> void:
-	rain.amount = 2800
+	rain.amount = 5500
 	rain.lifetime = 1.1
 	rain.preprocess = 1.2
 	rain.local_coords = false
@@ -129,7 +129,7 @@ func _make_rain() -> void:
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.albedo_color = Color(0.75, 0.82, 0.95, 0.3)
+	m.albedo_color = Color(0.75, 0.82, 0.95, 0.42)
 	q.material = m
 	rain.draw_pass_1 = q
 	add_child(rain)
@@ -151,14 +151,14 @@ func _make_rain() -> void:
 	ct.curve = curve
 	sp.scale_curve = ct
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.8, 0.88, 1.0, 0.5))
+	grad.set_color(0, Color(0.8, 0.88, 1.0, 0.3))
 	grad.set_color(1, Color(0.8, 0.88, 1.0, 0.0))
 	var gt := GradientTexture1D.new()
 	gt.gradient = grad
 	sp.color_ramp = gt
 	splash.process_material = sp
 	var sq := QuadMesh.new()
-	sq.size = Vector2(0.42, 0.42)
+	sq.size = Vector2(0.2, 0.2)
 	sq.orientation = PlaneMesh.FACE_Y
 	var sm := StandardMaterial3D.new()
 	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -191,10 +191,10 @@ func set_dawn(a: float) -> void:
 	sky_mat.sky_energy_multiplier = lerpf(0.7, 1.4, dawn_amount)
 	env.fog_light_color = NIGHT_FOG.lerp(DAWN_FOG, dawn_amount)
 	env.set("volumetric_fog_density", lerpf(0.032, 0.02, dawn_amount))
-	env.set("volumetric_fog_emission", Color(0.012, 0.016, 0.026).lerp(Color(0.3, 0.26, 0.24), dawn_amount))
-	moon.light_energy = lerpf(0.12, 0.7, dawn_amount)
+	env.set("volumetric_fog_emission", Color(0.03, 0.04, 0.065).lerp(Color(0.3, 0.26, 0.24), dawn_amount))
+	moon.light_energy = lerpf(0.3, 0.9, dawn_amount)
 	moon.light_color = Color(0.45, 0.55, 0.8).lerp(Color(1.0, 0.82, 0.65), dawn_amount)
-	env.set("ambient_light_energy", lerpf(0.9, 1.8, dawn_amount))
+	env.set("ambient_light_energy", lerpf(1.5, 2.2, dawn_amount))
 
 
 func _process(delta: float) -> void:

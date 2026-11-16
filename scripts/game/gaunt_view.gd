@@ -22,6 +22,7 @@ func setup(g: GauntSim) -> void:
 	sim = g
 	var scene: PackedScene = load("res://assets/models/gaunt.glb")
 	model = scene.instantiate()
+	model.scale = Vector3.ONE * 1.3
 	add_child(model)
 	var players := model.find_children("*", "AnimationPlayer", true, false)
 	if players.size() > 0:

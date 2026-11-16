@@ -46,7 +46,7 @@ func _ground_material(kind: String) -> ShaderMaterial:
 	m.shader = GROUND_SHADER
 	m.set_shader_parameter("noise_tex", noise_tex)
 	if kind == "asphalt":
-		m.set_shader_parameter("base_color", Color(0.06, 0.065, 0.075))
+		m.set_shader_parameter("base_color", Color(0.085, 0.09, 0.1))
 		m.set_shader_parameter("puddle_amount", 0.62)
 		m.set_shader_parameter("base_rough", 0.5)
 	else:
@@ -78,6 +78,9 @@ func _restyle(node: Node) -> void:
 						if mname.begins_with(k):
 							keep = true
 					var sm := (m as StandardMaterial3D).duplicate() as StandardMaterial3D
+					if mname.begins_with("lit_"):
+						# Lit windows were blowing out into white slabs under bloom.
+						sm.emission_energy_multiplier *= 0.45
 					if not keep:
 						# Rain on everything: shinier, and glass that actually reflects.
 						sm.roughness = clampf(sm.roughness * 0.72, 0.04, 1.0)
@@ -114,7 +117,7 @@ func _add_lights() -> void:
 			o.position = pos
 			add_child(o)
 			node = o
-			energy *= 0.32
+			energy *= 0.6
 		node.light_color = col
 		node.light_energy = energy
 		node.light_volumetric_fog_energy = float(l["fog"])

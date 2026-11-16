@@ -14,3 +14,10 @@ Nits:
 
 Nits:
 - Unverified: if Godot's Windows rename isn't atomic, fall back to reading save.json.tmp.
+
+## From the followups-1 review (merged)
+
+Nits:
+- story_data.gd's spawn note says hunters stay at least `clear` from the car, but _make's jitter makes the real guarantee about clear minus 1.7 m. The `clear` key is also unused by any mission.
+- The final step's two priority lines (end_vera, end_ruck) must keep their order in the radio queue: priority lines go ahead of normal ones but stay in order among themselves. Check this when the radio queue lands.
+- _spawn_hunting now draws one rng value per creature, so seeded replays of the pharmacy spawn changed. Nothing pins them.

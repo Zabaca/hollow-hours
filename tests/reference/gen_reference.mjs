@@ -1,15 +1,19 @@
 // Writes tests/car_reference.json: scripted-input runs of Roadkill's own car.js, body.js and
 // world.js collision code, which tests/car_test.gd replays against the GDScript port.
 //
-//   bun tests/reference/gen_reference.mjs [path/to/roadkill/game]
+//   bun tests/reference/gen_reference.mjs path/to/roadkill/game
 //
-// The default path is James's checkout. The JSON is committed, so this only needs re-running
+// The path is Roadkill's game folder (its car.js, body.js, world.js). The JSON is committed, so this only needs re-running
 // when Roadkill's handling changes. Nothing in the games repo is modified.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const GAME = resolve(process.argv[2] ?? '/Users/uptown/Projects/zabaca/games/games/roadkill/game')
+if (!process.argv[2]) {
+  console.error('usage: bun tests/reference/gen_reference.mjs path/to/roadkill/game')
+  process.exit(2)
+}
+const GAME = resolve(process.argv[2])
 const here = dirname(fileURLToPath(import.meta.url))
 const load = (f) => import(pathToFileURL(join(GAME, f)).href)
 

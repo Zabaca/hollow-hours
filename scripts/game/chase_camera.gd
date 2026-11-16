@@ -27,7 +27,10 @@ func update_camera(delta: float, car_pos: Vector2, car_angle: float, car_vel: Ve
 	time += delta
 	var speed := car_vel.length()
 	var want := car_angle
-	if speed > 6.0:
+	# Lean toward the direction of travel to show a slide, but only while going forward: after a
+	# crash the car recoils backwards, and following that velocity swung the view 47 degrees round
+	# and back (measured) for what the player sees as a lurch.
+	if speed > 6.0 and car_vel.dot(Vector2.from_angle(car_angle)) > 0.5 * speed:
 		want = lerp_angle(car_angle, car_vel.angle(), 0.45)
 	if not inited:
 		yaw = want
@@ -41,7 +44,7 @@ func update_camera(delta: float, car_pos: Vector2, car_angle: float, car_vel: Ve
 	cam_pos = _pull_in(GM.to3(car_pos, ground + 1.8), cam_pos, delta)
 	look_at_from_position(cam_pos, focus, Vector3.UP)
 
-	trauma = maxf(0.0, trauma - delta * 0.9)
+	trauma = maxf(0.0, trauma - delta * 1.5)
 	fov_punch = maxf(0.0, fov_punch - delta * 14.0)
 	var shake := trauma * trauma
 	if shake > 0.0001:

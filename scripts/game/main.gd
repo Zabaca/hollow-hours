@@ -29,6 +29,8 @@ var shot_at := 6.0
 var shot_game := -1.0
 var shot_speed := -1.0
 var audio_log := false
+var cam_log := false
+var crash_us := 0
 var tick_started_us := 0
 var tick_no := 0
 var debug_start := PackedFloat64Array()
@@ -57,6 +59,8 @@ func _ready() -> void:
 			Settings.apply_preset(false)
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
+		elif a == "--cam-log":
+			cam_log = true
 		elif a == "--audio-log":
 			audio_log = true
 		elif a.begins_with("--start="):
@@ -234,6 +238,10 @@ func _process(delta: float) -> void:
 	car_view.sync(game, game.world, pos, ang, delta)
 	cam.update_camera(delta, pos, ang, car.body.velocity, car_view.ground, car.boosting)
 	_sync_creatures(delta)
+	if cam_log and crash_us != 0 and Time.get_ticks_usec() - crash_us < 1800000:
+		print("CAMLOG t=%4d ms tick=%d dt=%.4f ts=%.2f speed=%.1f vel_deg=%4.0f car_deg=%4.0f cam_yaw_deg=%4.0f trauma=%.2f fov=%.1f" % [
+			(Time.get_ticks_usec() - crash_us) / 1000, tick_no, delta, Engine.time_scale, car.speed(), rad_to_deg(car.body.velocity.angle()),
+			rad_to_deg(car.body.angle), rad_to_deg(cam.yaw), cam.trauma, cam.fov])
 
 	var latched := game.pack.latched().size()
 	var near := game.pack.nearest_hunter(car)
@@ -293,13 +301,15 @@ func _on_event(e: Dictionary) -> void:
 	match e["type"]:
 		"crash":
 			var impact: float = e["impact"]
+			if cam_log and crash_us == 0:
+				crash_us = Time.get_ticks_usec()
+				print("CAMLOG crash impact=%.1f tick=%d frame=%d" % [impact, tick_no, Engine.get_frames_drawn()])
 			if audio_log:
 				_log_crash(impact)
 			var at: Vector3 = GM.to3(e["point"], 0.7)
 			fx.spark_burst(at, clampf(impact / 18.0, 0.3, 1.0))
-			cam.add_trauma(clampf(impact / 22.0, 0.25, 1.0))
-			if impact > 8.0:
-				fx.hit_stop(clampf(0.02 + impact * 0.0025, 0.03, 0.07), 0.06)
+			# No hit-stop on a crash: it read as a freeze followed by a burst of movement.
+			cam.add_trauma(clampf(impact / 40.0, 0.12, 0.5))
 			fx.kick_chroma(clampf(impact / 25.0, 0.1, 0.8))
 			if impact > 12.0:
 				audio.play("crash-heavy", 0.0, audio.rng.randf_range(0.9, 1.05), "Car", 0.15)
@@ -316,7 +326,7 @@ func _on_event(e: Dictionary) -> void:
 		"hull":
 			fx.wash_red(clampf(float(e["amount"]) * 0.025, 0.0, 0.4))
 		"latch":
-			fx.hit_stop(0.09, 0.03)
+			fx.hit_stop(0.05, 0.1)
 			cam.add_trauma(0.9)
 			cam.punch_fov(12.0)
 			fx.wash_red(0.6)
@@ -331,14 +341,13 @@ func _on_event(e: Dictionary) -> void:
 			audio.play("metal_scrape", -14.0, audio.rng.randf_range(1.1, 1.4), "SFX", 0.35)
 		"thrown":
 			cam.add_trauma(0.3)
-			fx.hit_stop(0.035, 0.08)
 			audio.play_at("creature_thrown", _p3(e), 2.0, audio.rng.randf_range(0.9, 1.1), 90.0)
 			audio.play("slam", -6.0, 1.0, "SFX", 0.2)
 		"bounce":
 			cam.add_trauma(0.3)
 			audio.play_at("creature_screech_3", _p3(e), 0.0, 1.0, 90.0)
 		"roadkill":
-			fx.hit_stop(0.07, 0.05)
+			fx.hit_stop(0.04, 0.1)
 			cam.add_trauma(0.4)
 			fx.kick_chroma(0.35)
 			fx.spark_burst(GM.to3(e["point"], 0.6), 0.4)

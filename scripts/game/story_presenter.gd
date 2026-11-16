@@ -39,7 +39,7 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 	game = g
 	hud = StoryHud.new()
 	add_child(hud)
-	hud.root.visible = with_hud
+	hud.show_hud(with_hud)
 	markers = MarkerView.new()
 	add_child(markers)
 	fail_menu = FailMenu.new()

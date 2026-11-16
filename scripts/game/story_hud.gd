@@ -21,6 +21,8 @@ var card_kicker: Label
 var card_title: Label
 var card_rule: ColorRect
 var card_sub: Label
+## Subtitles sit on a layer above the menus, so the wreck call stays readable under the fail menu.
+var subtitle_layer := CanvasLayer.new()
 var subtitle_panel := PanelContainer.new()
 var speaker_label := Label.new()
 var subtitle_label := Label.new()
@@ -49,6 +51,12 @@ func _ready() -> void:
 	radar.offset_top = -36.0 - RADAR_SIZE
 	radar.offset_bottom = -36.0
 	root.add_child(radar)
+
+
+## Show or hide the whole HUD (the --no-hud flag).
+func show_hud(on: bool) -> void:
+	root.visible = on
+	subtitle_layer.visible = on
 
 
 func _text(l: Label, px: int, color: Color, weight: int, tracking: int) -> void:
@@ -183,7 +191,10 @@ func _build_subtitles() -> void:
 	col.add_child(speaker_label)
 	_text(subtitle_label, 26, MenuStyle.BONE, 500, 1)
 	col.add_child(subtitle_label)
-	root.add_child(subtitle_panel)
+	subtitle_layer.layer = 23
+	subtitle_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(subtitle_layer)
+	subtitle_layer.add_child(subtitle_panel)
 	subtitle_panel.visible = false
 
 

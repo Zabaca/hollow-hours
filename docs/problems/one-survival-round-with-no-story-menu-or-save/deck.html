@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hollow Hours is one five-minute survival round</title>
+<!-- Source of every number:
+  The repository at commit 4d962e7, read Nov 16, 2026: the round is 300 seconds (the night clock), R restarts, Esc or P shows "PAUSED", nothing is written to disk; the pack starts at three Gaunts and grows to five; the quarter's arena is 140 by 108 m; the car's flat-out speed is engine force over four times rolling resistance, 9750 / 320, about 30 m/s (110 km/h); car_test and pack_test run headless.
+  The owner's decisions of Nov 16, 2026, relayed by the lead session: missions, radio calls, a title screen, three missions, saving between missions; a few hundred to about 2,000 ElevenLabs credits; about 2,300 credits used so far.
+  Option 01: 21 lines (Vera 11, Teo 5, Ruck 5), 1,361 characters counted with their cue words; about one credit per character (the owner's other voiced work, not checked on this plan); four effects aimed under 400 credits (1,360 + 400 = 1,760 aimed); a 2,000-credit cap; slices of 3 to 4, 4 to 6, 4 to 6, 3 to 4, 2 to 3 and 2 to 3 agent hours, 18 to 26 in all; the owner's time about 10 + 5 + 5 minutes and a 30-minute play.
+  Option 02: about 25 minutes of night, an 8-minute floor on Continue, 19 to 27 agent hours, 22 lines.
+  Zabaca's gemini-image tool's README: $0.067 an image at 1K (Nano Banana 2), $0.134 (Nano Banana Pro); three drafts and one Pro final come to $0.335. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1f2328; --ink-deep: #2b3038; --ink-2: #3a414b; --muted: #77808c; --line: #e3e6ea; --wash: #f4f5f7;
+    --accent: #2f6fde; --accent-strong: #2459b8; --accent-light: #6b9bf0; --accent-wash: #eaf1fd;
+    --display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-snap-type: y mandatory; background: var(--ink); }
+  body { margin: 0; font-family: var(--sans); color: var(--ink); counter-reset: slide; }
+
+  .slide {
+    counter-increment: slide;
+    scroll-snap-align: center;
+    position: relative;
+    width: min(100vw, 177.78vh);
+    aspect-ratio: 16 / 9;
+    margin: 0 auto;
+    background: #fff;
+    padding: 5.5% 6% 9%;
+    display: flex; flex-direction: column;
+    font-size: clamp(11px, 1.45vw, 26px);
+    overflow: hidden;
+  }
+  .slide + .slide { margin-top: 2px; }
+  .kicker { font: 600 0.8em/1 var(--sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 1.1em; }
+  h1, h2 { font-family: var(--display); font-weight: 800; letter-spacing: -0.02em; text-wrap: balance; margin: 0; color: var(--ink); }
+  h2 { font-size: 2.35em; line-height: 1.08; max-width: 32ch; }
+  .body { margin-top: 1.6em; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 1.2em; }
+  p, li { line-height: 1.45; margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.82em; }
+  .foot {
+    position: absolute; left: 6%; right: 6%; bottom: 4%;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    font-size: 0.7em; color: var(--muted);
+  }
+  .foot::after { content: counter(slide); font-variant-numeric: tabular-nums; }
+  .mark { display: flex; flex-direction: column; gap: 0.25em; line-height: 1; }
+  .mark b { font: 800 1.15em/1 var(--display); letter-spacing: -0.02em; color: var(--ink); }
+  .mark span { font-size: 0.75em; font-weight: 500; letter-spacing: 0.18em; color: var(--accent); }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5em; }
+  .stat { border-top: 0.2em solid var(--ink); padding-top: 0.8em; }
+  .stat b { display: block; font: 800 3.4em/1 var(--display); letter-spacing: -0.03em; }
+  .stat b em { font-style: normal; color: var(--accent); }
+  .stat p { margin-top: 0.5em; }
+
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 0.45em 0.8em 0.45em 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.78em; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  td.n, th.n { text-align: right; }
+  tr.hl td { background: var(--accent-wash); font-weight: 600; }
+  table.dense { font-size: 0.86em; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3em; align-items: start; }
+  .cols.three { grid-template-columns: repeat(3, 1fr); gap: 1.4em; }
+  .card { background: var(--wash); border-radius: 0.5em; padding: 1.1em 1.3em; }
+  .card h3 { font: 700 1.05em/1.2 var(--display); margin: 0 0 0.5em; }
+  .card.us { background: var(--accent-wash); }
+
+  ol.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.7em; counter-reset: step; }
+  ol.steps li { counter-increment: step; display: grid; grid-template-columns: 2.2em 1fr max-content; gap: 0.8em; align-items: baseline; }
+  ol.steps li::before { content: counter(step); font: 800 1.2em/1 var(--display); color: var(--accent); }
+  ol.steps .when { color: var(--muted); font-size: 0.85em; font-variant-numeric: tabular-nums; }
+  ul.tight { padding-left: 1.1em; margin: 0; display: grid; gap: 0.45em; }
+
+  .cover { background: var(--ink); color: #fff; padding: 0; flex-direction: row; }
+  .cover .text { flex: 1.1; padding: 6% 5% 9% 6%; display: flex; flex-direction: column; justify-content: center; }
+  .cover h1 { color: #fff; font-size: 2.9em; line-height: 1.05; }
+  .cover .kicker { color: var(--accent-light); }
+  .cover p { color: var(--line); margin-top: 1.4em; font-size: 1.05em; }
+  .cover .foot { right: auto; width: 42%; color: var(--muted); }
+  .cover .foot::after { content: none; }
+  .cover .mark b { color: #fff; }
+  .end { background: var(--ink); color: #fff; justify-content: center; }
+  .end h2 { color: #fff; font-size: 2.8em; }
+  .end .kicker { color: var(--accent-light); }
+  .end p { color: var(--line); }
+  .end .foot .mark b { color: #fff; }
+
+  @media (max-width: 760px) {
+    html { scroll-snap-type: none; }
+    .slide { width: 100%; aspect-ratio: auto; min-height: 100svh; font-size: 15px; padding: 2.2em 1.25em 4.5em; }
+    h2 { font-size: 1.9em; }
+    .stats, .cols, .cols.three { grid-template-columns: 1fr; gap: 1.2em; max-width: none; }
+    .cover { flex-direction: column-reverse; padding: 0; }
+    .cover h1 { font-size: 2.1em; }
+    .end h2 { font-size: 1.9em; overflow-wrap: anywhere; }
+    .cover .text { padding: 2em 1.25em 5em; }
+    .cover .foot { width: auto; right: 1.25em; }
+    .foot { left: 1.25em; right: 1.25em; bottom: 1.4em; }
+    ol.steps li { grid-template-columns: 1.8em 1fr; }
+    ol.steps .when { grid-column: 2; }
+    .wrap-x { overflow-x: auto; }
+  }
+
+  @page { size: 13.333in 7.5in; margin: 0; }
+  @media print {
+    html { background: #fff; }
+    .slide { width: 13.333in; height: 7.5in; aspect-ratio: auto; font-size: 19px; margin: 0; break-after: page; }
+    .slide + .slide { margin-top: 0; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+
+<body>
+
+<section class="slide cover">
+  <div class="text">
+    <div class="kicker">Problem &middot; Hollow Hours &middot; November 2026</div>
+    <h1>Hollow Hours is one five-minute survival round, with no story, menu or save</h1>
+    <p>Two ways to make it the story you asked for: three radio-told missions, a title screen and saving. They differ only in whether a clock runs over the whole story.</p>
+    <div class="foot"><div class="mark"><b>Zabaca</b><span>PLAN FOR THE OWNER</span></div><div>Nov 16, 2026</div></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">What it costs today</div>
+  <h2>A player gets five minutes of the same round and no reason to come back</h2>
+  <div class="body">
+    <div class="stats">
+      <div class="stat"><b>5:00</b><p>the whole game: one countdown to first light, then R to go again</p></div>
+      <div class="stat"><b><em>None</em></b><p>of a title, settings screen, map, story or save</p></div>
+      <div class="stat"><b>Built</b><p>the car, city, pack and sound, with the car and pack tested headless</p></div>
+    </div>
+    <p class="muted small">Read in the game's code on Nov 16, 2026. The built parts are what the story stands on.</p>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">What you decided</div>
+  <h2>You set the shape: missions told by radio, a title screen, and saving between missions</h2>
+  <div class="body">
+    <ul class="tight">
+      <li><b>Missions instead of survival.</b> One at a time, marked on the map and screen, free roam between, the creatures always out, the story ending in an escape.</li>
+      <li><b>Radio calls</b> with ElevenLabs voices and subtitles, within a few hundred to about 2,000 credits.</li>
+      <li><b>This round:</b> a title screen and menu, three missions, saving between missions.</li>
+      <li><b>The title:</b> New Game, Continue, Settings, Quit, over scary painted key art with scary sound; pause offers Resume, Settings, Quit to menu.</li>
+      <li><b>All original:</b> our own Gaunt, car and city; nothing from any other game or film.</li>
+    </ul>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">The story</div>
+  <h2>Three voices on a radio tell the story; you never speak, and they call you Red</h2>
+  <div class="body">
+    <p>The quarter was walled off three nights ago when the Gaunts came up out of the drains. You were left inside, with a red muscle car and a radio.</p>
+    <div class="cols three">
+      <div class="card"><h3>Vera</h3><p>A night dispatcher stranded on the hotel roof. Dry, steady, kind. Runs the first two missions.</p></div>
+      <div class="card"><h3>Teo</h3><p>A pharmacist barricaded in the pharmacy tower. Young and scared.</p></div>
+      <div class="card"><h3>Ruck</h3><p>An officer at the cordon outside. Offers the way out, and says the quarter burns at first light.</p></div>
+    </div>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">The missions</div>
+  <h2>A delivery, a rescue, then the escape through the west gate</h2>
+  <div class="body">
+    <div class="wrap-x"><table class="dense">
+      <tr><th>Mission</th><th>What you do</th><th>Fails when</th><th>How the pack presses</th></tr>
+      <tr><td><b>1 Batteries</b></td><td>Load a box at the gas station shop, bring it to the hotel</td><td>Wrecked</td><td>Loading sets off an alarm that calls them in</td></tr>
+      <tr><td><b>2 The Pharmacist</b></td><td>Run down two at the pharmacy, take Teo in, bring him to the hotel</td><td>Wrecked, or 2:00 passes before Teo is in</td><td>Two more waiting at the door</td></tr>
+      <tr><td><b>3 West Gate</b></td><td>Pick up Vera and Teo, live 60 seconds, reach the gate within 20</td><td>Wrecked, or the gate closes</td><td>Six, all hunting, for the last minute</td></tr>
+    </table></div>
+    <p class="muted small">Every stop is a hold of 3 to 4 seconds, and a stopped car is what they hunt. Each mission is aimed at two to four minutes; the numbers are first guesses.</p>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">How it plays</div>
+  <h2>Between missions the city stays open and hunted; each finished mission is saved</h2>
+  <div class="body">
+    <ol class="steps">
+      <li><span><b>Free roam.</b> The next mission's start glows on the radar, the map and in the street.</span></li>
+      <li><span><b>Start.</b> Drive into it: a radio call, a title card, the first objective.</span></li>
+      <li><span><b>Steps.</b> Reach, hold still, run down, stay alive, beat a timer; calls play as you drive.</span></li>
+      <li><span><b>Checkpoint.</b> After each pickup. A failure offers Retry from checkpoint, Restart or Quit.</span></li>
+      <li><span><b>Done.</b> "MISSION COMPLETE", a closing call naming the next start, an automatic save.</span></li>
+    </ol>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">All the options</div>
+  <h2>Two options; the only difference is whether a clock runs over the whole story</h2>
+  <div class="body">
+    <div class="wrap-x"><table class="dense">
+      <tr><th></th><th>1. Dawn only at the end</th><th>2. One night on a clock</th></tr>
+      <tr><td><b>The night</b></td><td>No clock; the sky lightens each mission; first light as you drive out</td><td>About 25 minutes on screen for the whole story; at zero the quarter burns</td></tr>
+      <tr><td><b>Free roam</b></td><td>Free</td><td>Costs night</td></tr>
+      <tr><td><b>A failed mission</b></td><td>Costs that mission</td><td>Costs that mission and the night it took</td></tr>
+      <tr><td><b>Agent hours</b></td><td>18 to 26</td><td>19 to 27</td></tr>
+      <tr><td><b>Voice</b></td><td>21 lines, about 1,360 characters</td><td>22 lines, about 1,390</td></tr>
+    </table></div>
+    <p class="muted small">Both have the same missions, menus, key art, voices and saving. Today's round stays playable in either.</p>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Recommendation</div>
+  <h2>Recommended: option 1, because a story-wide clock works against the free roam you asked for</h2>
+  <div class="body">
+    <ul class="tight">
+      <li><b>Free roam stays free.</b> With a clock, every minute of roaming is a minute less night, so players stop roaming.</li>
+      <li><b>Failures do not stack.</b> A hard mission retried a few times cannot leave too little night for the next.</li>
+      <li><b>Dawn still means the end:</b> first light comes as you drive out through the gate.</li>
+      <li><b>The dread stays</b> where it counts: the stops, the shutter timer, the last minute before the gate.</li>
+    </ul>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Title and menus</div>
+  <h2>The title opens on the painted key art with rain, thunder, the tension music and a distant screech</h2>
+  <div class="body">
+    <div class="cols three">
+      <div class="card"><h3>Title</h3><p>New Game, Continue (shows the next mission), Settings, Credits, Quit. Keyboard, gamepad and mouse.</p></div>
+      <div class="card"><h3>Settings</h3><p>Six volumes (with a Voice one), graphics High or Low, fullscreen, subtitles, the controls list. Kept between sessions.</p></div>
+      <div class="card"><h3>Pause</h3><p>Resume, Map, Settings, Restart mission, Quit to menu.</p></div>
+    </div>
+    <p class="muted small">Also: a radar and a full map with the places named, markers in the street, mission cards, and the old round as "Survive the Night" if you keep it.</p>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Key art</div>
+  <h2>The key art repaints a render of our own car and Gaunts, so nothing in it is anyone else's</h2>
+  <div class="body">
+    <div class="cols">
+      <ol class="steps">
+        <li><span>Render our Bruiser and three Gaunts on the wet avenue in Blender.</span></li>
+        <li><span>Repaint it as an oil painting with Google's Nano Banana 2, three drafts.</span></li>
+        <li><span>You pick one; it fills the title behind the menu.</span></li>
+      </ol>
+      <div class="card us"><h3>About $0.34, capped at $3</h3><p>Three drafts at $0.067 and one final at $0.134. It uses the Gemini key already on your Mac; whether its billing is on is unchecked until the first call.</p></div>
+    </div>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Voices</div>
+  <h2>21 radio lines, about 1,360 characters, inside a 2,000-credit cap</h2>
+  <div class="body">
+    <div class="stats">
+      <div class="stat"><b>21</b><p>lines: Vera 11, Teo 5, Ruck 5</p></div>
+      <div class="stat"><b>~1,360</b><p>credits for the voices, at about one per character</p></div>
+      <div class="stat"><b>&lt;400</b><p>credits aimed for four effects: radio squelch in and out, the gate's klaxon and rolling leaves</p></div>
+    </div>
+    <p class="muted small">The title reuses the tension music, so no new music is bought. One credit per character is the rate your other voiced work measured, not checked on this plan; the generator logs credits and stops at the cap.</p>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">The order</div>
+  <h2>Six slices, menu first, about 18 to 26 agent hours</h2>
+  <div class="body">
+    <ol class="steps">
+      <li><span><b>Title and menus</b>, with today's round behind New Game for now</span><span class="when">3 to 4 h</span></li>
+      <li><span><b>Missions in the simulation</b>, tested headless; can run beside slice 1</span><span class="when">4 to 6 h</span></li>
+      <li><span><b>Missions on screen</b>: objective, radar, map, markers, cards, saving</span><span class="when">4 to 6 h</span></li>
+      <li><span><b>The west gate and the ending</b>, with the city's wall opened</span><span class="when">3 to 4 h</span></li>
+      <li><span><b>Voices</b>, after your yes on the script and budget</span><span class="when">2 to 3 h</span></li>
+      <li><span><b>Key art</b>, after your yes on the spend</span><span class="when">2 to 3 h</span></li>
+    </ol>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Cost and risk</div>
+  <h2>The spend is small; what nobody has checked yet is how it feels to play</h2>
+  <div class="body">
+    <div class="cols">
+      <div class="card"><h3>Cost</h3><ul class="tight">
+        <li>About $0.34 of images, capped at $3</li>
+        <li>About 1,760 ElevenLabs credits aimed, capped at 2,000</li>
+        <li>18 to 26 agent hours, review included</li>
+      </ul></div>
+      <div class="card"><h3>Not yet verified</h3><ul class="tight">
+        <li>Difficulty: every number is a guess until your hand play</li>
+        <li>The Gemini key's billing, and the voice rate per character</li>
+        <li>The city rebuild changing only the gate</li>
+        <li>Short game windows will flash up on your Mac during screenshots</li>
+      </ul></div>
+    </div>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Yours to decide</div>
+  <h2>Five answers from you; slices 1 to 4 wait only on the first</h2>
+  <div class="body">
+    <div class="wrap-x"><table class="dense">
+      <tr><th>Question</th><th>Recommended</th><th>Waits on it</th></tr>
+      <tr><td>Which option?</td><td>Option 1</td><td>Every slice</td></tr>
+      <tr><td>Spend up to $3 on key art with the Gemini key on your Mac?</td><td>Yes</td><td>Slice 6</td></tr>
+      <tr><td>Spend up to 2,000 ElevenLabs credits?</td><td>Yes</td><td>Slice 5</td></tr>
+      <tr><td>Is the story right as written: names, the burning at first light, the 21 lines?</td><td>Yes; a changed line later costs only its own characters</td><td>Slice 5</td></tr>
+      <tr><td>Keep today's round as "Survive the Night"?</td><td>Yes, shown after the story is finished</td><td>Nothing</td></tr>
+    </table></div>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide end">
+  <div class="kicker">Next step</div>
+  <h2>Next, your pick of option; then slices 1 and 2 go to builders together</h2>
+  <p style="margin-top:1.4em">Your time across the round: about 20 minutes of answers, a key-art pick and a listen to the voices, then a 30-minute play after slice 4 to tune it.</p>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  addEventListener("keydown", (e) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, " ": 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1 }[e.key];
+    if (!step || matchMedia("(max-width: 760px)").matches) return;
+    e.preventDefault();
+    const mid = innerHeight / 2;
+    const now = slides.findIndex((s) => { const r = s.getBoundingClientRect(); return r.top <= mid && r.bottom >= mid; });
+    slides[Math.max(0, Math.min(slides.length - 1, now + step))].scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 problem: one-survival-round-with-no-story-menu-or-save
 title: Three radio-told missions on a mission layer inside the simulation, no clock until the escape at first light, a title screen over painted key art made from our own render, saved between missions
 summary: A title screen (New Game, Continue, Settings, Credits, Quit) over a painted key-art image made by repainting a Blender render of our own Bruiser and Gaunts. A short story told in 21 voiced radio lines from three people (Vera on the hotel roof, Teo in the pharmacy, Ruck at the cordon) carries three missions in order, Batteries (a delivery), The Pharmacist (a rescue) and West Gate (the escape), with free roam between them and the pack always out. The five-minute clock goes: the night lightens a little each mission and first light comes only as you drive out through the west gate. Missions are a state machine inside the headless simulation, tested like the pack. A radar and a full map mark the objective. The game saves between missions, with checkpoints inside them. Six slices, about 18 to 26 agent hours including review, about 1,360 characters of voice (a 2,000-credit cap) and under $3 of image generation.
-status: proposed
+status: accepted
 ---
 
 ## Solution

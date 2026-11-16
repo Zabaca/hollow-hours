@@ -50,7 +50,7 @@ func _ready() -> void:
 	speed_label.offset_right = -36
 	speed_label.offset_bottom = -44
 	speed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_label(unit_label, 14, MenuStyle.DIM, 600, 8)
+	_label(unit_label, 14, Color(MenuStyle.BONE, 0.72), 600, 8)
 	unit_label.text = "KM/H"
 	unit_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	unit_label.offset_left = -240
@@ -59,7 +59,7 @@ func _ready() -> void:
 	unit_label.offset_bottom = -28
 	unit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
-	_label(kills_label, 14, MenuStyle.DIM, 600, 7)
+	_label(kills_label, 14, Color(MenuStyle.BONE, 0.72), 600, 7)
 	kills_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	kills_label.offset_left = -340
 	kills_label.offset_top = -26
@@ -83,7 +83,7 @@ func _ready() -> void:
 	hull_fill.color = HULL_COLOR
 	boost_fill.color = BOOST_COLOR
 	var hl := hull_label
-	_label(hl, 13, MenuStyle.DIM, 600, 7)
+	_label(hl, 14, Color(MenuStyle.BONE, 0.72), 600, 7)
 	hl.text = "HULL"
 	hl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	hl.offset_left = 36
@@ -92,7 +92,7 @@ func _ready() -> void:
 	hl.offset_bottom = -66
 	root.add_child(hl)
 	var bl := boost_label
-	_label(bl, 13, MenuStyle.DIM, 600, 7)
+	_label(bl, 14, Color(MenuStyle.BONE, 0.72), 600, 7)
 	bl.text = "BOOST"
 	bl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	bl.offset_left = 36

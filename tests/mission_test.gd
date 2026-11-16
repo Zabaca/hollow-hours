@@ -1,0 +1,728 @@
+extends Node
+## Headless behaviour checks for the story: the three missions, their fail states, checkpoints,
+## the save and the pack's story hooks, all through the seam pack_test uses (step GameSim, read
+## its events), plus the autopilot playing the whole story start to finish.
+##
+##   godot --headless --path . res://tests/mission_test.tscn
+##
+## Fixed seeds, no window. Tests that are not about the pack switch its director off and clear it,
+## so nothing but what the story places hunts the car.
+
+const DT := 1.0 / 120.0
+const IDLE := {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false}
+const DIR := "user://mission_test"
+
+var failures := 0
+
+
+func _ready() -> void:
+	DirAccess.make_dir_recursive_absolute(DIR)
+	_clean()
+	_test_script()
+	_test_places()
+	_test_new_game()
+	_test_hold()
+	_test_alarm()
+	_test_run_down_count()
+	_test_wreck_fails_each_mission()
+	_test_shutter()
+	_test_gate_timer()
+	_test_retry_from_checkpoint()
+	_test_retry_before_checkpoint()
+	_test_restart_mission()
+	_test_complete_and_save()
+	_test_missions_in_order()
+	_test_continue_and_revert()
+	_test_save_file()
+	_test_settings_file()
+	_test_gate_trigger()
+	_test_open_gate_gap()
+	_test_no_dawn_clock()
+	_test_pack_hooks()
+	_test_whole_story_driven()
+	_clean()
+	print("")
+	print("mission_test: %d failed" % failures)
+	get_tree().quit(1 if failures > 0 else 0)
+
+
+func _check(ok: bool, name: String, detail: String = "") -> void:
+	print(("PASS " if ok else "FAIL "), name, ("  " + detail) if detail != "" else "")
+	if not ok:
+		failures += 1
+
+
+func _clean() -> void:
+	var d := DirAccess.open(DIR)
+	if d == null:
+		return
+	for f in d.get_files():
+		d.remove(f)
+
+
+# ----------------------------------------------------------------------------- helpers
+
+
+## A story sim with nothing hunting: the director off and the pack cleared.
+func _quiet(sim: GameSim) -> GameSim:
+	sim.pack.director_on = false
+	sim.pack.gaunts.clear()
+	return sim
+
+
+func _story(seed_in: int = 7) -> GameSim:
+	return _quiet(GameSim.new(CityLayout.DATA, "bruiser", seed_in, true))
+
+
+func _save_at(next_id: String) -> Dictionary:
+	var done: Array = []
+	for m in StoryData.MISSIONS:
+		if m["id"] == next_id:
+			break
+		done.append(m["id"])
+	return {
+		"version": SaveStore.VERSION, "saved_at": 0, "next": next_id, "done": done, "ending_seen": false,
+		"totals": {"kills": 0, "wrecks": 0, "seconds": 0.0},
+	}
+
+
+## Continue at the given mission (as a player who has finished the ones before it).
+func _continued(next_id: String, seed_in: int = 7) -> GameSim:
+	var sim := GameSim.new(CityLayout.DATA, "bruiser", seed_in, true)
+	sim.continue_story(_save_at(next_id))
+	return _quiet(sim)
+
+
+func _at(sim: GameSim, place: String, angle: float = 0.0) -> void:
+	sim.place_car(StoryData.place_pos(place), angle, sim.hull)
+
+
+## Step `seconds` with the given controls; every event that came out, in order.
+func _run(sim: GameSim, seconds: float, controls: Dictionary = IDLE) -> Array:
+	var out: Array = []
+	for i in int(round(seconds / DT)):
+		sim.step(DT, controls)
+		out.append_array(sim.take_events())
+	return out
+
+
+func _of(events: Array, type: String) -> Array:
+	return events.filter(func(e): return e["type"] == type)
+
+
+func _has(events: Array, type: String) -> bool:
+	return not _of(events, type).is_empty()
+
+
+func _lines(events: Array) -> Array:
+	return _of(events, "line").map(func(e): return e["id"])
+
+
+## Mission 1 up to just after the box is loaded (the checkpoint), by placing the car and waiting.
+func _load_box(sim: GameSim) -> Array:
+	var out: Array = []
+	_at(sim, "shop")
+	out.append_array(_run(sim, 0.1))
+	out.append_array(_run(sim, 4.2))
+	return out
+
+
+## Mission 3 (continued) up to the checkpoint at the hotel; returns the events.
+func _pick_up_both(sim: GameSim) -> Array:
+	var out: Array = []
+	_at(sim, "shop")
+	out.append_array(_run(sim, 0.1))
+	_at(sim, "hotel")
+	out.append_array(_run(sim, 4.2))
+	return out
+
+
+# ----------------------------------------------------------------------------- the script and the places
+
+
+func _test_script() -> void:
+	var n := 0
+	var chars := 0
+	var bad_cue := 0
+	for id in StoryData.LINES:
+		n += 1
+		chars += String(StoryData.LINES[id]["text"]).length()
+		var sub := StoryData.subtitle(id)
+		if sub.contains("[") or sub.contains("]") or sub == "" or sub != sub.strip_edges():
+			bad_cue += 1
+	_check(n == 21, "the radio script has 21 lines", "lines=%d" % n)
+	_check(chars <= 1500, "the script stays inside the voice generator's 1,500 character limit", "chars with cue words=%d" % chars)
+	_check(bad_cue == 0, "every subtitle is the text without its cue words")
+	var missing: Array = []
+	for id in StoryData.line_ids_used():
+		if not StoryData.LINES.has(id):
+			missing.append(id)
+	_check(missing.is_empty(), "every line the missions name exists", str(missing))
+	var speakers_ok := true
+	for id in StoryData.LINES:
+		if not StoryData.SPEAKERS.has(StoryData.LINES[id]["speaker"]):
+			speakers_ok = false
+	_check(speakers_ok, "every line has one of the three speakers")
+	var unused: Array = []
+	var used := StoryData.line_ids_used()
+	for id in StoryData.LINES:
+		if id not in used:
+			unused.append(id)
+	_check(unused.is_empty(), "every line is used by a mission or a fail reason", str(unused))
+	_check(StoryData.reading_time("wrecked") >= 2.0, "a subtitle is up for at least two seconds")
+
+
+func _test_places() -> void:
+	var sim := _story()
+	var w := sim.world
+	var bad: Array = []
+	var unreachable: Array = []
+	var start: Vector2 = StoryData.place_pos("safe_start")
+	for id in StoryData.PLACES:
+		var pl: Dictionary = StoryData.PLACES[id]
+		if not pl["marker"]:
+			continue
+		var p: Vector2 = pl["pos"]
+		if p.x < w.arena["left"] or p.x > w.arena["right"] or p.y < w.arena["bottom"] or p.y > w.arena["top"]:
+			bad.append(id + ": outside the arena")
+		# Clear of every building, wreck and post by the car's length (its widest reach).
+		var clearance := 2.3 + (0.0 if id == "west_gate" else 0.0)
+		for b in w.boxes:
+			var dx := maxf(maxf(b["x0"] - p.x, 0.0), p.x - b["x1"])
+			var dy := maxf(maxf(b["y0"] - p.y, 0.0), p.y - b["y1"])
+			if Vector2(dx, dy).length() < clearance:
+				bad.append("%s: %.1f m from a %s" % [id, Vector2(dx, dy).length(), b["kind"]])
+		for q in w.posts:
+			if p.distance_to(Vector2(q["x"], q["y"])) - q["r"] < clearance:
+				bad.append("%s: too near a %s" % [id, q["kind"]])
+		var path := sim.nav.path(start, p)
+		if path.is_empty():
+			unreachable.append(id)
+	_check(bad.is_empty(), "every place is in the arena and clear of buildings, wrecks and posts", str(bad))
+	_check(unreachable.is_empty(), "every place is reachable on the path grid from the safe start", str(unreachable))
+	var apart := true
+	for id in ["hut", "shop"]:
+		if start.distance_to(StoryData.place_pos(id)) <= StoryData.place_radius(id):
+			apart = false
+	_check(apart, "the safe start is outside every mission start marker")
+	_check(w.gate["pos"].is_equal_approx(StoryData.place_pos("west_gate")), "the sim's gate is where the story's West Gate is", str(w.gate["pos"]))
+
+
+# ----------------------------------------------------------------------------- starting, holding, counting
+
+
+func _test_new_game() -> void:
+	var sim := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
+	var e := sim.take_events()
+	var started := _of(e, "mission_started")
+	var obj := _of(e, "objective")
+	_check(started.size() == 1 and started[0]["number"] == 1 and started[0]["title"] == "BATTERIES", "a new story starts mission 1")
+	_check(obj.size() == 1 and obj[0]["kind"] == "reach" and obj[0]["place"] == "shop" and String(obj[0]["text"]) != "", "its first objective is to reach the shop", str(obj))
+	_check(_lines(e) == ["bat_call_1", "bat_call_2"], "its first two lines are Vera's call", str(_lines(e)))
+	_check(sim.mission.objective_text() == obj[0]["text"] and sim.hull == GameSim.MAX_HULL, "the objective reads back and the hull is full")
+	var blip: Array = sim.mission.blips()
+	_check(blip.size() == 1 and blip[0]["kind"] == "objective" and blip[0]["place"] == "shop", "the shop is the objective's blip")
+
+
+func _test_hold() -> void:
+	var sim := _story()
+	sim.take_events()
+	_at(sim, "shop")
+	var e := _run(sim, 0.1)
+	_check(_lines(e) == ["bat_shop"] and sim.mission.hold_progress() >= 0.0, "reaching the shop starts the hold and plays its line", str(_lines(e)))
+	var filling := _of(e, "hold")
+	e = _run(sim, 2.0)
+	var p1: float = sim.mission.hold_progress()
+	_check(absf(p1 - 0.5) < 0.05, "the hold fills while the car is inside the marker and still", "progress=%.3f" % p1)
+	_check(filling.size() == 1 and filling[0]["state"] == "filling", "and reports it filling", str(filling))
+	# Out of the marker: it pauses rather than resetting.
+	sim.place_car(Vector2(46.0, -20.0), 0.0, sim.hull)
+	e = _run(sim, 1.5)
+	_check(absf(sim.mission.hold_progress() - p1) < 0.002, "the hold pauses outside the marker", "progress=%.3f" % sim.mission.hold_progress())
+	_check(_of(e, "hold").size() >= 1 and _of(e, "hold")[0]["state"] == "paused", "and reports it paused")
+	# Inside but moving: still paused.
+	_at(sim, "shop")
+	sim.car.body.velocity = Vector2(8.0, 0.0)
+	_run(sim, 0.05)
+	_check(absf(sim.mission.hold_progress() - p1) < 0.002, "the hold does not fill while the car is moving", "progress=%.3f" % sim.mission.hold_progress())
+	# Still and inside: it picks up where it left off and finishes in the rest of the four seconds.
+	_at(sim, "shop")
+	e = _run(sim, 1.6)
+	_check(not _has(e, "checkpoint"), "it has not finished before four seconds are held")
+	e = _run(sim, 0.7)
+	var cp := _of(e, "checkpoint")
+	_check(cp.size() == 1 and "bat_loaded" in _lines(e), "four seconds held loads the box: a checkpoint and Vera's line", str(_lines(e)))
+	_check(sim.mission.objective_text().contains("hotel"), "and the next objective is the hotel", sim.mission.objective_text())
+
+
+func _test_alarm() -> void:
+	var sim := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
+	sim.take_events()
+	var before := sim.pack.alive_count()
+	_at(sim, "shop")
+	var e := _run(sim, 0.1)
+	var alarm_early := "bat_alarm" in _lines(e)
+	e = _run(sim, 1.5)
+	_check(not alarm_early and "bat_alarm" in _lines(e), "the shop's alarm sounds once the loading has begun")
+	e.append_array(_run(sim, 2.0))
+	_check(before == 3 and sim.pack.alive_count() == 4, "and a fourth Gaunt joins the three", "before=%d after=%d" % [before, sim.pack.alive_count()])
+
+
+func _kill_one(sim: GameSim) -> Array:
+	# A stunned creature in the car's path, run over at speed (the pack test's recipe).
+	sim.place_car(Vector2(-30.0, -2.5), 0.0, sim.hull)
+	sim.car.body.velocity = Vector2(20.0, 0.0)
+	var g := GauntSim.new()
+	g.id = 500 + sim.pack.next_id
+	sim.pack.next_id += 1
+	g.state = GauntSim.State.DOWN
+	g.stun = 30.0
+	g.pos = Vector2(-22.0, -2.5)
+	sim.pack.gaunts.append(g)
+	return _run(sim, 0.8, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
+
+
+func _test_run_down_count() -> void:
+	var sim := _continued("pharmacist")
+	sim.take_events()
+	# A creature run down before the step begins does not count towards it.
+	_at(sim, "hut", PI / 2.0)
+	var e := _run(sim, 0.1)
+	_check(_lines(e) == ["ph_call_1", "ph_call_2"], "mission 2 starts at the park hut with Teo's call and Vera's", str(_lines(e)))
+	_kill_one(sim)
+	var kills_before := sim.kills
+	sim.pack.gaunts.clear()
+	_at(sim, "pharmacy")
+	e = _run(sim, 0.1)
+	var o: Dictionary = sim.mission.objective()
+	_check(kills_before == 1 and o["kind"] == "kill" and o["remaining"] == 2, "the run-down step counts from its own start", "objective=%s" % str(o))
+	_check("ph_door" in _lines(e), "Teo's shutter line plays")
+	var hunters := 0
+	var near := true
+	for g in sim.pack.gaunts:
+		if g.attacking() and g.alert:
+			hunters += 1
+		if g.pos.distance_to(StoryData.place_pos("pharmacy")) > 12.0:
+			near = false
+	_check(hunters == 2 and sim.pack.gaunts.size() == 2 and near, "two Gaunts are placed at the pharmacy, already hunting", "hunters=%d total=%d" % [hunters, sim.pack.gaunts.size()])
+	sim.pack.gaunts.clear()
+	_kill_one(sim)
+	_check(sim.mission.objective()["remaining"] == 1, "one run down leaves one to go")
+	e = _kill_one(sim)
+	_check(sim.mission.objective()["kind"] == "hold" and sim.mission.objective_text().contains("Teo"), "two run down ends the step", sim.mission.objective_text())
+	_check("ph_cleared" in _lines(e), "and Teo says to stop by the door", str(_lines(e)))
+
+
+# ----------------------------------------------------------------------------- failing
+
+
+func _test_wreck_fails_each_mission() -> void:
+	for id in ["batteries", "pharmacist", "west_gate"]:
+		var sim := _story() if id == "batteries" else _continued(id)
+		sim.take_events()
+		if id != "batteries":
+			_at(sim, StoryData.MISSIONS[StoryData.mission_index(id)]["start"])
+			_run(sim, 0.1)
+		sim.damage(1000.0, "test")
+		var e := _run(sim, 0.1)
+		var failed := _of(e, "mission_failed")
+		_check(failed.size() == 1 and failed[0]["reason"] == "wrecked" and failed[0]["id"] == id, "a wreck fails %s with its reason" % id, str(failed))
+		_check("wrecked" in _lines(e) and _of(e, "line").back()["priority"], "and Vera's call jumps the queue")
+		_check(sim.mission.objective().is_empty() and sim.mission.state == MissionSim.State.FAILED, "the objective is gone while it waits for a retry")
+
+
+func _test_shutter() -> void:
+	var sim := _continued("pharmacist")
+	sim.take_events()
+	_at(sim, "hut", PI / 2.0)
+	_run(sim, 0.1)
+	var t: Array = sim.mission.timers_left()
+	_check(t.size() == 1 and t[0]["id"] == "shutter" and absf(t[0]["left"] - 120.0) < 0.5, "the shutter timer starts at the call, at two minutes", str(t))
+	var e := _run(sim, 59.0)
+	_check(absf(sim.mission.timers_left()[0]["left"] - 60.9) < 1.0, "it counts down in simulated time", str(sim.mission.timers_left()))
+	e.append_array(_run(sim, 59.0))
+	_check(not _has(e, "mission_failed"), "the mission holds at 1:58")
+	e = _run(sim, 3.0)
+	var failed := _of(e, "mission_failed")
+	_check(failed.size() == 1 and failed[0]["reason"] == "shutter" and "ph_failed" in _lines(e), "the shutter gives way at 2:00 and Teo screams", str(failed))
+	_check(sim.phase == GameSim.Phase.PLAYING, "a timed-out mission does not wreck the car")
+
+
+func _test_gate_timer() -> void:
+	var sim := _continued("west_gate")
+	sim.take_events()
+	_at(sim, "shop", -PI / 2.0)
+	var e := _run(sim, 0.1)
+	_check(_lines(e) == ["gate_call_1", "gate_call_2"], "mission 3 starts at the gas station with Ruck's call and Vera's", str(_lines(e)))
+	e = _pick_up_both(sim)
+	_check(_has(e, "checkpoint") and "gate_aboard" in _lines(e), "Vera and Teo aboard is a checkpoint and Ruck's warning", str(_lines(e)))
+	_check(sim.mission.objective()["kind"] == "survive", "then sixty seconds of staying alive")
+	e = _run(sim, 59.0)
+	_check(not _has(e, "gate_open") and not sim.world.gate["open"], "the gate stays shut for sixty seconds")
+	e = _run(sim, 2.0)
+	_check(_has(e, "gate_open") and "gate_open" in _lines(e) and sim.world.gate["open"], "then it opens, with Ruck's line")
+	_check(sim.mission.objective()["kind"] == "gate" and sim.mission.timers_left()[0]["id"] == "gate", "and the objective is the gate, on a timer")
+	e = _run(sim, 18.0)
+	_check(not _has(e, "mission_failed"), "the car has twenty seconds")
+	e = _run(sim, 2.5)
+	var failed := _of(e, "mission_failed")
+	_check(failed.size() == 1 and failed[0]["reason"] == "gate" and "gate_failed" in _lines(e) and _has(e, "gate_closed"), "the gate closes on a car that is too late", str(failed))
+	_check(not sim.world.gate["open"], "the gate is shut again")
+
+
+func _test_retry_from_checkpoint() -> void:
+	var sim := _continued("west_gate")
+	sim.take_events()
+	_at(sim, "shop", -PI / 2.0)
+	_run(sim, 0.1)
+	_at(sim, "hotel", PI / 2.0)
+	sim.damage(70.0, "test")  # hull 30 when the checkpoint is taken
+	_run(sim, 4.2)
+	var cp_pos: Vector2 = sim.car.body.position
+	var cp_hull := sim.hull
+	_run(sim, 5.0)
+	sim.damage(1000.0, "test")
+	_run(sim, 0.1)
+	_check(sim.phase == GameSim.Phase.WRECKED and sim.mission.state == MissionSim.State.FAILED, "wrecked after the checkpoint")
+	sim.retry_mission()
+	var e := sim.take_events()
+	_check(sim.phase == GameSim.Phase.PLAYING and sim.hull >= 60.0 and cp_hull < 60.0, "retry brings the car back with at least 60 hull", "hull=%.0f (was %.0f at the checkpoint)" % [sim.hull, cp_hull])
+	_check(sim.car.body.position.distance_to(cp_pos) < 0.5 and sim.car.speed() < 0.1, "at the checkpoint's place, at rest", "at %s, checkpoint %s" % [str(sim.car.body.position), str(cp_pos)])
+	_check(sim.mission.objective()["kind"] == "survive" and not sim.mission.timers_left().size() > 0, "on the step after the checkpoint")
+	var retry := _of(e, "retry")
+	_check(retry.size() == 1 and retry[0]["to"] == "checkpoint", "and says so", str(retry))
+	var far := true
+	var alerted := true
+	for g in sim.pack.gaunts:
+		if g.pos.distance_to(sim.car.body.position) < 40.0:
+			far = false
+		if not g.alert:
+			alerted = false
+	_check(sim.pack.gaunts.size() == 6 and far and alerted, "with a fresh pack of six, alerted, away from the car", "n=%d far=%s alerted=%s" % [sim.pack.gaunts.size(), far, alerted])
+	# And the mission carries on from there: sixty seconds, then the gate.
+	sim.pack.gaunts.clear()  # the six would have the idle car; the point is the mission's course
+	e = _run(sim, 61.0)
+	_check(_has(e, "gate_open"), "the retried run plays on to the gate opening")
+
+
+func _test_retry_before_checkpoint() -> void:
+	var sim := _story()
+	sim.take_events()
+	_at(sim, "shop")
+	_run(sim, 0.5)
+	sim.damage(1000.0, "test")
+	_run(sim, 0.1)
+	sim.retry_mission()
+	var e := sim.take_events()
+	var ps: Dictionary = sim.world.player_start
+	_check(_has(e, "mission_started") and sim.mission.objective()["place"] == "shop" and sim.mission.objective()["kind"] == "reach", "before the first checkpoint a retry restarts the mission", str(_of(e, "retry")))
+	_check(sim.car.body.position.distance_to(Vector2(ps["x"], ps["y"])) < 0.5 and sim.hull == GameSim.MAX_HULL, "at the safe start with a full hull")
+
+
+func _test_restart_mission() -> void:
+	var sim := _continued("pharmacist")
+	sim.take_events()
+	_at(sim, "hut", PI / 2.0)
+	_run(sim, 30.0)
+	_at(sim, "pharmacy")
+	_run(sim, 0.1)
+	_check(sim.mission.objective()["kind"] == "kill", "mid-mission, on the run-down step")
+	sim.damage(40.0, "test")
+	sim.restart_mission()
+	var e := sim.take_events()
+	var hut: Vector2 = StoryData.place_pos("hut")
+	_check(_has(e, "mission_started") and sim.mission.objective()["kind"] == "reach" and sim.mission.objective()["place"] == "pharmacy", "restart starts the mission over", str(_lines(e)))
+	_check(sim.car.body.position.distance_to(hut) < 0.5 and sim.hull == GameSim.MAX_HULL, "the car at the mission's start with a full hull")
+	_check(absf(sim.mission.timers_left()[0]["left"] - 120.0) < 0.5, "and the shutter timer back at two minutes")
+
+
+# ----------------------------------------------------------------------------- completing, saving, order
+
+
+func _test_complete_and_save() -> void:
+	var sim := _story()
+	sim.take_events()
+	var e := _load_box(sim)
+	_at(sim, "hotel", PI / 2.0)
+	e.append_array(_run(sim, 3.3))
+	var done := _of(e, "mission_complete")
+	_check(done.size() == 1 and done[0]["id"] == "batteries" and not done[0]["final"] and "bat_done" in _lines(e), "delivering the box completes Batteries, with Vera's closing call", str(done))
+	var saves := _of(e, "save")
+	_check(saves.size() == 1 and saves[0]["data"]["next"] == "pharmacist" and saves[0]["data"]["done"] == ["batteries"], "and asks for a save naming the next mission", str(saves))
+	_check(sim.mission.state == MissionSim.State.ROAM and sim.mission.blips().size() == 1 and sim.mission.blips()[0]["kind"] == "start" and sim.mission.blips()[0]["place"] == "hut", "back in free roam with the park hut lit as a start")
+	var path := DIR + "/round_trip.json"
+	var wrote := SaveStore.write_save(saves[0]["data"], path)
+	var back := SaveStore.load_save(path)
+	_check(wrote and not back.is_empty() and back["next"] == "pharmacist" and back["done"] == ["batteries"] and back["version"] == SaveStore.VERSION, "the save written to a file reads back to the same next mission", str(back))
+	_check(not FileAccess.file_exists(path + ".tmp"), "no temporary file is left behind")
+	var sim2 := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
+	sim2.continue_story(back)
+	var e2 := sim2.take_events()
+	var roam := _of(e2, "roam")
+	_check(roam.size() == 1 and roam[0]["next"] == "pharmacist" and sim2.mission.blips()[0]["place"] == "hut", "Continue from it lights mission 2's start")
+
+
+func _test_missions_in_order() -> void:
+	var sim := _story()
+	sim.take_events()
+	_at(sim, "hut", PI / 2.0)
+	var e := _run(sim, 1.0)
+	_check(not _has(e, "mission_started") and sim.mission.objective()["place"] == "shop", "mission 2 cannot start before mission 1 is done")
+	var sim2 := _continued("west_gate")
+	sim2.take_events()
+	_at(sim2, "hut", PI / 2.0)
+	e = _run(sim2, 1.0)
+	_check(not _has(e, "mission_started"), "nor can mission 3 start at mission 2's marker")
+	_at(sim2, "shop", -PI / 2.0)
+	e = _run(sim2, 0.2)
+	_check(_of(e, "mission_started").size() == 1 and _of(e, "mission_started")[0]["number"] == 3, "but its own does")
+
+
+func _test_continue_and_revert() -> void:
+	var sim := _story()
+	sim.take_events()
+	_load_box(sim)
+	_at(sim, "hotel", PI / 2.0)
+	_run(sim, 3.3)
+	sim.damage(1000.0, "test")
+	var e := _run(sim, 0.1)
+	_check(_has(e, "roam_wrecked") and sim.phase == GameSim.Phase.WRECKED, "wrecked in free roam is reported")
+	sim.revert_to_save()
+	e = sim.take_events()
+	var safe: Dictionary = StoryData.PLACES["safe_start"]
+	_check(sim.phase == GameSim.Phase.PLAYING and sim.hull == GameSim.MAX_HULL and sim.car.body.position.distance_to(safe["pos"]) < 0.5, "back to the last save: the safe start, a full hull")
+	_check(sim.mission.state == MissionSim.State.ROAM and sim.mission.blips()[0]["place"] == "hut", "with mission 2's start lit", str(_of(e, "roam")))
+	# Before any save there is nothing to go back to but a new game.
+	var fresh := _story()
+	fresh.take_events()
+	fresh.damage(1000.0, "test")
+	_run(fresh, 0.1)
+	fresh.revert_to_save()
+	_check(fresh.mission.state == MissionSim.State.ACTIVE and fresh.mission.objective()["place"] == "shop", "before the first save a wreck means a new game")
+	_check(sim.mission.dawn_amount() > fresh.mission.dawn_amount(), "the sky has lightened a touch since the first mission", "%.2f vs %.2f" % [sim.mission.dawn_amount(), fresh.mission.dawn_amount()])
+
+
+# ----------------------------------------------------------------------------- files
+
+
+func _test_save_file() -> void:
+	var path := DIR + "/damaged.json"
+	_check(SaveStore.load_save(DIR + "/none.json").is_empty(), "a missing save counts as no save")
+	var cases := {
+		"garbage": "not json {",
+		"an array": "[1, 2, 3]",
+		"an unknown version": '{"version": 99, "next": "pharmacist", "done": ["batteries"], "ending_seen": false, "totals": {"kills": 0, "wrecks": 0, "seconds": 0}}',
+		"the wrong next mission": '{"version": 1, "next": "west_gate", "done": ["batteries"], "ending_seen": false, "totals": {"kills": 0, "wrecks": 0, "seconds": 0}}',
+		"missions out of order": '{"version": 1, "next": "west_gate", "done": ["pharmacist"], "ending_seen": false, "totals": {"kills": 0, "wrecks": 0, "seconds": 0}}',
+		"no totals": '{"version": 1, "next": "pharmacist", "done": ["batteries"], "ending_seen": false}',
+	}
+	for name in cases:
+		_clean()
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		f.store_string(cases[name])
+		f.close()
+		var d := SaveStore.load_save(path)
+		var aside := _files_starting(DIR, "damaged.json.bad")
+		_check(d.is_empty() and aside.size() == 1 and not FileAccess.file_exists(path), "a save with %s reads as no save and is kept aside" % name, str(aside))
+		if aside.size() == 1:
+			var kept := FileAccess.open(DIR + "/" + aside[0], FileAccess.READ)
+			_check(kept != null and kept.get_as_text() == cases[name], "and the damaged file is kept as it was")
+	_clean()
+	var ok := _save_at("pharmacist")
+	ok["totals"] = {"kills": 7, "wrecks": 2, "seconds": 311.5}
+	SaveStore.write_save(ok, path)
+	var back := SaveStore.load_save(path)
+	_check(back["totals"]["kills"] == 7 and back["totals"]["seconds"] == 311.5 and back["done"] == ["batteries"], "a good save round trips with its totals")
+	var all := _save_at("")
+	all["done"] = ["batteries", "pharmacist", "west_gate"]
+	all["ending_seen"] = true
+	SaveStore.write_save(all, path)
+	back = SaveStore.load_save(path)
+	_check(not back.is_empty() and back["next"] == "" and back["ending_seen"] == true, "and so does a finished story")
+	# Overwriting an existing save replaces it whole.
+	SaveStore.write_save(ok, path)
+	_check(SaveStore.load_save(path)["next"] == "pharmacist", "a second write replaces the first")
+
+
+func _files_starting(dir: String, prefix: String) -> Array:
+	var out: Array = []
+	var d := DirAccess.open(dir)
+	for f in d.get_files():
+		if f.begins_with(prefix):
+			out.append(f)
+	return out
+
+
+func _test_settings_file() -> void:
+	_clean()
+	var path := DIR + "/settings.json"
+	var defaults := {"master": 1.0, "music": 0.7, "graphics": "high", "fullscreen": false, "subtitles": true, "frame_cap": 60}
+	_check(SaveStore.load_settings(defaults, path) == defaults, "a missing settings file gives the defaults")
+	var changed := {"master": 0.5, "music": 0.2, "graphics": "low", "fullscreen": true, "subtitles": false, "frame_cap": 144}
+	_check(SaveStore.write_settings(changed, path), "settings are written")
+	_check(SaveStore.load_settings(defaults, path) == changed, "and read back as they were written", str(SaveStore.load_settings(defaults, path)))
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string('{"master": "loud", "music": 0.3, "invented": 1, "frame_cap": 120.0}')
+	f.close()
+	var got := SaveStore.load_settings(defaults, path)
+	_check(got["master"] == 1.0 and got["music"] == 0.3 and got["frame_cap"] == 120 and typeof(got["frame_cap"]) == TYPE_INT and not got.has("invented") and got["graphics"] == "high", "a value of the wrong kind or an unknown key is ignored, the rest are kept", str(got))
+	f = FileAccess.open(path, FileAccess.WRITE)
+	f.store_string("{{ broken")
+	f.close()
+	_check(SaveStore.load_settings(defaults, path) == defaults and _files_starting(DIR, "settings.json.bad").size() == 1, "a damaged settings file gives the defaults and is kept aside")
+
+
+# ----------------------------------------------------------------------------- the gate and the night
+
+
+## Mission 3 up to the gate opening, a car ready on the avenue facing the gate.
+func _gate_open_sim() -> GameSim:
+	var sim := _continued("west_gate")
+	sim.take_events()
+	_pick_up_both(sim)
+	_run(sim, 61.0)
+	return sim
+
+
+func _toward_gate(sim: GameSim, seconds: float) -> Array:
+	sim.place_car(Vector2(-45.0, 0.0), PI, GameSim.MAX_HULL)
+	sim.car.body.velocity = Vector2(-15.0, 0.0)
+	return _run(sim, seconds, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
+
+
+func _test_gate_trigger() -> void:
+	var sim := _gate_open_sim()
+	_check(sim.world.gate["open"], "the gate is open")
+	var e := _toward_gate(sim, 3.0)
+	_check(_has(e, "escaped") and sim.phase == GameSim.Phase.ESCAPED, "reaching the gate while it is open is the escape", "phase=%d" % sim.phase)
+	_check(_has(e, "mission_complete") and _of(e, "mission_complete")[0]["final"] and "end_vera" in _lines(e) and "end_ruck" in _lines(e), "the last mission completes with Vera's and Ruck's closing lines", str(_lines(e)))
+	_check(not _has(e, "story_complete"), "the story is not over until the car has rolled out")
+	e = _run(sim, GameSim.ESCAPE_TIME + 0.5)
+	var saves := _of(e, "save")
+	_check(_has(e, "story_complete") and saves.size() == 1 and saves[0]["data"]["ending_seen"] == true and saves[0]["data"]["next"] == "", "the story completes and asks for a final save", str(_of(e, "story_complete")))
+	_check(sim.car.body.position.x < sim.world.arena["left"] - 5.0 and sim.car.speed() < 0.5, "the car has gone out through the wall and come to rest", "x=%.1f v=%.2f" % [sim.car.body.position.x, sim.car.speed()])
+	var fled := true
+	for g in sim.pack.gaunts:
+		if g.alive():
+			fled = false
+	_check(fled, "the survivors flee")
+	# With the gate shut the wall holds, and nothing ends.
+	var shut := _continued("west_gate")
+	shut.take_events()
+	_pick_up_both(shut)
+	e = _toward_gate(shut, 4.0)
+	_check(not _has(e, "escaped") and shut.phase == GameSim.Phase.PLAYING and shut.car.body.position.x >= shut.world.arena["left"], "with the gate shut the wall holds the car", "x=%.1f" % shut.car.body.position.x)
+	_check(_has(e, "crash") and shut.hull < GameSim.MAX_HULL, "and the car pays for it")
+
+
+func _test_open_gate_gap() -> void:
+	# The gap in the wall itself, without the story: open, a car in its width goes through;
+	# a car beside it, or a shut gate, is held.
+	var open := GameSim.new(CityLayout.DATA, "bruiser", 7)
+	open.pack.gaunts.clear()
+	open.pack.director_on = false
+	open.world.gate["open"] = true
+	open.place_car(Vector2(-60.0, 0.0), PI, GameSim.MAX_HULL)
+	open.car.body.velocity = Vector2(-15.0, 0.0)
+	_run(open, 3.0, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
+	_check(open.car.body.position.x < -75.0 and open.hull == GameSim.MAX_HULL, "an open gate lets a car through its gap", "x=%.1f" % open.car.body.position.x)
+	var beside := GameSim.new(CityLayout.DATA, "bruiser", 7)
+	beside.pack.gaunts.clear()
+	beside.pack.director_on = false
+	beside.world.gate["open"] = true
+	beside.place_car(Vector2(-60.0, 20.0), PI, GameSim.MAX_HULL)
+	beside.car.body.velocity = Vector2(-15.0, 0.0)
+	_run(beside, 3.0, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
+	_check(beside.car.body.position.x >= -70.0, "but the wall beside the gap holds", "x=%.1f" % beside.car.body.position.x)
+
+
+func _test_no_dawn_clock() -> void:
+	var sim := _story()
+	sim.take_events()
+	var e := _run(sim, GameSim.NIGHT_LENGTH + 10.0)
+	_check(not _has(e, "dawn") and sim.phase == GameSim.Phase.PLAYING, "story mode has no dawn clock", "time=%.0f phase=%d" % [sim.time, sim.phase])
+	var survival := GameSim.new(CityLayout.DATA, "bruiser", 7)
+	_check(survival.mission == null and not survival.story_mode, "and Survive the Night is the same game without a story")
+
+
+# ----------------------------------------------------------------------------- the pack's story hooks
+
+
+func _lurker(sim: GameSim, p: Vector2) -> GauntSim:
+	var g := GauntSim.new()
+	g.id = sim.pack.next_id
+	sim.pack.next_id += 1
+	g.pos = p
+	g.state = GauntSim.State.LURK
+	sim.pack.gaunts.append(g)
+	return g
+
+
+func _test_pack_hooks() -> void:
+	var sim := GameSim.new(CityLayout.DATA, "bruiser", 7)
+	sim.pack.gaunts.clear()
+	sim.pack.director_on = false
+	var near := _lurker(sim, Vector2(-30.0, 0.0))
+	var far := _lurker(sim, Vector2(30.0, 0.0))
+	var n := sim.pack.alert_near(Vector2(-60.0, 0.0), 50.0)
+	_check(n == 1 and near.alert and near.state == GauntSim.State.STALK and not far.alert and far.state == GauntSim.State.LURK, "an alert reaches only the Gaunts inside its radius", "n=%d" % n)
+	_check(sim.pack.alert_all() == 2 and far.alert, "and alerting all reaches every one")
+	sim.pack.gaunts.clear()
+	var g := sim.pack.place_hunting(Vector2(10.0, 12.0), sim.car)
+	_check(sim.pack.gaunts.size() == 1 and g.state == GauntSim.State.HUNT and g.alert and g.pos.distance_to(Vector2(10.0, 12.0)) < 3.0, "a Gaunt can be placed at a point, already hunting", "state=%d at %s" % [g.state, str(g.pos)])
+	# The pack's size is the story's to set: the director fills up to it and stops.
+	var sized := GameSim.new(CityLayout.DATA, "bruiser", 7)
+	sized.pack.gaunts.clear()
+	sized.pack.set_size(5)
+	for i in int(40.0 / DT):
+		sized.pack.step(DT, sized.car)
+	_check(sized.pack.alive_count() == 5, "the director holds the pack at a size set from outside", "alive=%d" % sized.pack.alive_count())
+	sized.pack.set_size(6)
+	sized.pack.alerted_spawns = true
+	for i in int(10.0 / DT):
+		sized.pack.step(DT, sized.car)
+	var all_alert := true
+	for o in sized.pack.gaunts:
+		if o.alive() and o.state == GauntSim.State.STALK and not o.alert:
+			all_alert = false
+	_check(sized.pack.alive_count() == 6 and all_alert, "a bigger size brings more in, alerted after an alert-all", "alive=%d" % sized.pack.alive_count())
+	var quiet := GameSim.new(CityLayout.DATA, "bruiser", 7)
+	quiet.pack.gaunts.clear()
+	quiet.pack.director_on = false
+	for i in int(20.0 / DT):
+		quiet.pack.step(DT, quiet.car)
+	_check(quiet.pack.alive_count() == 0, "with the director off nothing is spawned")
+
+
+# ----------------------------------------------------------------------------- the whole story, driven
+
+
+func _test_whole_story_driven() -> void:
+	for seed_in in [7, 3]:
+		_drive_story(seed_in)
+
+
+func _drive_story(seed_in: int) -> void:
+	var sim := _story(seed_in)
+	var pilot := Autopilot.new()
+	var log: Array = []
+	var failed := false
+	var complete := false
+	var marks := {}
+	var steps := int(600.0 / DT)
+	for i in steps:
+		sim.step(DT, pilot.controls(sim, DT))
+		for e in sim.take_events():
+			match e["type"]:
+				"mission_complete":
+					log.append(e["id"])
+					marks[e["id"]] = int(sim.time)
+				"mission_failed":
+					failed = true
+					print("  failed: ", e["id"], " ", e["reason"], " at ", int(sim.time))
+				"story_complete":
+					complete = true
+		if complete or failed:
+			break
+	_check(log == ["batteries", "pharmacist", "west_gate"] and complete and not failed, "seed %d: the autopilot drives all three missions to the end with the pack off" % seed_in, "log=%s t=%.0f" % [str(marks), sim.time])
+	_check(sim.time < 600.0, "within ten simulated minutes", "t=%.0f hull=%.0f kills=%d" % [sim.time, sim.hull, sim.kills])

@@ -6,11 +6,6 @@ extends Node3D
 ## graphics preset; `--no-hud` hides the HUD (for key-art frames). Example (with a window, not --headless):
 ##   godot --path . -- --demo --shot=/tmp/hollow.png --shot-at=8
 
-const DEMO_ROUTE := [
-	Vector2(-14, -0.4), Vector2(3, -0.4), Vector2(8, 0.4), Vector2(50, 0.4), Vector2(62, 8), Vector2(62, 42),
-	Vector2(40, 44), Vector2(10, 44), Vector2(5.8, 36), Vector2(5.8, 10), Vector2(2, -0.4), Vector2(-30, -0.4),
-]
-
 var game: GameSim
 var city: City
 var atmos: Atmosphere
@@ -38,14 +33,8 @@ var debug_start := PackedFloat64Array()
 var debug_drive := Vector2(INF, 0.0)  # --drive=throttle,turn: constant controls instead of the autopilot
 var shot_taken := false
 var started_ms := 0
-var route_i := 0
-var stuck_t := 0.0
-var path_t := 0.0
-var path_goal := Vector2.ZERO
-var nav_path := PackedVector2Array()
-var reverse_t := 0.0
-var reverse_turn := 1.0
 var threat := 0.0
+var autopilot := Autopilot.new()
 var ended := false
 
 
@@ -159,51 +148,13 @@ func _controls(delta: float) -> Dictionary:
 	if debug_drive.x != INF:
 		return {"throttle": debug_drive.x, "turn": debug_drive.y, "handbrake": false, "boost": false}
 	if demo:
-		return _autopilot(delta)
+		return autopilot.controls(game, delta)
 	return {
 		"throttle": Input.get_axis("brake", "accelerate"),
 		"turn": Input.get_axis("steer_right", "steer_left"),
 		"handbrake": Input.is_action_pressed("handbrake"),
 		"boost": Input.is_action_pressed("boost"),
 	}
-
-
-## A pure-pursuit driver round the town, for footage and for checking the game without hands.
-func _autopilot(delta: float) -> Dictionary:
-	var car := game.car
-	# Jammed against something: back out for a moment, steering away.
-	if reverse_t > 0.0:
-		reverse_t -= delta
-		return {"throttle": -1.0, "turn": -reverse_turn, "handbrake": false, "boost": false}
-	stuck_t = stuck_t + delta if (car.speed() < 1.0 and game.time > 2.0) else 0.0
-	if stuck_t > 1.2:
-		stuck_t = 0.0
-		reverse_t = 1.3
-		reverse_turn = 1.0 if randf() < 0.5 else -1.0
-	# Something on the car: do what a player would, slide and swerve until it lets go.
-	if game.pack.latched().size() > 0:
-		var flip := 1.0 if int(game.time / 0.7) % 2 == 0 else -1.0
-		return {"throttle": 1.0, "turn": flip, "handbrake": true, "boost": false}
-	var target: Vector2 = DEMO_ROUTE[route_i]
-	if car.body.position.distance_to(target) < 9.0:
-		route_i = (route_i + 1) % DEMO_ROUTE.size()
-		target = DEMO_ROUTE[route_i]
-	# Follow the nav grid round buildings; go straight when the way is clear.
-	var aim := target
-	if not game.world.line_clear(car.body.position, target, 1.6):
-		path_t -= delta
-		if path_t <= 0.0 or path_goal != target:
-			path_t = 0.4
-			path_goal = target
-			nav_path = game.nav.path(car.body.position, target)
-		for p in nav_path:
-			if p.distance_to(car.body.position) > 7.0 and game.world.line_clear(car.body.position, p, 1.2):
-				aim = p
-				break
-	var want := (aim - car.body.position).angle()
-	var err := angle_difference(car.body.angle, want)
-	var throttle := 0.7 if absf(err) < 0.5 else 0.4
-	return {"throttle": throttle, "turn": clampf(err * 2.4, -1.0, 1.0), "handbrake": false, "boost": false}
 
 
 func _poll_actions() -> void:
@@ -238,7 +189,7 @@ func _restart() -> void:
 	prev_pos = game.car.body.position
 	prev_angle = game.car.body.angle
 	ended = false
-	route_i = 0
+	autopilot = Autopilot.new()
 
 
 # ----------------------------------------------------------------------------- the step

@@ -41,6 +41,12 @@ var spawn_timer := 0.0
 var next_id := 1
 var kills := 0
 var side := 1.0
+## The story sets the pack's size (-1 keeps the time ramp of pack_size_for), and a test can switch
+## the director off so nothing is spawned but what is placed by hand.
+var size_override := -1
+var director_on := true
+## True after alert_all(): creatures the director adds from then on come in alerted too.
+var alerted_spawns := false
 
 
 func _init(w: SimWorld, n: NavGrid, seed_value: int = 1) -> void:
@@ -123,6 +129,11 @@ func spawn_one(car: CarSim, min_dist: float = 60.0) -> GauntSim:
 				p = s
 	else:
 		p = cands[rng.randi() % cands.size()]
+	return _make(p, car, GauntSim.State.STALK if time > 90.0 else GauntSim.State.LURK)
+
+
+## A creature at `p` (jittered a little and pushed out of anything solid), facing the car.
+func _make(p: Vector2, car: CarSim, state: int) -> GauntSim:
 	var g := GauntSim.new()
 	g.id = next_id
 	next_id += 1
@@ -134,7 +145,11 @@ func spawn_one(car: CarSim, min_dist: float = 60.0) -> GauntSim:
 	g.max_speed = rng.randf_range(17.5, 20.5)
 	g.cooldown = rng.randf_range(0.0, 0.8)
 	g.chitter_t = rng.randf_range(3.0, 9.0)
-	g.state = GauntSim.State.STALK if time > 90.0 else GauntSim.State.LURK
+	g.state = state
+	if alerted_spawns:
+		g.alert = true
+		if g.state == GauntSim.State.LURK:
+			g.state = GauntSim.State.STALK
 	gaunts.append(g)
 	ev("spawn", g)
 	return g
@@ -143,6 +158,51 @@ func spawn_one(car: CarSim, min_dist: float = 60.0) -> GauntSim:
 func spawn_initial(car: CarSim, count: int = 3) -> void:
 	for i in count:
 		spawn_one(car)
+
+
+## The story's hook: a creature placed at a point, already hunting the car.
+func place_hunting(p: Vector2, car: CarSim) -> GauntSim:
+	var g := _make(p, car, GauntSim.State.HUNT)
+	g.alert = true
+	return g
+
+
+## The story's hook: every creature within `radius` of a point is alerted. A lurker starts
+## stalking at once rather than waiting for the night to grow restless. Returns how many.
+func alert_near(p: Vector2, radius: float) -> int:
+	var n := 0
+	for g in gaunts:
+		if not g.alive() or g.pos.distance_to(p) > radius:
+			continue
+		n += 1
+		if not g.alert:
+			g.alert = true
+			ev("alert", g)
+		if g.state == GauntSim.State.LURK:
+			g.set_state(GauntSim.State.STALK)
+	return n
+
+
+func alert_all() -> int:
+	alerted_spawns = true
+	return alert_near(Vector2.ZERO, INF)
+
+
+## The story's hook: hold the pack at `n` creatures (the director tops it up at once, then every
+## five seconds). It never culls: a bigger pack thins out as creatures are run down.
+func set_size(n: int) -> void:
+	size_override = n
+	spawn_timer = minf(spawn_timer, 0.0)
+
+
+## A fresh pack of `count` creatures out of sight of the car, for a retry, a restart or a load.
+func reset_pack(car: CarSim, count: int, alerted: bool) -> void:
+	gaunts.clear()
+	spawn_timer = 5.0
+	alerted_spawns = false
+	spawn_initial(car, count)
+	if alerted:
+		alert_all()
 
 
 func start_dawn() -> void:
@@ -206,10 +266,11 @@ func step(dt: float, car: CarSim, _ctl: Dictionary = {}) -> void:
 
 
 func _director(dt: float, car: CarSim) -> void:
-	if dawn:
+	if dawn or not director_on:
 		return
 	spawn_timer -= dt
-	if alive_count() < pack_size_for(time) and spawn_timer <= 0.0:
+	var want := size_override if size_override >= 0 else pack_size_for(time)
+	if alive_count() < want and spawn_timer <= 0.0:
 		spawn_one(car)
 		spawn_timer = 5.0
 

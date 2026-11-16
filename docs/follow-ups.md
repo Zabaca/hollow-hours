@@ -17,3 +17,23 @@ Nits:
 - Colours are hard-coded outside menu_style.gd. The heading-and-rule block is copied in three panels. title.gd calls SettingsPanel._build_controls, a private method. MenuRow.note and MenuStyle.rule's alpha are unused. menu_nav_test's helper names differ from the other tests'.
 - The left stick is untested in the menus.
 - README links to a local Roadkill checkout path. Point it at the Roadkill repo instead.
+
+## From the slice 2 review (missions in the simulation, merged with this note)
+
+Should-fix (the first two before slice 4 draws the gate):
+- **The gate trigger is wider than the gap.** The trigger radius is 6 m but the gap is about 3.9 m, so the escape can roll the car through the wall beside the gap (mission_sim.gd gate step, sim_world.gd). Require the gap test, or ease the car onto the gap's centre line.
+- **Restart mission shuts the gate silently.** It sends no gate_closed event, so a drawn gate would stay open over a closed wall. Use one _close_gate helper that emits the event.
+- **Quitting during the final roll-out strands Continue.** The final mission saves next "" with ending_seen false 4 s before story_complete, so resume() lands in roam with nothing to do. Skip that save, or play the ending on resume.
+- **A free-roam wreck loses its totals on revert.** revert_to_save rebuilds from last_save, so wrecks, kills and seconds are lost. Carry the live totals across.
+- **Pharmacy hunters can spawn inside the car.** They're placed 8 m out at a random bearing with no car check. Choose the bearing away from the car, or keep at least the ring's distance.
+- **Completion lines don't jump the radio queue.** Only fail lines carry priority:true, but the spec says completion lines do too.
+- **Settings ownership.** See the slice 1 notes: SaveStore owns the I/O, Settings the schema. Delete SaveStore.load_settings and write_settings.
+
+Nits:
+- mission_test has a dead expression at line 189, and it reads sim.mission.state, where the spec says to use events or objective().
+- MissionSim sets pack.alerted_spawns directly; use a pack hook.
+- probe.gd's header still mentions main.gd's autopilot.
+- MIN_RETRY_HULL, HOLD_SPEED and ROAM_PACK are tuning numbers that belong in StoryData.
+- Document that the presenter stops stepping on mission_failed.
+- The map-only places were checked against city.py building centres; say so in the comment.
+- Unverified: if Godot's Windows rename isn't atomic, fall back to reading save.json.tmp.

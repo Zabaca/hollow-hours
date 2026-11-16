@@ -11,6 +11,11 @@ var blocks: Array = []  # {x0,y0,x1,y1}: raised sidewalk slabs
 var lights: Array = []  # layout lights: {x,y,z,energy,range,kind,...}
 var spawns: Array = []  # Vector2 hiding places for the creatures
 var player_start := {"x": -30.0, "y": -2.5, "angle": 0.0}
+## The way out of the quarter: a gap in the west wall at the avenue's end. `pos` is the middle of
+## the gap on the wall line, `dir` points out of the quarter. Shut, the arena wall holds the car as
+## everywhere else; open, the wall lets a car in the gap's width through (the story's escape moves
+## it the rest of the way). The layout's own "gate" record ({x, y, width}) overrides the default.
+var gate := {"pos": Vector2(-70.0, 0.0), "dir": Vector2(-1.0, 0.0), "width": 10.0, "open": false}
 
 
 static func from_layout(data: Dictionary) -> SimWorld:
@@ -29,6 +34,12 @@ static func from_layout(data: Dictionary) -> SimWorld:
 		w.spawns.append(Vector2(float(s["x"]), float(s["y"])))
 	var ps: Dictionary = data["player_start"]
 	w.player_start = {"x": float(ps["x"]), "y": float(ps["y"]), "angle": float(ps["angle"])}
+	if data.has("gate"):
+		var g: Dictionary = data["gate"]
+		w.gate["pos"] = Vector2(float(g["x"]), float(g["y"]))
+		w.gate["width"] = float(g["width"])
+	else:
+		w.gate["pos"] = Vector2(w.arena["left"], 0.0)
 	return w
 
 
@@ -44,7 +55,11 @@ func height_at(p: Vector2) -> float:
 ## posts and boxes, in the order world.js driveCar does it.
 func collide_car(car: CarSim, min_impact: float = 6.0) -> Array:
 	var hits: Array = []
-	var wall := SimCollide.keep_in_box(car, arena, 0.35)
+	var box := arena
+	if gate["open"] and absf(car.body.position.y - gate["pos"].y) <= float(gate["width"]) * 0.5 - car.hit_half_width:
+		box = arena.duplicate()
+		box["left"] = float(arena["left"]) - 60.0
+	var wall := SimCollide.keep_in_box(car, box, 0.35)
 	if wall["impact"] > min_impact:
 		hits.append({"impact": wall["impact"], "point": wall["point"], "kind": "wall"})
 	var at := car.body.position

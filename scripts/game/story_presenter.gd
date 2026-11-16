@@ -51,6 +51,7 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 	add_child(map_screen)
 	radio = Radio.new()
 	add_child(radio)
+	hud.subtitle_source = radio
 
 
 ## True while something the presenter shows holds the world still: no pause menu on top of it.
@@ -92,6 +93,7 @@ func on_event(e: Dictionary) -> void:
 			radio.clear()
 			hud.hide_card()
 		"story_complete":
+			SaveStore.unlock_survive(save_path)  # outlives the save: starting over must not hide Survive the Night
 			_end_in = ENDING_SECONDS
 			hud.show_card("The end", "First light", "", ENDING_SECONDS - 3.0)
 
@@ -106,7 +108,6 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 	if not o.is_empty():
 		text = _objective_text(o)
 	hud.set_objective(text)
-	hud.set_subtitle(radio.current_subtitle())
 	hud.set_hold(m.hold_progress())
 	hud.set_timers(m.timers_left())
 	var blips := m.blips()
@@ -177,10 +178,3 @@ func _after_reset() -> void:
 
 func open_map() -> void:
 	map_screen.open(game.car.body.position, game.car.body.angle, game.mission.blips())
-
-
-func toggle_map() -> void:
-	if map_screen.is_open:
-		map_screen.close()
-	elif not fail_menu.is_open:
-		open_map()

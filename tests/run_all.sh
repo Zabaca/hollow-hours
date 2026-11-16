@@ -12,3 +12,4 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 "$GODOT" --headless --path "$HERE" res://tests/mission_test.tscn
 "$GODOT" --headless --path "$HERE" res://tests/presenter_test.tscn
 "$GODOT" --headless --path "$HERE" res://tests/radio_test.tscn
+"$GODOT" --headless --path "$HERE" --script res://tests/story_input_test.gd

@@ -183,6 +183,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		if presenter == null or not presenter.blocks_pause():
 			_open_pause()
+	elif presenter != null and event.is_action_pressed("map") and not event.is_echo():
+		# Opens only: closing is the open map's own business (MapScreen._input), so the key that
+		# closes it can never reach this and open it again.
+		get_viewport().set_input_as_handled()
+		if not presenter.blocks_pause() and not pause_menu.is_open:
+			presenter.open_map()
 
 
 func _apply_viewport() -> void:
@@ -213,8 +219,6 @@ func _poll_actions() -> void:
 	# In the story a stray key must not throw a mission away: restarting is in the pause menu.
 	if presenter == null and Input.is_action_just_pressed("restart"):
 		_restart()
-	if presenter != null and Input.is_action_just_pressed("map"):
-		presenter.toggle_map()
 	if Input.is_action_just_pressed("fullscreen"):
 		Settings.set_fullscreen(DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN)
 	if Input.is_action_just_pressed("quality"):

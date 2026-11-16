@@ -30,8 +30,10 @@ func _ready() -> void:
 	_test_complete_saves_and_roams()
 	_test_wreck_in_roam_goes_back()
 	await _test_pause_menu_rows()
+	await _test_subtitle_under_fail_menu()
 	_test_full_map()
 	_test_title_continue()
+	_test_unlock_outlives_the_save()
 	_clean()
 	print("")
 	print("presenter_test: %d failed" % failures)
@@ -98,6 +100,7 @@ func _feed(r: Rig, delta: float = DT) -> void:
 		r.presenter.on_event(e)
 	var car := r.game.car
 	r.presenter.update(delta, car.body.position, car.body.angle)
+	r.presenter.hud._process(0.0)  # the HUD reads the radio on its own, every frame
 
 
 func _run(r: Rig, seconds: float) -> void:
@@ -373,13 +376,47 @@ func _test_pause_menu_rows() -> void:
 func _test_full_map() -> void:
 	var r := _rig()
 	var p := r.presenter
-	p.toggle_map()
-	_check(p.map_screen.is_open and get_tree().paused and p.blocks_pause() and p.map_screen.view.mode == MapView.Mode.FULL, "Tab opens the full map and stops the world")
+	p.open_map()
+	_check(p.map_screen.is_open and get_tree().paused and p.blocks_pause() and p.map_screen.view.mode == MapView.Mode.FULL, "the full map opens and stops the world")
 	_check(p.map_screen.view.blips.size() == 1 and p.map_screen.view.blips[0]["place"] == "shop", "with the objective on it")
-	p.toggle_map()
-	_check(not p.map_screen.is_open and not get_tree().paused and not p.blocks_pause(), "and Tab closes it again")
+	p.map_screen.close()
+	_check(not p.map_screen.is_open and not get_tree().paused and not p.blocks_pause(), "and closing it gives the world back")
 	_drop(r)
 
+
+## The fail menu pauses the tree. The wreck call must still be subtitled: that needs a HUD that keeps
+## running while paused, which a test rig whose parent is Always cannot show, so this one is Pausable.
+func _test_subtitle_under_fail_menu() -> void:
+	var r := _rig()
+	r.parent.process_mode = Node.PROCESS_MODE_PAUSABLE
+	r.presenter.radio.clear()
+	_until_quiet(r.presenter.radio)
+	r.presenter.hud.set_subtitle({})
+	_wreck(r)
+	_feed(r, 1.6)
+	_check(r.presenter.fail_menu.is_open and get_tree().paused, "the fail menu is up and the world is paused")
+	var shown := false
+	for i in 60:
+		await get_tree().create_timer(0.1, true, false, true).timeout
+		if r.presenter.hud.subtitle_panel.visible and r.presenter.hud.speaker_label.text == "VERA":
+			shown = true
+			break
+	_check(shown, "Vera's wreck call is subtitled under the fail menu", r.presenter.hud.speaker_label.text)
+	r.presenter.fail_menu.close()
+	_drop(r)
+
+
+func _test_unlock_outlives_the_save() -> void:
+	_clean()
+	_check(not SaveStore.survive_unlocked(SAVE), "Survive the Night is locked before the story is finished")
+	var r := _rig("west_gate")
+	r.presenter.on_event({"type": "story_complete"})
+	_check(SaveStore.survive_unlocked(SAVE), "finishing the story unlocks it")
+	_drop(r)
+	# Starting over takes the save away; the unlock stays, so the title still offers it.
+	_check(SaveStore.load_save(SAVE).is_empty(), "with no save on disk")
+	var rows := _title_rows()
+	_check("Survive the Night:on" in rows and rows[1] == "Continue:off", "the title still offers Survive the Night", str(rows))
 
 func _test_title_continue() -> void:
 	_clean()

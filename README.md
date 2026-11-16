@@ -74,7 +74,7 @@ assets/models/                      bruiser.glb, gaunt.glb, city.glb (made by to
 assets/audio/                       generated sound and music, plus Roadkill's engine and impacts
 assets/fonts/                       Cormorant (SIL Open Font License, licence beside it), the menus' face
 assets/ui/title_art.png             the title's picture: for now a frame of the game itself, to be replaced by the key art
-tests/                              car_test (vs Roadkill's own code), pack_test (behaviour), settings_test, menu_nav_test, mission_test (the story), presenter_test (the story on screen), radio_test (the radio)
+tests/                              car_test (vs Roadkill's own code), pack_test (behaviour), settings_test, menu_nav_test, mission_test (the story), presenter_test (the story on screen), story_input_test (the map and menus with real key events), radio_test (the radio)
 tools/blender/, tools/audio/        how the models and sounds were made; not exported
 docs/driving-port.md                what mapped 1:1 from car.js and what did not
 ```

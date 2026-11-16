@@ -31,6 +31,9 @@ var radar := MapView.new()
 var _card_tween: Tween
 var _notice_tween: Tween
 var _objective_tween: Tween
+## Where the subtitle comes from (the radio, which runs under the fail menu). Read every frame, here and not
+## in the presenter, because this node keeps running while the tree is paused and the presenter does not.
+var subtitle_source: Object
 var _timer_low := false
 var _subtitle_id := ""
 
@@ -51,6 +54,11 @@ func _ready() -> void:
 	radar.offset_top = -36.0 - RADAR_SIZE
 	radar.offset_bottom = -36.0
 	root.add_child(radar)
+
+
+func _process(_delta: float) -> void:
+	if subtitle_source != null:
+		set_subtitle(subtitle_source.current_subtitle())
 
 
 ## Show or hide the whole HUD (the --no-hud flag).

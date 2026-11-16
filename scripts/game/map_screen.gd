@@ -2,7 +2,8 @@ class_name MapScreen
 extends CanvasLayer
 ## The full map: the whole quarter north-up with the places named, the car and the objective. It stops
 ## the world while it is up (and gives the pause back if it was already paused). Tab, Esc, P, the
-## gamepad's Back or B close it.
+## gamepad's Back or B close it. While it is open it takes the menu keys too (up, down, accept, Tab as
+## focus-next), so nothing underneath, such as the pause menu's rows, can act on them.
 
 signal closed
 
@@ -59,6 +60,7 @@ func open(pos: Vector2, angle: float, blips: Array) -> void:
 	_was_paused = get_tree().paused
 	get_tree().paused = true
 	view.set_state(pos, angle, blips)
+	get_viewport().gui_release_focus()  # the pause menu's row that opened this must not hold the keys
 	visible = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -74,9 +76,18 @@ func close() -> void:
 	closed.emit()
 
 
-func _unhandled_input(event: InputEvent) -> void:
+const SWALLOWED := ["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept", "ui_focus_next", "ui_focus_prev", "ui_select"]
+
+
+## `_input` runs before the GUI sees an event, so a focused control underneath never gets it.
+func _input(event: InputEvent) -> void:
 	if not is_open or Engine.get_process_frames() == _opened_frame:
 		return
 	if event.is_action_pressed("map") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause"):
 		get_viewport().set_input_as_handled()
 		close()
+		return
+	for a in SWALLOWED:
+		if event.is_action(a):
+			get_viewport().set_input_as_handled()
+			return

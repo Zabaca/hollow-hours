@@ -120,7 +120,7 @@ func _build_menu() -> void:
 	cont.set_enabled(not save.is_empty())
 	if not save.is_empty():
 		cont.note = "Mission %d" % (StoryData.mission_index(str(save["next"])) + 1) if str(save["next"]) != "" else "Free roam"
-	if not save.is_empty() and bool(save["ending_seen"]):
+	if (not save.is_empty() and bool(save["ending_seen"])) or SaveStore.survive_unlocked(Session.save_path):
 		_item("Survive the Night", _survive)
 	_item("Settings", _open_settings)
 	_item("Credits", _open_credits)

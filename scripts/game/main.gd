@@ -28,6 +28,8 @@ var shot_path := ""
 var shot_at := 6.0
 var shot_game := -1.0
 var shot_speed := -1.0
+var debug_start := PackedFloat64Array()
+var debug_drive := Vector2(INF, 0.0)  # --drive=throttle,turn: constant controls instead of the autopilot
 var shot_taken := false
 var started_ms := 0
 var route_i := 0
@@ -52,6 +54,12 @@ func _ready() -> void:
 			Settings.apply_preset(false)
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
+		elif a.begins_with("--start="):
+			# --start=x,y,angle puts the car there (map metres, radians)
+			debug_start = a.trim_prefix("--start=").split_floats(",")
+		elif a.begins_with("--drive="):
+			var dv := a.trim_prefix("--drive=").split_floats(",")
+			debug_drive = Vector2(dv[0], dv[1])
 		elif a.begins_with("--shot-speed="):
 			shot_speed = float(a.trim_prefix("--shot-speed="))
 		elif a.begins_with("--shot-game="):
@@ -62,6 +70,9 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 
 	game = GameSim.new(CityLayout.DATA)
+	if debug_start.size() == 3:
+		game.car.body.position = Vector2(debug_start[0], debug_start[1])
+		game.car.body.angle = debug_start[2]
 	city = City.new()
 	add_child(city)
 	city.build(CityLayout.DATA)
@@ -101,6 +112,8 @@ func _apply_viewport() -> void:
 # ----------------------------------------------------------------------------- input
 
 func _controls(delta: float) -> Dictionary:
+	if debug_drive.x != INF:
+		return {"throttle": debug_drive.x, "turn": debug_drive.y, "handbrake": false, "boost": false}
 	if demo:
 		return _autopilot(delta)
 	return {

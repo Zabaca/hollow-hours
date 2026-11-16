@@ -54,8 +54,8 @@ func update_camera(delta: float, car_pos: Vector2, car_angle: float, car_vel: Ve
 
 
 const PAD := 0.45  # the camera is a small ball: this far from any solid
-const MIN_DIST := 1.4  # never closer to the car than this, however tight
-const LIFT := 2.6  # extra height when squeezed, to look down over the car
+const MIN_DIST := 2.0  # never closer to the car than this, however tight
+const LIFT := 6.0  # extra height when squeezed, to look down over the car
 
 
 ## How high a collider stands (the sim's boxes are plan-view only).
@@ -67,6 +67,8 @@ static func box_height(kind: String) -> float:
 			return 1.4
 		"fence":
 			return 1.9
+		"perimeter":
+			return 4.8
 	return 90.0
 
 
@@ -75,7 +77,16 @@ static func box_height(kind: String) -> float:
 static func clear_fraction(world: SimWorld, from: Vector3, to: Vector3, pad: float) -> float:
 	var d := to - from
 	var best := 1.0
-	for b in world.boxes:
+	# The perimeter wall (city.py draws it just outside the arena, 4.5 m high) is not one of the
+	# boxes, so a camera behind a car at the edge would end up outside it, looking at its far side.
+	var boxes: Array = world.boxes.duplicate()
+	var a: Dictionary = world.arena
+	var far := 400.0
+	boxes.append({"x0": -far, "y0": -far, "x1": a["left"], "y1": far, "kind": "perimeter"})
+	boxes.append({"x0": a["right"], "y0": -far, "x1": far, "y1": far, "kind": "perimeter"})
+	boxes.append({"x0": -far, "y0": -far, "x1": far, "y1": a["bottom"], "kind": "perimeter"})
+	boxes.append({"x0": -far, "y0": a["top"], "x1": far, "y1": far, "kind": "perimeter"})
+	for b in boxes:
 		var lo := Vector3(float(b["x0"]) - pad, -pad, -float(b["y1"]) - pad)
 		var hi := Vector3(float(b["x1"]) + pad, box_height(String(b["kind"])) + pad, -float(b["y0"]) + pad)
 		var tmin := 0.0

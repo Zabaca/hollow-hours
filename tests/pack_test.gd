@@ -152,3 +152,7 @@ func _test_camera_pull() -> void:
 	var low := ChaseCamera.clear_fraction(w, Vector3(13.5, 1.0, -10.0), Vector3(13.5, 1.0, -20.0), 0.45)
 	var high := ChaseCamera.clear_fraction(w, Vector3(13.5, 6.0, -10.0), Vector3(13.5, 6.0, -20.0), 0.45)
 	_check(low < 1.0 and high == 1.0, "a low camera is stopped by a wreck and a high one passes over", "low=%.2f high=%.2f" % [low, high])
+	# The perimeter wall is not a box in the layout: a camera behind a car at the west edge
+	# must still be stopped by it (it used to end up outside, looking at the wall's far side).
+	var edge := ChaseCamera.clear_fraction(w, Vector3(-66.0, 1.8, 0.0), Vector3(-80.0, 4.0, 0.0), 0.45)
+	_check(edge < 1.0, "a camera behind the west edge is stopped by the perimeter wall", "fraction=%.2f" % edge)

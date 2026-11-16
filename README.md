@@ -141,6 +141,15 @@ a Mac without Wine; add it later on a Windows machine or through Wine. The macOS
 unsigned (`codesign=0`); a signed, notarised build needs an Apple developer identity. The presets
 exclude `tools/`, `tests/` and `docs/`.
 
+## Signed and notarized Mac build
+
+`tools/macos/release.sh` exports the universal app, signs it with the Developer ID in the login keychain
+(hardened runtime, secure timestamp, `tools/macos/HollowHours.entitlements`), then notarizes, staples and zips it to
+`build/macos/HollowHours-mac.zip`. No identity or credential is stored in the repo: give it
+`NOTARY_PROFILE=<keychain profile>` or `NOTARY_KEY`, `NOTARY_KEY_ID` and `NOTARY_ISSUER` (an App Store Connect team
+key) in the environment. With neither it signs and stops. Only the macOS export template is needed
+(`macos.zip` in `~/Library/Application Support/Godot/export_templates/4.7.2.stable/`).
+
 ## Remaking the assets
 
 Blender 5.3 headless, foreground, one script per asset (the output is committed, so this is only

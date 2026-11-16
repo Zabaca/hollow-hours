@@ -42,8 +42,11 @@ scenes/main.tscn                    the only scene; main.gd builds everything in
 scripts/sim/                        the simulation, pure GDScript, runs headless
   car_sim.gd, sim_body.gd, sim_collide.gd   the port of Roadkill's car.js / body.js / world.js
   sim_world.gd, nav_grid.gd         colliders from the city layout, A* grid for the creatures
-  gaunt_sim.gd, pack_sim.gd         the creature's states and the pack's AI and director
-  game_sim.gd                       hull, boost gauge, crashes, claws, the night clock
+  gaunt_sim.gd, pack_sim.gd         the creature's states and the pack's AI and director (and its story hooks)
+  game_sim.gd                       hull, boost gauge, crashes, claws, the night clock, the escape
+  story_data.gd, mission_sim.gd     the story as data (places, radio script, three missions) and its state machine
+  save_store.gd                     the save and the settings as JSON, written through a temporary file and a rename
+  autopilot.gd                      the pure-pursuit driver for --demo and for the tests
 scripts/game/                       what you see and hear
   main.gd                           wires the sim to the views; input, events, game feel
   city.gd, atmosphere.gd            the wet city, lights, fog, rain, lightning, dawn
@@ -53,7 +56,7 @@ scripts/game/                       what you see and hear
 shaders/                            wet_ground (puddles, ripples), screen_fx (post effects)
 assets/models/                      bruiser.glb, gaunt.glb, city.glb (made by tools/blender/*.py)
 assets/audio/                       generated sound and music, plus Roadkill's engine and impacts
-tests/                              car_test (vs Roadkill's own code), pack_test (behaviour)
+tests/                              car_test (vs Roadkill's own code), pack_test (behaviour), mission_test (the story)
 tools/blender/, tools/audio/        how the models and sounds were made; not exported
 docs/driving-port.md                what mapped 1:1 from car.js and what did not
 ```
@@ -81,7 +84,12 @@ command from anywhere with `--path` pointing at this folder.
    ```
    godot --headless --path . res://tests/car_test.tscn
    godot --headless --path . res://tests/pack_test.tscn
+   godot --headless --path . res://tests/mission_test.tscn
    ```
+
+   `tests/run_all.sh` imports and runs all three. `mission_test` plays each mission to success and to
+   each fail state by stepping `GameSim` in story mode and reading its events (like `pack_test`), checks
+   the save and the settings files, and has the autopilot drive the whole story with the pack off.
 
    `car_test` replays scripted driving runs from `tests/car_reference.json` (made by Roadkill's
    own `car.js`, `body.js` and `world.js` collision code) through the GDScript port and compares

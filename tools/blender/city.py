@@ -28,6 +28,12 @@ LAYOUT = dict(
     player_start=dict(x=-30.0, y=-2.5, angle=0.0),
 )
 
+# The way out: a gap in the west perimeter wall where the avenue (y = 0) meets it. The game draws the
+# gate's leaves and lamps and the cordon's searchlights; this script cuts the gap, builds the frame
+# and an approach road outside, and writes the gate record. It draws no random numbers, so every other
+# box, light and spawn keeps its place.
+GATE = dict(x=-70.0, y=0.0, width=8.0)
+
 ROADS_X = [-64.0, 0.0, 64.0]
 ROADS_Y = [-48.0, 0.0, 48.0]
 RW = 14.0
@@ -679,13 +685,39 @@ def street_scene(g, protos):
     LAYOUT["creature_spawns"] += [dict(x=-66, y=30), dict(x=66, y=-30), dict(x=-30, y=52), dict(x=30, y=-52), dict(x=0, y=40), dict(x=0, y=-40), dict(x=-64, y=-6), dict(x=64, y=6)]
 
 
+def gate_frame(g):
+    """Two concrete piers either side of the gap, a lintel over it, a rail for the leaves to roll on,
+    and the road that carries on outside the wall, with its edge lines."""
+    ax = LAYOUT["arena"]
+    x = GATE["x"]
+    hw = GATE["width"] / 2
+    for sgn in (-1, 1):
+        y0, y1 = (hw, hw + 1.4) if sgn > 0 else (-hw - 1.4, -hw)
+        box(g, "concrete", x - 1.5, y0, 0.0, x + 0.7, y1, 7.0)
+        box(g, "trim", x - 1.6, y0 - 0.1, 7.0, x + 0.8, y1 + 0.1, 7.25)
+    box(g, "concrete", x - 1.3, -hw, 6.2, x + 0.5, hw, 7.0)
+    box(g, "trim", x - 1.4, -hw - 1.5, 7.0, x + 0.6, hw + 1.5, 7.25)
+    # the rail along the outside of the wall the leaves slide on
+    box(g, "metal", x - 1.75, -hw - 6.0, 0.0, x - 1.6, hw + 6.0, 0.12)
+    # the road outside: the avenue carries on to the cordon
+    box(g, "asphalt", x - 44.0, -hw - 1.0, -0.3, x, hw + 1.0, 0.0)
+    for k in range(7):
+        x0 = x - 3.0 - k * 6.0
+        flat(g, "marking_y", x0 - 3.0, -0.1, x0, 0.1, 0.012)
+    for sgn in (-1, 1):
+        flat(g, "marking", x - 44.0, sgn * (hw - 0.3), x, sgn * (hw - 0.15), 0.012)
+    LAYOUT["gate"] = dict(x=GATE["x"], y=GATE["y"], width=GATE["width"])
+
+
 def perimeter(g):
     ax = LAYOUT["arena"]
     t = 1.0
-    for (a, b, c, d) in ((ax["left"] - t, ax["bottom"] - t, ax["right"] + t, ax["bottom"]), (ax["left"] - t, ax["top"], ax["right"] + t, ax["top"] + t), (ax["left"] - t, ax["bottom"], ax["left"], ax["top"]), (ax["right"], ax["bottom"], ax["right"] + t, ax["top"])):
+    gy0, gy1 = GATE["y"] - GATE["width"] / 2, GATE["y"] + GATE["width"] / 2
+    for (a, b, c, d) in ((ax["left"] - t, ax["bottom"] - t, ax["right"] + t, ax["bottom"]), (ax["left"] - t, ax["top"], ax["right"] + t, ax["top"] + t), (ax["left"] - t, ax["bottom"], ax["left"], gy0), (ax["left"] - t, gy1, ax["left"], ax["top"]), (ax["right"], ax["bottom"], ax["right"] + t, ax["top"])):
         box(g, "concrete", a, b, 0.0, c, d, 4.5)
         box(g, "trim", a - 0.1, b - 0.1, 4.5, c + 0.1, d + 0.1, 4.8)
         # razor-wire hint: a thin dark band above
+    gate_frame(g)
     # a skyline of dark, mostly unlit towers beyond the wall: only seen through the fog
     for k in range(60):
         a = 2 * math.pi * k / 60 + RNG.uniform(-0.03, 0.03)

@@ -61,6 +61,11 @@ func _process(_delta: float) -> void:
 		set_subtitle(subtitle_source.current_subtitle())
 
 
+## The ending: the objective, radar and bars go quietly.
+func fade_out(seconds: float) -> void:
+	create_tween().tween_property(root, "modulate:a", 0.0, seconds)
+
+
 ## Show or hide the whole HUD (the --no-hud flag).
 func show_hud(on: bool) -> void:
 	root.visible = on

@@ -18,6 +18,8 @@ var heart: AudioStreamPlayer
 var claws: AudioStreamPlayer
 var sfx_bus := -1
 var lowpass: AudioEffectLowPassFilter
+## The ending hushes the music and the weather, 0 to 1.
+var hush := 0.0
 var duck := 0.0
 var threat := 0.0
 var cooldowns := {}
@@ -180,9 +182,11 @@ func update_mix(game: GameSim, latched: int, threat_in: float, raining_in: bool,
 	threat = lerpf(threat, threat_in, GM.damp(1.6, delta))
 	music_a.volume_db = linear_to_db(maxf((1.0 - threat) * 0.38, 0.0001))
 	music_b.volume_db = linear_to_db(maxf(threat * 0.45, 0.0001))
+	music_a.volume_db -= hush * 16.0
+	music_b.volume_db -= hush * 16.0
 	heart.volume_db = linear_to_db(maxf(clampf((threat - 0.35) * 1.5 + (1.0 - game.hull / GameSim.MAX_HULL) * 0.6, 0.0, 1.0) * 0.55, 0.0001))
 	heart.pitch_scale = 0.9 + threat * 0.4
-	rain.volume_db = -13.0 if raining_in else -80.0
+	rain.volume_db = (-13.0 - hush * 5.0) if raining_in else -80.0
 	roof.volume_db = linear_to_db(maxf(0.05 + latched * 0.0, 0.0001)) - 8.0 if raining_in else -80.0
 	claws.volume_db = linear_to_db(0.5) if latched > 0 else -80.0
 	claws.pitch_scale = 0.9 + 0.1 * latched

@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_save_file()
 	_test_gate_trigger()
 	_test_gate_needs_the_gap()
+	_test_camera_through_the_gap()
 	_test_restart_closes_the_gate()
 	_test_open_gate_gap()
 	_test_no_dawn_clock()
@@ -208,7 +209,9 @@ func _test_places() -> void:
 		if start.distance_to(StoryData.place_pos(id)) <= StoryData.place_radius(id):
 			apart = false
 	_check(apart, "the safe start is outside every mission start marker")
-	_check(w.gate["pos"].is_equal_approx(StoryData.place_pos("west_gate")), "the sim's gate is where the story's West Gate is", str(w.gate["pos"]))
+	_check(CityLayout.DATA.has("gate") and w.gate["pos"].is_equal_approx(StoryData.place_pos("west_gate")), "the layout's gate record is where the story's West Gate is", str(w.gate["pos"]))
+	var gate_rec: Dictionary = CityLayout.DATA["gate"]
+	_check(is_equal_approx(float(gate_rec["x"]), float(w.arena["left"])) and float(gate_rec["width"]) >= 2.0 * 1.06 + 4.0, "and it sits in the west wall with room for the car to line up", str(gate_rec))
 
 
 # ----------------------------------------------------------------------------- starting, holding, counting
@@ -611,7 +614,8 @@ func _test_gate_trigger() -> void:
 	e = _run(sim, GameSim.ESCAPE_TIME + 0.5)
 	var saves := _of(e, "save")
 	_check(_has(e, "story_complete") and saves.size() == 1 and saves[0]["data"]["ending_seen"] == true and saves[0]["data"]["next"] == "", "the story completes and asks for a final save", str(_of(e, "story_complete")))
-	_check(sim.car.body.position.x < sim.world.arena["left"] - 5.0 and sim.car.speed() < 0.5, "the car has gone out through the wall and come to rest", "x=%.1f v=%.2f" % [sim.car.body.position.x, sim.car.speed()])
+	var rest: Vector2 = sim.car.body.position
+	_check(absf(rest.x - (float(sim.world.arena["left"]) - GameSim.ESCAPE_DISTANCE)) < 0.5 and absf(rest.y) < 0.5 and sim.car.speed() < 0.1, "the car has gone out through the gate to its resting place on the road outside", "at %s v=%.2f" % [str(rest), sim.car.speed()])
 	var fled := true
 	for g in sim.pack.gaunts:
 		if g.alive():
@@ -654,10 +658,21 @@ func _test_gate_needs_the_gap() -> void:
 	sim.car.body.velocity = Vector2(-10.0, 0.0)
 	var e := _run(sim, 1.5, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
 	_check(not _has(e, "escaped") and sim.phase == GameSim.Phase.PLAYING and sim.car.body.position.x >= sim.world.arena["left"], "beside the gap the trigger does not fire and the wall holds", "x=%.1f y=%.1f" % [sim.car.body.position.x, sim.car.body.position.y])
-	sim.place_car(Vector2(-67.0, 3.0), PI, GameSim.MAX_HULL)
+	sim.place_car(Vector2(-67.0, 2.0), PI, GameSim.MAX_HULL)
 	sim.car.body.velocity = Vector2(-10.0, 0.0)
 	e = _run(sim, 0.5, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
 	_check(_has(e, "escaped"), "lined up with the gap it does")
+
+
+func _test_camera_through_the_gap() -> void:
+	var sim := _story()
+	var from := Vector3(-66.0, 1.8, 0.0)
+	var to := Vector3(-80.0, 4.0, 0.0)  # outside the wall, straight through the gate
+	var shut := ChaseCamera.clear_fraction(sim.world, from, to, 0.45)
+	sim.world.gate["open"] = true
+	var open := ChaseCamera.clear_fraction(sim.world, from, to, 0.45)
+	var beside := ChaseCamera.clear_fraction(sim.world, Vector3(-66.0, 1.8, -12.0), Vector3(-80.0, 4.0, -12.0), 0.45)
+	_check(shut < 1.0 and open == 1.0 and beside < 1.0, "the chase camera sees through an open gate and not through the wall beside it", "shut=%.2f open=%.2f beside=%.2f" % [shut, open, beside])
 
 
 func _test_restart_closes_the_gate() -> void:

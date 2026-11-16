@@ -5,12 +5,13 @@ extends RefCounted
 ## Game flags (`--demo`, `--shot`, `--low`, `--start`, `--drive`, `--cam-log`, `--audio-log`, and
 ## `--shot-at`, `--shot-game`, `--shot-speed`) skip the menus and go straight into the round, so every
 ## command in the README still works. `--screen=NAME` opens one screen for a screenshot instead
-## (title, settings, controls, credits, confirm, pause, pause-settings, and in a story map, fail, complete);
+## (title, settings, controls, credits, confirm, pause, pause-settings, and in a story map, fail, complete, ending);
 ## `--shot=PATH` and `--shot-at=SECONDS`
 ## then save a frame of that screen and quit.
 ##
 ## Story flags: `--story` starts a new story, `--continue` continues from the save, `--mission=N` (1 to 3)
-## starts mission N directly, with the car at its start; all skip the menus. `--save=PATH` reads and writes the save there instead of the
+## starts mission N directly, with the car at its start; all skip the menus. `--gate=open` or
+## `--gate=opening` (opens 1.5 s in) shows the west gate open, for screenshots. `--save=PATH` reads and writes the save there instead of the
 ## player's (for screenshots of Continue); it does not skip the menus. `--seed=N` fixes the pack's seed.
 
 const GAME_FLAGS := [
@@ -18,7 +19,7 @@ const GAME_FLAGS := [
 	"--cam-log", "--audio-log", "--no-hud", "--story", "--mission", "--continue",
 ]
 ## Screens that live in the story: the game scene opens them over a mission.
-const STORY_SCREENS := ["map", "fail", "complete"]
+const STORY_SCREENS := ["map", "fail", "complete", "ending"]
 const MAIN_SCENE := "res://scenes/main.tscn"
 const TITLE_SCENE := "res://scenes/title.tscn"
 

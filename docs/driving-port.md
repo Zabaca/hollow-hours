@@ -37,6 +37,7 @@ forward without any extra turn. The Blender build writes the city in the same co
   Here a single hull value maps to `power` (down to 72 % at the last half), a small steering `pull`
   below 35 %, and an engine that cuts out (`sputter`) below 30 %. `left`, `right`, `rear` and
   per-wheel grip stay at 1.
+- **Collision box.** `CarSim` keeps Roadkill's 4 x 2 m box for the dynamics (inertia, wheels, grip) but collides with `hit_half_length` / `hit_half_width`, which `GameSim` sets to 2.27 x 1.06 to match the Bruiser model (it spans 2.31 ahead and 2.23 behind the centre), so the bull bar meets a wall when the crash is reported and heard. The tests leave it at 2 x 1 and match car.js exactly. Impacts of 1.5 to 6 m/s raise a `bump` event (a soft thud, no damage); 6 and up is Roadkill's crash.
 - **Collisions.** Boxes are axis aligned, as in Roadkill. Wrecks lie at 0 or 90 degrees for the
   sim and are drawn a few degrees off for looks, so a wreck's hit box can differ from what you see
   by about 0.2 m. Car-against-car collisions (`collideCars`) are not ported: there is one car.

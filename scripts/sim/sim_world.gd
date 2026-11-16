@@ -42,10 +42,10 @@ func height_at(p: Vector2) -> float:
 
 ## The hardest hit this step as {"impact", "point", "kind"}: the car against the arena wall,
 ## posts and boxes, in the order world.js driveCar does it.
-func collide_car(car: CarSim) -> Array:
+func collide_car(car: CarSim, min_impact: float = 6.0) -> Array:
 	var hits: Array = []
 	var wall := SimCollide.keep_in_box(car, arena, 0.35)
-	if wall["impact"] > 6.0:
+	if wall["impact"] > min_impact:
 		hits.append({"impact": wall["impact"], "point": wall["point"], "kind": "wall"})
 	var at := car.body.position
 	var r := Vector2(car.half_length, car.half_width).length() + 0.1
@@ -53,13 +53,13 @@ func collide_car(car: CarSim) -> Array:
 		if absf(p["x"] - at.x) > r + p["r"] or absf(p["y"] - at.y) > r + p["r"]:
 			continue
 		var hit := SimCollide.car_vs_circle(car, Vector2(p["x"], p["y"]), p["r"])
-		if hit["impact"] > 6.0:
+		if hit["impact"] > min_impact:
 			hits.append({"impact": hit["impact"], "point": hit["point"], "kind": p["kind"]})
 	for b in boxes:
 		if b["x1"] < at.x - r or b["x0"] > at.x + r or b["y1"] < at.y - r or b["y0"] > at.y + r:
 			continue
 		var hb := SimCollide.car_vs_box(car, b, 0.3)
-		if hb["impact"] > 6.0:
+		if hb["impact"] > min_impact:
 			hits.append({"impact": hb["impact"], "point": hb["point"], "kind": b["kind"]})
 	return hits
 

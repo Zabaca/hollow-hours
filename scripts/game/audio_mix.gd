@@ -74,9 +74,9 @@ func _loop(file: String, bus: String, db: float) -> AudioStreamPlayer:
 
 
 func _stream(file: String) -> AudioStream:
-	var path := DIR + file + ".mp3"
+	var path := DIR + file + ".wav"
 	if not ResourceLoader.exists(path):
-		path = DIR + file + ".wav"
+		path = DIR + file + ".mp3"
 	return load(path)
 
 
@@ -86,11 +86,11 @@ func toggle_mute() -> void:
 
 
 ## A flat one-shot. `gap` stops the same sound stacking inside that many seconds.
-func play(file: String, db: float = 0.0, pitch: float = 1.0, bus: String = "SFX", gap: float = 0.0) -> void:
+func play(file: String, db: float = 0.0, pitch: float = 1.0, bus: String = "SFX", gap: float = 0.0) -> AudioStreamPlayer:
 	if gap > 0.0:
 		var now := Time.get_ticks_msec() / 1000.0
 		if now - float(cooldowns.get(file, -99.0)) < gap:
-			return
+			return null
 		cooldowns[file] = now
 	var p := AudioStreamPlayer.new()
 	p.stream = _stream(file)
@@ -100,6 +100,7 @@ func play(file: String, db: float = 0.0, pitch: float = 1.0, bus: String = "SFX"
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
+	return p
 
 
 ## A one-shot placed in the world, so it pans and fades with distance.

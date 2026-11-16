@@ -28,6 +28,9 @@ var shot_path := ""
 var shot_at := 6.0
 var shot_game := -1.0
 var shot_speed := -1.0
+var audio_log := false
+var tick_started_us := 0
+var tick_no := 0
 var debug_start := PackedFloat64Array()
 var debug_drive := Vector2(INF, 0.0)  # --drive=throttle,turn: constant controls instead of the autopilot
 var shot_taken := false
@@ -54,6 +57,8 @@ func _ready() -> void:
 			Settings.apply_preset(false)
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
+		elif a == "--audio-log":
+			audio_log = true
 		elif a.begins_with("--start="):
 			# --start=x,y,angle puts the car there (map metres, radians)
 			debug_start = a.trim_prefix("--start=").split_floats(",")
@@ -210,6 +215,8 @@ func _physics_process(delta: float) -> void:
 		return
 	prev_pos = game.car.body.position
 	prev_angle = game.car.body.angle
+	tick_started_us = Time.get_ticks_usec()
+	tick_no += 1
 	game.step(delta, _controls(delta))
 	for e in game.take_events():
 		_on_event(e)
@@ -286,11 +293,13 @@ func _on_event(e: Dictionary) -> void:
 	match e["type"]:
 		"crash":
 			var impact: float = e["impact"]
+			if audio_log:
+				_log_crash(impact)
 			var at: Vector3 = GM.to3(e["point"], 0.7)
 			fx.spark_burst(at, clampf(impact / 18.0, 0.3, 1.0))
 			cam.add_trauma(clampf(impact / 22.0, 0.25, 1.0))
 			if impact > 8.0:
-				fx.hit_stop(clampf(0.03 + impact * 0.004, 0.04, 0.12), 0.06)
+				fx.hit_stop(clampf(0.02 + impact * 0.0025, 0.03, 0.07), 0.06)
 			fx.kick_chroma(clampf(impact / 25.0, 0.1, 0.8))
 			if impact > 12.0:
 				audio.play("crash-heavy", 0.0, audio.rng.randf_range(0.9, 1.05), "Car", 0.15)
@@ -300,6 +309,10 @@ func _on_event(e: Dictionary) -> void:
 				audio.play("crash-light", 0.0, audio.rng.randf_range(0.9, 1.1), "Car", 0.1)
 			if str(e["kind"]) in ["wall", "building", "fence"]:
 				audio.play("metal_scrape", -8.0, audio.rng.randf_range(0.9, 1.1), "Car", 0.6)
+		"bump":
+			var soft: float = e["impact"]
+			audio.play("stomp", clampf(-14.0 + soft * 1.6, -14.0, -4.0), audio.rng.randf_range(0.8, 1.0), "Car", 0.12)
+			cam.add_trauma(clampf(soft / 40.0, 0.03, 0.15))
 		"hull":
 			fx.wash_red(clampf(float(e["amount"]) * 0.025, 0.0, 0.4))
 		"latch":
@@ -361,3 +374,20 @@ func _on_event(e: Dictionary) -> void:
 			audio.muffle(1.0)
 		"dawn":
 			audio.play("thunder", -8.0, 1.0, "Ambience")
+
+
+## --audio-log: how long from the start of the physics tick that found the crash to the play()
+## call, what the audio driver reports, and whether a sound started during hit-stop advances at
+## real speed (its playback position 100 real ms later).
+func _log_crash(impact: float) -> void:
+	var before := Time.get_ticks_usec()
+	var p := audio.play("crash-heavy", 0.0, 1.0, "Car", 0.0)
+	var after := Time.get_ticks_usec()
+	print("AUDIOLOG tick=%d impact=%.1f tick_to_play_us=%d play_call_us=%d out_latency_ms=%.1f mix_rate=%d next_mix_ms=%.1f time_scale=%.2f" % [
+		tick_no, impact, before - tick_started_us, after - before,
+		AudioServer.get_output_latency() * 1000.0, int(AudioServer.get_mix_rate()), AudioServer.get_time_to_next_mix() * 1000.0, Engine.time_scale])
+	if p != null:
+		var t0 := Time.get_ticks_usec()
+		await get_tree().create_timer(0.1, true, false, true).timeout
+		var real_ms := (Time.get_ticks_usec() - t0) / 1000.0
+		print("AUDIOLOG playback_position_after %.1f real ms = %.1f ms (time_scale now %.2f)" % [real_ms, p.get_playback_position() * 1000.0, Engine.time_scale])

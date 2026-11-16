@@ -23,6 +23,10 @@ window/size/viewport_height=900
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[audio]
+
+driver/output_latency=10
+
 [physics]
 
 common/physics_ticks_per_second=120

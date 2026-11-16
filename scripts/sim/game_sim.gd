@@ -8,6 +8,8 @@ enum Phase { PLAYING, WRECKED, DAWN }
 
 const NIGHT_LENGTH := 300.0  # seconds until first light
 const MAX_HULL := 100.0
+const CRASH := 6.0  # m/s into a wall that counts as a crash (Roadkill's threshold)
+const BUMP := 1.5  # m/s into a wall that is still a knock you can hear
 const CLAW_DPS := 3.0  # hull per second per creature clinging to the car
 const BOOST := CarSim.BOOST
 const GRAB := PackSim.GRAB_DRAG * PackSim.GAUNT_MASS / 80.0  # N per (m/s) per clinging creature
@@ -45,6 +47,11 @@ func reset() -> void:
 	car = CarSim.new(CarSim.BODIES["bruiser"])
 	car.body.position = Vector2(ps["x"], ps["y"])
 	car.body.angle = ps["angle"]
+	# The Bruiser model (bruiser.glb) spans x -2.23..2.31 and z -1.2..1.2 against the 4 x 2 m
+	# dynamics box; collide with most of that so the bull bar does not sink into a wall before
+	# the crash is reported and heard (tests/aabb_probe.gd measures it).
+	car.hit_half_length = 2.27
+	car.hit_half_width = 1.06
 	pack = PackSim.new(world, nav, seed_value)
 	phase = Phase.PLAYING
 	hull = MAX_HULL
@@ -151,10 +158,14 @@ func step(dt: float, controls: Dictionary) -> void:
 
 	# Walls, posts, buildings and wrecks.
 	var worst := 0.0
-	for hit in world.collide_car(car):
+	for hit in world.collide_car(car, BUMP):
 		var impact: float = hit["impact"]
+		if impact <= CRASH:
+			# A knock under Roadkill's crash threshold: no damage, but it must be heard.
+			events.append({"type": "bump", "impact": impact, "point": hit["point"], "kind": hit["kind"]})
+			continue
 		worst = maxf(worst, impact)
-		damage(clampf((impact - 6.0) * 2.4 + 2.0, 2.0, 36.0), "crash")
+		damage(clampf((impact - CRASH) * 2.4 + 2.0, 2.0, 36.0), "crash")
 		events.append({"type": "crash", "impact": impact, "point": hit["point"], "kind": hit["kind"]})
 	if worst > 8.0:
 		pack.shake(car, 0.6)

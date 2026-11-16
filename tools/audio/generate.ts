@@ -77,7 +77,14 @@ async function buy(item: Item): Promise<string> {
   return raw
 }
 
+// Impact one-shots are kept as wav: an mp3 has to be decoded as it starts, and a crash should sound on the impact frame.
+const WAV_ONESHOTS = new Set(['glass_break', 'metal_scrape', 'creature_latch', 'sting_latch'])
+
 async function convert(item: Item, raw: string) {
+  if (!item.loop && WAV_ONESHOTS.has(item.name)) {
+    await $`ffmpeg -y -loglevel error -i ${raw} -ac 1 -ar 44100 -c:a pcm_s16le ${join(dest, item.name + '.wav')}`
+    return
+  }
   if (!item.loop) {
     await $`ffmpeg -y -loglevel error -i ${raw} -ac 1 -b:a 112k ${join(dest, item.name + '.mp3')}`
     return

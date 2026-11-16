@@ -96,7 +96,7 @@ static func car_vs_box(car: CarSim, box: Dictionary, bounce: float = 0.3) -> Dic
 				inside.append(p)
 		for q in box_corners:
 			var l := body.to_local(q)
-			if absf(l.x) <= car.half_length + eps and absf(l.y) <= car.half_width + eps:
+			if absf(l.x) <= car.hit_half_length + eps and absf(l.y) <= car.hit_half_width + eps:
 				inside.append(q)
 		var point: Vector2
 		if inside.size() > 0:
@@ -142,7 +142,7 @@ static func _extreme(points: Array, normal: Vector2, use_min: bool) -> Vector2:
 static func circle_vs_car(car: CarSim, center: Vector2, radius: float) -> Dictionary:
 	var body := car.body
 	var local := body.to_local(center)
-	var closest := Vector2(clampf(local.x, -car.half_length, car.half_length), clampf(local.y, -car.half_width, car.half_width))
+	var closest := Vector2(clampf(local.x, -car.hit_half_length, car.hit_half_length), clampf(local.y, -car.hit_half_width, car.hit_half_width))
 	var d := local - closest
 	var dist := d.length()
 	var normal_local: Vector2
@@ -154,8 +154,8 @@ static func circle_vs_car(car: CarSim, center: Vector2, radius: float) -> Dictio
 		depth = radius - dist
 	else:
 		# Centre inside the box: leave by the nearest face.
-		var dx := car.half_length - absf(local.x)
-		var dy := car.half_width - absf(local.y)
+		var dx := car.hit_half_length - absf(local.x)
+		var dy := car.hit_half_width - absf(local.y)
 		if dx < dy:
 			normal_local = Vector2(signf(local.x) if local.x != 0.0 else 1.0, 0.0)
 		else:

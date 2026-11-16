@@ -39,6 +39,11 @@ var handbrake_release := 0.2  # seconds for rear grip to come back
 
 var half_length: float
 var half_width: float
+## The box that collides with the world. It is the dynamics box (half_length, half_width: what
+## Roadkill's car.js uses) unless a caller widens it, so the picture's bumpers meet a wall when the
+## hit is reported (GameSim does this for the Bruiser model, which is longer than 4 m).
+var hit_half_length: float
+var hit_half_width: float
 var body: SimBody
 ## Each: {"local": Vector2, "front": bool, "angle": float, "skidding": bool}
 var wheels: Array = []
@@ -67,6 +72,8 @@ func _init(opts: Dictionary = {}) -> void:
 	handbrake_release = opts.get("handbrake_release", handbrake_release)
 	half_length = car_length / 2.0
 	half_width = car_width / 2.0
+	hit_half_length = half_length
+	hit_half_width = half_width
 	body = SimBody.new(mass, (mass * (car_length * car_length + car_width * car_width)) / 12.0)
 	var axle := half_length - 0.65
 	var track := half_width - 0.3
@@ -172,8 +179,8 @@ func update(controls: Dictionary, dt: float, wear: Dictionary = FRESH) -> void:
 
 
 func corners() -> Array:
-	var x := half_length
-	var y := half_width
+	var x := hit_half_length
+	var y := hit_half_width
 	var out: Array = []
 	for p in [Vector2(x, y), Vector2(-x, y), Vector2(-x, -y), Vector2(x, -y)]:
 		out.append(body.to_world(p))

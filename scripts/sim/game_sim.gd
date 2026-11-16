@@ -73,6 +73,27 @@ func continue_story(save: Dictionary) -> void:
 	_drain_mission()
 
 
+## Story mode: start mission `i` (0 to 2) directly, as a developer flag does: a new game for the first,
+## else the progress of someone who has finished the ones before it, the car at the mission's start
+## marker and the mission begun.
+func start_story_at(i: int) -> void:
+	if i <= 0:
+		story_mode = true
+		reset()
+		return
+	var done: Array = []
+	for k in i:
+		done.append(StoryData.MISSIONS[k]["id"])
+	continue_story({
+		"version": SaveStore.VERSION, "saved_at": 0, "next": StoryData.MISSIONS[i]["id"], "done": done,
+		"ending_seen": false, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0},
+	})
+	var at: Dictionary = StoryData.PLACES[StoryData.MISSIONS[i]["start"]]
+	place_car(at["pos"], float(at["angle"]), MAX_HULL)
+	mission.start_mission(self, i)
+	_drain_mission()
+
+
 ## Story mode: wrecked in free roam sends you back to the last save (a new game before the first).
 func revert_to_save() -> void:
 	var last := mission.last_save if mission != null else {}

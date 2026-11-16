@@ -90,3 +90,18 @@ static func load_save(path: String = SAVE_PATH) -> Dictionary:
 
 static func write_save(data: Dictionary, path: String = SAVE_PATH) -> bool:
 	return write_json(path, data)
+
+
+## What the player has unlocked, kept beside the save but outside it, so starting a new story does not
+## take it away. Today that is Survive the Night, offered once the story has been finished.
+static func unlocks_path(save_path: String = SAVE_PATH) -> String:
+	return save_path.get_base_dir().path_join(save_path.get_file().get_basename() + "_unlocks.json")
+
+
+static func survive_unlocked(save_path: String = SAVE_PATH) -> bool:
+	var d: Variant = read_json(unlocks_path(save_path))
+	return d != null and d.get("survive") == true
+
+
+static func unlock_survive(save_path: String = SAVE_PATH) -> bool:
+	return write_json(unlocks_path(save_path), {"version": VERSION, "survive": true})

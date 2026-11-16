@@ -3,7 +3,8 @@ extends Node3D
 ##
 ## Command line (after `--`): `--demo` lets an autopilot drive; `--shot=/path.png` saves a frame
 ## and quits after `--shot-at=SECONDS` (default 6) of real time; `--low` starts on the low
-## graphics preset; `--no-hud` hides the HUD (for key-art frames). Example (with a window, not --headless):
+## graphics preset; `--no-hud` hides the HUD (for key-art frames); `--story` and `--mission=N` start the
+## story (see Session). Example (with a window, not --headless):
 ##   godot --path . -- --demo --shot=/tmp/hollow.png --shot-at=8
 
 var game: GameSim
@@ -15,6 +16,8 @@ var fx: FX
 var audio: AudioMix
 var hud: Hud
 var pause_menu: PauseMenu
+var presenter: StoryPresenter  # story mode only
+var story_dawn := 0.0
 var views := {}  # creature id -> GauntView
 var prev_pos := Vector2.ZERO
 var prev_angle := 0.0
@@ -73,7 +76,7 @@ func _ready() -> void:
 	get_window().title = "Hollow Hours"
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 
-	game = GameSim.new(CityLayout.DATA)
+	game = _make_game()
 	if debug_start.size() == 3:
 		game.car.body.position = Vector2(debug_start[0], debug_start[1])
 		game.car.body.angle = debug_start[2]
@@ -103,6 +106,20 @@ func _ready() -> void:
 	add_child(pause_menu)
 	pause_menu.resumed.connect(_apply_graphics)
 	pause_menu.quit_to_menu.connect(_quit_to_menu)
+	if game.story_mode:
+		hud.use_story_layout()
+		presenter = StoryPresenter.new()
+		add_child(presenter)
+		presenter.setup(game, not no_hud)
+		presenter.save_path = Session.save_path
+		presenter.quit_to_menu.connect(_quit_to_menu)
+		presenter.world_reset.connect(_reset_views)
+		pause_menu.map_screen = presenter.map_screen
+		pause_menu.map_requested.connect(presenter.open_map)
+		presenter.map_screen.closed.connect(pause_menu.focus_map_row)
+		pause_menu.restart_requested.connect(func() -> void:
+			pause_menu.resume_game()
+			presenter.restart_mission())
 	atmos.lightning.connect(_on_lightning)
 	_apply_viewport()
 	prev_pos = game.car.body.position
@@ -112,6 +129,38 @@ func _ready() -> void:
 	if Session.screen.begins_with("pause"):
 		# --screen=pause: a frame of the pause menu over the game, for screenshots
 		get_tree().create_timer(8.0).timeout.connect(_open_pause)
+	elif presenter != null and Session.screen in Session.STORY_SCREENS:
+		get_tree().create_timer(3.0).timeout.connect(_story_screen)
+
+
+## Survival is today's round; story mode is a new story, a Continue (Session.continue_save) or a mission
+## started directly (--mission=N).
+func _make_game() -> GameSim:
+	if Session.mode != "story":
+		return GameSim.new(CityLayout.DATA)
+	if Session.continue_flag:
+		Session.continue_save = SaveStore.load_save(Session.save_path)
+	var seed_in := Session.seed_flag if Session.seed_flag >= 0 else randi() % 100000
+	var g := GameSim.new(CityLayout.DATA, "bruiser", seed_in, true)
+	if Session.mission_flag > 1:
+		g.start_story_at(Session.mission_flag - 1)
+	elif not Session.continue_save.is_empty():
+		g.continue_story(Session.continue_save)
+	return g
+
+
+## --screen=map|fail|complete: open that story screen over the mission, for a screenshot.
+func _story_screen() -> void:
+	match Session.screen:
+		"map":
+			presenter.open_map()
+		"fail":
+			game.damage(1000.0, "dev")
+		"complete":
+			presenter.on_event({"type": "mission_complete", "title": "BATTERIES", "id": "batteries", "mission": 0, "final": false})
+	if Session.shot_path != "":
+		await get_tree().create_timer(Session.shot_at, true, false, true).timeout
+		Session.save_shot_and_quit(get_tree(), Session.shot_path)
 
 
 func _apply_graphics() -> void:
@@ -120,7 +169,7 @@ func _apply_graphics() -> void:
 
 
 func _open_pause() -> void:
-	pause_menu.open(audio)
+	pause_menu.open(audio, presenter != null, presenter != null and game.mission.active())
 
 
 func _quit_to_menu() -> void:
@@ -132,7 +181,14 @@ func _quit_to_menu() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not demo and event.is_action_pressed("pause") and not event.is_echo():
 		get_viewport().set_input_as_handled()
-		_open_pause()
+		if presenter == null or not presenter.blocks_pause():
+			_open_pause()
+	elif presenter != null and event.is_action_pressed("map") and not event.is_echo():
+		# Opens only: closing is the open map's own business (MapScreen._input), so the key that
+		# closes it can never reach this and open it again.
+		get_viewport().set_input_as_handled()
+		if not presenter.blocks_pause() and not pause_menu.is_open:
+			presenter.open_map()
 
 
 func _apply_viewport() -> void:
@@ -160,7 +216,8 @@ func _controls(delta: float) -> Dictionary:
 func _poll_actions() -> void:
 	if demo:
 		return
-	if Input.is_action_just_pressed("restart"):
+	# In the story a stray key must not throw a mission away: restarting is in the pause menu.
+	if presenter == null and Input.is_action_just_pressed("restart"):
 		_restart()
 	if Input.is_action_just_pressed("fullscreen"):
 		Settings.set_fullscreen(DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -172,14 +229,20 @@ func _poll_actions() -> void:
 
 
 func _restart() -> void:
-	Engine.time_scale = 1.0
 	game.reset()
-	for id in views:
-		views[id].queue_free()
-	views.clear()
 	hud.clear_end()
 	hud.show_intro()
 	hud.intro_time = 3.0
+	_reset_views()
+
+
+## After the car has been put somewhere new (a restart, a retry, going back to a save): forget the old
+## creatures and effects and start the camera over.
+func _reset_views() -> void:
+	Engine.time_scale = 1.0
+	for id in views:
+		views[id].queue_free()
+	views.clear()
 	fx.desat = 0.0
 	fx.dawn = 0.0
 	fx.fade = 0.6
@@ -202,7 +265,9 @@ func _physics_process(delta: float) -> void:
 	game.step(delta, _controls(delta))
 	for e in game.take_events():
 		_on_event(e)
-	if not ended and game.phase != GameSim.Phase.PLAYING:
+		if presenter != null:
+			presenter.on_event(e)
+	if presenter == null and not ended and game.phase != GameSim.Phase.PLAYING:
 		ended = true
 		hud.show_end(game.phase, game)
 
@@ -227,10 +292,15 @@ func _process(delta: float) -> void:
 	threat = clampf(threat_in, 0.0, 1.0)
 	audio.update_mix(game, latched, threat, true, delta)
 	hud.update_hud(game, latched, delta)
+	if presenter != null:
+		presenter.update(delta, pos, ang)
 	fx.vignette = 0.42 + threat * 0.3
 	fx.chroma = maxf(fx.chroma, clampf((car.speed() - 22.0) / 40.0, 0.0, 0.25))
-	# Dawn creeps in over the last stretch of the night.
+	# Dawn creeps in over the last stretch of the night; in the story the sky lightens a touch with each mission.
 	var dawn := clampf((game.time - (GameSim.NIGHT_LENGTH - 45.0)) / 75.0, 0.0, 1.0)
+	if presenter != null:
+		story_dawn = move_toward(story_dawn, presenter.dawn_target(), delta * 0.04)
+		dawn = story_dawn
 	if absf(dawn - atmos.dawn_amount) > 0.002:
 		atmos.set_dawn(dawn)
 		fx.dawn = dawn * 0.6

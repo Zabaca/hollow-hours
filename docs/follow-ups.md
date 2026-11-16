@@ -19,17 +19,17 @@ Nits:
 
 Nits:
 - story_data.gd's spawn note says hunters stay at least `clear` from the car, but _make's jitter makes the real guarantee about clear minus 1.7 m. The `clear` key is also unused by any mission.
-- The final step's two priority lines (end_vera, end_ruck) must keep their order in the radio queue: priority lines go ahead of normal ones but stay in order among themselves. Check this when the radio queue lands.
 - _spawn_hunting now draws one rng value per creature, so seeded replays of the pharmacy spawn changed. Nothing pins them.
+
+## From slice 3 (missions on screen)
+
+- The ending is a stub: on story_complete the presenter shows a "First light" card and returns to the title after 9 s. Slice 4 replaces it (the closing lines, the pull-back, the credits roll).
+- The radio keeps running (process mode Always) while the fail menu is open, so the wreck's call plays under it, and goes back to Pausable when the menu closes.
+- Sky: the story lightens the sky with MissionSim.dawn_amount() at 0.04 per second; the first light of the ending is slice 4's.
 
 ## From the voices review (slice 5, merged)
 
-Should-fix:
-- **Stale radio lines survive a retry.** Radio.on_event ignores the sim's "retry" event, and nothing drops queued lines on mission_failed, so an old call plays after a retry. Call clear() on retry, and drop non-priority lines on mission_failed. Slice 3 wires the radio, so it does this.
-- **README is missing the radio.** The layout and test list leave out radio.gd and radio_test.
-
 Nits:
-- The radio clock uses scaled delta, so a hit-stop makes a subtitle outlast its voice. Use delta / Engine.time_scale, as fx.gd does.
 - clear() during the opening squelch plays the closing static for a call that never spoke.
 - _music_duck takes the first Amplify on the Music bus.
 - say() or clear() before the node is in the tree errors.

@@ -65,7 +65,8 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
-	advance(delta)
+	# Real time, not game time: a hit-stop slows the game, not the voice, so the subtitle must not outlast it.
+	advance(delta / maxf(Engine.time_scale, 0.001))
 
 
 ## The file a line's audio lives in (it may not exist yet).
@@ -122,6 +123,12 @@ func clear() -> void:
 	_voice.stop()
 	if phase != Phase.IDLE and phase != Phase.CLOSING:
 		_close()
+
+
+## Drop the ordinary lines still waiting (a mission has failed): stale calls must not play after a
+## retry. Priority lines stay, and the line already speaking is not cut.
+func drop_ordinary() -> void:
+	queue = queue.filter(func(q: Dictionary) -> bool: return q["priority"])
 
 
 func is_busy() -> bool:

@@ -686,19 +686,20 @@ def street_scene(g, protos):
 
 
 def gate_frame(g):
-    """Two concrete piers either side of the gap, a lintel over it, a rail for the leaves to roll on,
-    and the road that carries on outside the wall, with its edge lines."""
-    ax = LAYOUT["arena"]
+    """Two concrete piers either side of the gap, a lintel over it, a rail for the leaves to roll on, and
+    the road that carries on outside the wall, with its edge lines. Everything of the frame stays outside
+    x = GATE["x"] (the sim's wall), so nothing stands in the arena without a collider; the leaves hang on
+    the wall's inner face and the game draws them."""
     x = GATE["x"]
     hw = GATE["width"] / 2
     for sgn in (-1, 1):
         y0, y1 = (hw, hw + 1.4) if sgn > 0 else (-hw - 1.4, -hw)
-        box(g, "concrete", x - 1.5, y0, 0.0, x + 0.7, y1, 7.0)
-        box(g, "trim", x - 1.6, y0 - 0.1, 7.0, x + 0.8, y1 + 0.1, 7.25)
-    box(g, "concrete", x - 1.3, -hw, 6.2, x + 0.5, hw, 7.0)
-    box(g, "trim", x - 1.4, -hw - 1.5, 7.0, x + 0.6, hw + 1.5, 7.25)
-    # the rail along the outside of the wall the leaves slide on
-    box(g, "metal", x - 1.75, -hw - 6.0, 0.0, x - 1.6, hw + 6.0, 0.12)
+        box(g, "concrete", x - 1.5, y0, 0.0, x, y1, 7.0)
+        box(g, "trim", x - 1.6, y0 - 0.1, 7.0, x, y1 + 0.1, 7.25)
+    box(g, "concrete", x - 1.3, -hw, 6.2, x, hw, 7.0)
+    box(g, "trim", x - 1.4, -hw - 1.5, 7.0, x, hw + 1.5, 7.25)
+    # the rail along the wall's inner face the leaves slide on
+    box(g, "metal", x, -hw - 6.0, 0.0, x + 0.12, hw + 6.0, 0.12)
     # the road outside: the avenue carries on to the cordon
     box(g, "asphalt", x - 44.0, -hw - 1.0, -0.3, x, hw + 1.0, 0.0)
     for k in range(7):

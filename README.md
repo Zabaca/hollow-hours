@@ -141,7 +141,8 @@ command from anywhere with `--path` pointing at this folder.
 
    Story flags: `--story` starts a new story, `--continue` continues from the save, and `--mission=N` (1 to 3) starts mission N directly, the car at
    its start; `--seed=N` fixes the pack; `--save=PATH` reads and writes the save there (for Continue
-   screenshots). Combine them with `--start=x,y,angle`, `--drive=0,0` and `--shot-game=SECONDS` (game time)
+   screenshots). A story run started by a flag with no `--save=` uses `user://dev_save.json`, never the player's
+   `save.json`, so screenshot runs cannot overwrite a real save. Combine them with `--start=x,y,angle`, `--drive=0,0` and `--shot-game=SECONDS` (game time)
    to photograph a moment, e.g. a hold at the shop:
    `-- --mission=1 --seed=11 --start=46,7,-1.57 --drive=0,0 --shot-game=2.7 --shot=/tmp/hold.png`.
 

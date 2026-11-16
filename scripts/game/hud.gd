@@ -30,7 +30,7 @@ var boost_label := Label.new()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 5
+	layer = MenuStyle.LAYER_HUD
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
@@ -144,13 +144,13 @@ func _label(l: Label, size: int, color: Color, weight: int = 400, tracking: int 
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## The story's HUD: the first-light countdown and the intro card give way to the objective and radar
-## (StoryHud), and the hull and boost bars move to the right of the radar in the corner.
 ## The ending: the bars and the speed go quietly.
 func fade_out(seconds: float) -> void:
-	create_tween().tween_property(root, "modulate:a", 0.0, seconds)
+	MenuStyle.fade_out(self, root, seconds)
 
 
+## The story's HUD: the first-light countdown and the intro card give way to the objective and radar
+## (StoryHud), and the hull and boost bars move to the right of the radar in the corner.
 func use_story_layout() -> void:
 	story = true
 	timer_label.visible = false

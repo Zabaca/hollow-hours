@@ -2,7 +2,8 @@ class_name CreditsRoll
 extends CanvasLayer
 ## The short credits roll at the end of the story: quiet lines rising on the dark left side of the
 ## picture, the title first, then who made what (the same lines as the Credits screen), then one last
-## line. Any key, click or button skips it. `finished` fires when it has gone off the top or been skipped.
+## line. Any key, click or button skips it. `finished` fires when it has run its length or been skipped;
+## the last line stays on screen after that, for the fade to black.
 
 signal finished
 
@@ -17,7 +18,7 @@ var _travel := 0.0
 
 
 func _ready() -> void:
-	layer = 24
+	layer = MenuStyle.LAYER_CREDITS
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	var root := Control.new()
@@ -59,6 +60,7 @@ func _fill() -> void:
 	column.add_child(MenuStyle.label(LAST_LINE, 34, MenuStyle.BONE, 300, 5))
 
 
+## Begin the roll from below the screen.
 func start() -> void:
 	column.reset_size()
 	var screen := get_viewport().get_visible_rect().size
@@ -69,6 +71,7 @@ func start() -> void:
 	visible = true
 
 
+## End it now (a key press): the text goes to where it would have stopped, and `finished` fires.
 func skip() -> void:
 	if playing:
 		_end()
@@ -76,8 +79,13 @@ func skip() -> void:
 
 func _end() -> void:
 	playing = false
-	visible = false
+	scroller.position.y = _rest_y()  # the last line stays up
 	finished.emit()
+
+
+func _rest_y() -> float:
+	var screen := get_viewport().get_visible_rect().size
+	return screen.y - (_travel - screen.y * 0.45)
 
 
 func _process(delta: float) -> void:
@@ -87,7 +95,7 @@ func _process(delta: float) -> void:
 	var u := clampf(elapsed / SECONDS, 0.0, 1.0)
 	var screen := get_viewport().get_visible_rect().size
 	# It stops a little short of leaving, so the last line is left on screen for the fade.
-	scroller.position.y = screen.y - u * (_travel - screen.y * 0.45)
+	scroller.position.y = lerpf(screen.y, _rest_y(), u)
 	if elapsed >= SECONDS:
 		_end()
 

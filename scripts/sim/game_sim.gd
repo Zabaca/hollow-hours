@@ -12,7 +12,9 @@ extends RefCounted
 enum Phase { PLAYING, WRECKED, DAWN, ESCAPED }
 
 const NIGHT_LENGTH := 300.0  # seconds until first light
-const ESCAPE_TIME := 5.0  # seconds the car takes to roll out of the gate and come to rest
+const ESCAPE_MIN_TIME := 1.5  # the roll-out lasts between these, whatever speed the car crosses at
+const ESCAPE_MAX_TIME := 7.5
+const ESCAPE_PUSH := 12.0  # a slow or stopped car is eased up to about this on the way out (m/s)
 const ESCAPE_DISTANCE := 26.0  # metres out from the gate it comes to rest, on the road outside
 const MAX_HULL := 100.0
 const CRASH := 6.0  # m/s into a wall that counts as a crash (Roadkill's threshold)
@@ -42,6 +44,9 @@ var story_mode := false
 var mission: MissionSim  # story mode only
 var escape_t := 0.0
 var escape_from := Vector2.ZERO
+var escape_time := 5.0  # how long this roll-out takes: it starts at the car's own speed, so no snap
+var escape_v0 := 0.0
+var escape_k := 0.0
 var story_done := false
 
 
@@ -304,6 +309,15 @@ func escape() -> void:
 	phase = Phase.ESCAPED
 	escape_t = 0.0
 	escape_from = car.body.position
+	# The speed along the way out is v(u) = v0 (1-u)^2 + 2 k u (1-u), u = 0..1 over the roll-out: it starts
+	# at the car's own speed v0 (so crossing the gate never changes it in one tick), may swell towards k,
+	# and is zero at the end. The distance it covers is T (v0 + k) / 3, so T follows from k.
+	var dist := escape_from.distance_to(Vector2(world.gate["pos"]) + Vector2(world.gate["dir"]) * ESCAPE_DISTANCE)
+	escape_v0 = car.speed()
+	escape_k = maxf(0.8 * escape_v0, ESCAPE_PUSH)
+	escape_time = clampf(3.0 * dist / (escape_v0 + escape_k), ESCAPE_MIN_TIME, ESCAPE_MAX_TIME)
+	# (clamped, the end is reached early or late rather than the curve bending, so rescale k to land on it)
+	escape_k = maxf(3.0 * dist / escape_time - escape_v0, 0.0)
 	pack.start_dawn()
 
 
@@ -311,10 +325,12 @@ func _step_escape(dt: float) -> void:
 	escape_t += dt
 	var dir: Vector2 = world.gate["dir"]
 	var end: Vector2 = Vector2(world.gate["pos"]) + dir * ESCAPE_DISTANCE
-	var u := clampf(escape_t / ESCAPE_TIME, 0.0, 1.0)
-	# Out along a gentle slowing curve onto the road's centre line, to rest at `end`.
-	car.body.position = escape_from.lerp(end, 1.0 - (1.0 - u) * (1.0 - u))
-	car.body.velocity = (end - escape_from) * (2.0 * (1.0 - u) / ESCAPE_TIME)
+	var u := clampf(escape_t / escape_time, 0.0, 1.0)
+	var along := end - escape_from
+	# Distance covered so far, as a share of the whole: the integral of the speed curve above.
+	var share := (escape_time / along.length()) * (escape_v0 * (1.0 - pow(1.0 - u, 3.0)) / 3.0 + escape_k * (u * u - 2.0 * pow(u, 3.0) / 3.0))
+	car.body.position = escape_from + along * clampf(share, 0.0, 1.0)
+	car.body.velocity = along.normalized() * (escape_v0 * (1.0 - u) * (1.0 - u) + 2.0 * escape_k * u * (1.0 - u))
 	car.body.angle = lerp_angle(car.body.angle, dir.angle(), minf(1.0, 4.0 * dt))
 	car.body.angular_velocity = 0.0
 	car.body.force = Vector2.ZERO  # nothing to spend while it rolls out
@@ -322,7 +338,7 @@ func _step_escape(dt: float) -> void:
 	pack.step(dt, car, last_controls)
 	for e in pack.take_events():
 		events.append(e)
-	if escape_t >= ESCAPE_TIME and not story_done and mission != null:
+	if escape_t >= escape_time and not story_done and mission != null:
 		story_done = true
 		mission.finish_story()
 	_drain_mission()

@@ -46,6 +46,11 @@ const ITEMS: Item[] = [
   { name: 'glass_break', kind: 'sfx', seconds: 1.2, prompt: 'A car window shattering, glass falling on asphalt, no music' },
   { name: 'heartbeat_loop', kind: 'sfx', seconds: 3.0, loop: true, prompt: 'A slow tense human heartbeat, deep thumps, steady, no other sound, loop' },
   { name: 'sting_latch', kind: 'sfx', seconds: 1.6, prompt: 'A low horror sting: sub-bass boom with a metallic shriek and a sudden cut, no melody' },
+  // the radio and the gate (the radio's lines are voices.ts's)
+  { name: 'radio_squelch_in', kind: 'sfx', seconds: 0.6, prompt: 'A handheld two-way radio opening a channel: a short burst of static and a soft click as the transmit key is pressed, dry, close, no voice, no music' },
+  { name: 'radio_static_out', kind: 'sfx', seconds: 1.0, prompt: 'A two-way radio transmission ending: a short fading burst of static hiss and then one sharp click, dry, close, no voice, no music' },
+  { name: 'gate_klaxon', kind: 'sfx', seconds: 3.0, prompt: 'A harsh industrial warning klaxon sounding on and off three times as a security gate is about to open, outdoors at night in the rain, no voice, no music' },
+  { name: 'gate_leaves', kind: 'sfx', seconds: 4.0, prompt: 'Two heavy steel gate leaves rolling open on iron wheels, a deep grinding rumble with metallic clanks, outdoors at night beside a concrete wall, no music' },
   // music
   { name: 'music_tension', kind: 'music', seconds: 60, loop: true, prompt: 'Dark ambient horror score for a night drive through an abandoned city. A slow evolving sub-bass drone, distant detuned strings, sparse metallic scrapes and a soft low pulse. No melody, no drums, no vocals. Unsettling, spacious, steady, loopable.' },
   { name: 'music_chase', kind: 'music', seconds: 60, loop: true, prompt: 'Dark horror chase music for a night drive while being hunted. A driving low pulse, tense ostinato of detuned synth and bowed metal, dissonant strings rising, urgent but cold. No vocals, no melody lead, loopable, steady intensity.' },

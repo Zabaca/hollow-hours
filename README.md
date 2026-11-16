@@ -195,6 +195,15 @@ Sound: `ELEVENLABS_API_KEY=... bun tools/audio/generate.ts [name ...]` buys only
 `engine.wav`, `skid.wav`, the crash, wreck, slam, sputter, stomp and splat recordings are copied from
 its `game/audio/` unchanged.
 
+The radio's voices: `bun tools/audio/voices.ts --dry` prints what is missing and the character count and
+buys nothing; `ELEVENLABS_API_KEY=... bun tools/audio/voices.ts [id ...]` voices the 21 lines of
+`scripts/sim/story_data.gd` (read through a headless Godot dump, so there is one copy of the script) with
+`eleven_v4`, Vera as Matilda, Teo as Liam and Ruck as Bill, into `assets/audio/radio/<id>.mp3`. A take is
+cached under the id and a hash of its text and voice, so editing a line re-voices only that line; one run
+refuses more than 1,500 characters without `--allow-more`. Spend is noted in `tools/audio/credits.log`.
+The Voice bus (a 300 to 3,400 Hz radio with a little grit) is in `scripts/game/audio_mix.gd`, and
+`scripts/game/radio.gd` plays the lines: queue, squelch, the music's dip and the subtitle.
+
 ## Tuning knobs
 
 Everything below is a constant to edit; none of it has been balanced by playing.

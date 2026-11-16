@@ -26,6 +26,8 @@ var paused := false
 var demo := false
 var shot_path := ""
 var shot_at := 6.0
+var shot_game := -1.0
+var shot_speed := -1.0
 var shot_taken := false
 var started_ms := 0
 var route_i := 0
@@ -50,6 +52,10 @@ func _ready() -> void:
 			Settings.apply_preset(false)
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
+		elif a.begins_with("--shot-speed="):
+			shot_speed = float(a.trim_prefix("--shot-speed="))
+		elif a.begins_with("--shot-game="):
+			shot_game = float(a.trim_prefix("--shot-game="))
 		elif a.begins_with("--shot-at="):
 			shot_at = float(a.trim_prefix("--shot-at="))
 	get_window().title = "Hollow Hours"
@@ -223,7 +229,7 @@ func _process(delta: float) -> void:
 		atmos.set_dawn(dawn)
 		fx.dawn = dawn * 0.6
 
-	if shot_path != "" and not shot_taken and (Time.get_ticks_msec() - started_ms) / 1000.0 >= shot_at:
+	if shot_path != "" and not shot_taken and ((shot_speed >= 0.0 and car.speed() >= shot_speed and game.time > 5.0) or (shot_game >= 0.0 and game.time >= shot_game) or (shot_game < 0.0 and shot_speed < 0.0 and (Time.get_ticks_msec() - started_ms) / 1000.0 >= shot_at)):
 		shot_taken = true
 		_take_shot()
 

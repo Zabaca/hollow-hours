@@ -46,7 +46,7 @@ func _ground_material(kind: String) -> ShaderMaterial:
 	m.shader = GROUND_SHADER
 	m.set_shader_parameter("noise_tex", noise_tex)
 	if kind == "asphalt":
-		m.set_shader_parameter("base_color", Color(0.085, 0.09, 0.1))
+		m.set_shader_parameter("base_color", Color(0.12, 0.125, 0.14))
 		m.set_shader_parameter("puddle_amount", 0.62)
 		m.set_shader_parameter("base_rough", 0.5)
 	else:

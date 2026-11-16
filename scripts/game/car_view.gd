@@ -7,6 +7,8 @@ extends Node3D
 
 const WHEEL_R := 0.42
 const SKID_POOL := 140
+const CAR_LAYER := 2  # render layer bit value (layer 2); the headlights' cull_mask leaves it out
+const BEAM_MASK := 1048575 - CAR_LAYER
 
 var model: Node3D
 var steers := {}  # "FL"/"FR" -> pivot node
@@ -18,6 +20,7 @@ var ground := 0.0
 var prev_vel := Vector2.ZERO
 var head_l: SpotLight3D
 var head_r: SpotLight3D
+var pool_light: SpotLight3D
 var tail: OmniLight3D
 var reverse: OmniLight3D
 var spray: Array = []
@@ -33,6 +36,9 @@ func build() -> void:
 	var scene: PackedScene = load("res://assets/models/bruiser.glb")
 	model = scene.instantiate()
 	add_child(model)
+	# The car lives on render layer 2 and the headlights do not light that layer, so the
+	# bumper, bull bar and headlight housings cannot shadow the beams they sit in.
+	_set_layer(model, CAR_LAYER)
 	for k in ["FL", "FR"]:
 		steers[k] = model.find_child("steer_" + k, true, false)
 	for k in ["FL", "FR", "RL", "RR"]:
@@ -42,26 +48,69 @@ func build() -> void:
 	_mark_pool()
 
 
+func _set_layer(node: Node, bit: int) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = bit
+	for c in node.get_children():
+		_set_layer(c, bit)
+
+
+## A soft low-beam pattern: wide, with the brightest part in the lower half (the road) and a
+## gentle fall-off at the sides and the top, so no hard edge shows on a wall or in the fog.
+func _beam_texture() -> ImageTexture:
+	var n := 256
+	var img := Image.create(n, n, false, Image.FORMAT_RGB8)
+	for y in n:
+		for x in n:
+			var u := (float(x) / (n - 1)) * 2.0 - 1.0
+			var v := (float(y) / (n - 1)) * 2.0 - 1.0  # +1 is the bottom of the beam
+			var r := Vector2(u, v * 0.9).length()
+			var radial := smoothstep(1.0, 0.25, r)
+			var vertical := lerpf(0.18, 1.0, smoothstep(-0.55, 0.45, v))
+			var k := radial * vertical
+			img.set_pixel(x, y, Color(k, k, k))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
 func _lights() -> void:
+	var beam := _beam_texture()
 	for sd in [-1.0, 1.0]:
 		var s := SpotLight3D.new()
-		s.spot_range = 60.0
-		s.spot_angle = 30.0
-		s.spot_angle_attenuation = 0.75
-		s.spot_attenuation = 0.8
-		s.light_energy = 34.0
+		s.spot_range = 55.0
+		s.spot_angle = 40.0
+		s.spot_angle_attenuation = 1.0
+		s.spot_attenuation = 1.0
+		s.light_energy = 70.0
 		s.light_color = Color(1.0, 0.95, 0.82)
-		s.light_volumetric_fog_energy = 2.2
-		s.light_specular = 1.2
+		s.light_volumetric_fog_energy = 1.4
+		s.light_specular = 1.0
+		s.light_projector = beam
+		s.light_cull_mask = BEAM_MASK
 		s.shadow_enabled = true
-		s.shadow_bias = 0.04
+		s.shadow_bias = 0.05
 		s.position = Vector3(2.0, 0.78, sd * 0.66)
 		model.add_child(s)
-		s.basis = Basis.looking_at(Vector3(1.0, -0.075, sd * -0.03), Vector3.UP)
+		s.basis = Basis.looking_at(Vector3(1.0, -0.1, 0.0), Vector3.UP)
 		if sd < 0.0:
 			head_l = s
 		else:
 			head_r = s
+	# The near road: a wide, low, shadowless pool right in front of the bumper that the two main
+	# beams overlap into, so the ground ahead is never a dark wedge.
+	var pool := SpotLight3D.new()
+	pool.spot_range = 26.0
+	pool.spot_angle = 62.0
+	pool.spot_angle_attenuation = 0.8
+	pool.light_energy = 24.0
+	pool.light_color = Color(1.0, 0.94, 0.8)
+	pool.light_volumetric_fog_energy = 0.0
+	pool.light_cull_mask = BEAM_MASK
+	pool.shadow_enabled = false
+	pool.position = Vector3(2.2, 0.8, 0.0)
+	model.add_child(pool)
+	pool.basis = Basis.looking_at(Vector3(1.0, -0.22, 0.0), Vector3.UP)
+	pool_light = pool
 	tail = OmniLight3D.new()
 	tail.light_color = Color(1.0, 0.1, 0.08)
 	tail.light_energy = 0.7
@@ -195,8 +244,9 @@ func sync(game: GameSim, world: SimWorld, pos: Vector2, angle: float, delta: flo
 	var flick := 1.0
 	if game.sputter > 0.0:
 		flick = 0.35 if int(Time.get_ticks_msec() / 60) % 2 == 0 else 1.0
-	head_l.light_energy = 34.0 * flick
-	head_r.light_energy = 34.0 * flick
+	head_l.light_energy = 70.0 * flick
+	head_r.light_energy = 70.0 * flick
+	pool_light.light_energy = 24.0 * flick
 
 	# Spray off the tyres once moving; marks when the rear tyres slide.
 	var ratio := clampf((speed - 5.0) / 20.0, 0.0, 1.0)

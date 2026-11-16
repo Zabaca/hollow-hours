@@ -42,3 +42,20 @@ Nits:
 - radio.gd builds the path twice, and advance()'s OPENING and GAP branches are identical.
 - voices.ts copies balance(), buy() and the run loop from generate.ts, hardcodes `godot` instead of honouring $GODOT, re-converts all 21 files on a run with no ids, and exits 0 when a line fails.
 - generate.ts's header says tools/audio/out is git-ignored, but the raw takes are committed on purpose. Fix the header.
+
+## From the slice 4 review (the West Gate and the ending, merged)
+
+Should-fix (in the followups-2 round):
+- **Speed snap at the gate.** The escape lerps from the trigger to a fixed spot, so a car arriving at 30 m/s drops to about 12 m/s in one tick, and the chase camera's FOV and distance snap. Start the curve at the car's own speed.
+- **Pause during the credits.** Pause and Map still open in the roll's first second, and the roll then eats the next key as a skip. Pausing during the fade leaves an invisible live menu under the blackout. Block pause and the map once the ending reaches roll, fade or done.
+- **Piers stick into the arena with no collider.** They reach 0.7 m past the sim wall at x = -70, and the shut leaves sit about 1.8 m behind the wall. Keep the piers outside x = -70 and put the leaves at the wall's inner face.
+- **Screenshot flags write the real save.** `--screen=ending` and `--mission` without `--save=` overwrote the player's save on 2026-11-16 (it was moved aside to agent-run-aside/). Story screenshot flags should default to a scratch save path.
+- **The pull-back jumps 2.6 m.** It starts at dist + 2.6 while the chase camera rests at dist. Lerp the radius from dist.
+- **The last credit line vanishes before the fade.** _end() hides the roll; keep it visible through the fade.
+
+Nits:
+- hud.gd: fade_out sits under use_story_layout's doc comment. fade_out is duplicated in hud.gd and story_hud.gd. The gate_leaves play_at line appears twice in main.gd. Docs are missing on CreditsRoll.start and skip and GateView.setup. gate_view.gd's shape comments are stale. city.py's gate_frame has an unused `ax`. CanvasLayer numbers 24 and 30 are magic.
+- Survive the Night's dawn fog now thins (the spec said unchanged; the lead accepted it).
+- The closing lines play as the car crosses the gate, before the pull-back. The spec placed them after.
+- pullback_progress() returns 0 at done, so the camera snaps back under the black.
+- The fail menu freezes the gate leaves about 17% closed. A restart during the gate run plays a stray gate_leaves sound.

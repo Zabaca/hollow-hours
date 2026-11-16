@@ -12,6 +12,7 @@ var dist := 8.6
 var time := 0.0
 var world: SimWorld
 var inited := false
+var pull := 1.0  # how much of the way from the car to the wanted spot the camera is allowed
 
 
 func add_trauma(amount: float) -> void:
@@ -37,7 +38,7 @@ func update_camera(delta: float, car_pos: Vector2, car_angle: float, car_vel: Ve
 	var fwd := Vector3(cos(yaw), 0.0, -sin(yaw))
 	var focus := GM.to3(car_pos, ground + 1.1) + fwd * 2.6
 	var cam_pos := focus - fwd * (d + 2.6) + Vector3(0.0, 3.5 + clampf(speed * 0.02, 0.0, 0.8), 0.0)
-	cam_pos = _clear_of_buildings(GM.to3(car_pos, ground + 1.2), cam_pos)
+	cam_pos = _pull_in(GM.to3(car_pos, ground + 1.8), cam_pos, delta)
 	look_at_from_position(cam_pos, focus, Vector3.UP)
 
 	trauma = maxf(0.0, trauma - delta * 0.9)
@@ -52,21 +53,72 @@ func update_camera(delta: float, car_pos: Vector2, car_angle: float, car_vel: Ve
 	fov = 66.0 + clampf(speed * 0.28, 0.0, 9.0) + boost_amount * 7.0 + fov_punch
 
 
-## Slide the camera toward the car until it is out of every building box.
-func _clear_of_buildings(from: Vector3, to: Vector3) -> Vector3:
+const PAD := 0.45  # the camera is a small ball: this far from any solid
+const MIN_DIST := 1.4  # never closer to the car than this, however tight
+const LIFT := 2.6  # extra height when squeezed, to look down over the car
+
+
+## How high a collider stands (the sim's boxes are plan-view only).
+static func box_height(kind: String) -> float:
+	match kind:
+		"wreck":
+			return 2.4
+		"prop":
+			return 1.4
+		"fence":
+			return 1.9
+	return 90.0
+
+
+## Where along from -> to (0..1) a ball of radius `pad` first meets one of the world's boxes;
+## 1.0 when the way is clear. A box the start is already inside is skipped.
+static func clear_fraction(world: SimWorld, from: Vector3, to: Vector3, pad: float) -> float:
+	var d := to - from
+	var best := 1.0
+	for b in world.boxes:
+		var lo := Vector3(float(b["x0"]) - pad, -pad, -float(b["y1"]) - pad)
+		var hi := Vector3(float(b["x1"]) + pad, box_height(String(b["kind"])) + pad, -float(b["y0"]) + pad)
+		var tmin := 0.0
+		var tmax := 1.0
+		var miss := false
+		for axis in 3:
+			var o: float = from[axis]
+			var dir: float = d[axis]
+			if absf(dir) < 1e-9:
+				if o < lo[axis] or o > hi[axis]:
+					miss = true
+					break
+			else:
+				var t1: float = (lo[axis] - o) / dir
+				var t2: float = (hi[axis] - o) / dir
+				if t1 > t2:
+					var tmp := t1
+					t1 = t2
+					t2 = tmp
+				tmin = maxf(tmin, t1)
+				tmax = minf(tmax, t2)
+				if tmin > tmax:
+					miss = true
+					break
+		if miss or tmin <= 0.0:
+			continue  # no hit, or the start is inside this box
+		best = minf(best, tmin)
+	return best
+
+
+## Pull the wanted camera position in so it is never inside or behind a wall: quickly when a
+## wall comes between, slowly back out when it clears. When squeezed it also rises a little.
+func _pull_in(pivot: Vector3, wanted: Vector3, delta: float) -> Vector3:
 	if world == null:
-		return to
-	var p := to
-	for i in 8:
-		var inside := false
-		var m := GM.from3(p)
-		for b in world.boxes:
-			if b["kind"] == "wreck" or b["kind"] == "prop":
-				continue
-			if m.x > b["x0"] - 0.4 and m.x < b["x1"] + 0.4 and m.y > b["y0"] - 0.4 and m.y < b["y1"] + 0.4 and p.y < 40.0:
-				inside = true
-				break
-		if not inside:
-			return p
-		p = from.lerp(p, 0.8)
-	return p
+		return wanted
+	var length := pivot.distance_to(wanted)
+	var target := clampf(clear_fraction(world, pivot, wanted, PAD), MIN_DIST / maxf(length, 0.01), 1.0)
+	if target < pull:
+		pull = lerpf(pull, target, GM.damp(20.0, delta))
+		# Fast, but never further out than the wall allows (the pad is the slack).
+		pull = minf(pull, target + 0.3 / maxf(length, 0.01))
+	else:
+		pull = lerpf(pull, target, GM.damp(1.6, delta))
+	var pos := pivot.lerp(wanted, pull)
+	pos.y += (1.0 - pull) * LIFT
+	return pos

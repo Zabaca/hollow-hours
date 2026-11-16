@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_no_wall_walking()
 	_test_nav_round_building()
 	_test_dawn()
+	_test_camera_pull()
 	print("")
 	print("pack_test: %d failed" % failures)
 	get_tree().quit(1 if failures > 0 else 0)
@@ -134,3 +135,20 @@ func _test_dawn() -> void:
 			any_alive = true
 	_check(sim.phase == GameSim.Phase.DAWN or sim.phase == GameSim.Phase.WRECKED, "the night ends at first light", "phase=%d" % sim.phase)
 	_check(int(tally.get("dawn", 0)) == 1 and not any_alive, "the survivors flee at dawn", "dawn events=%d alive=%s" % [int(tally.get("dawn", 0)), any_alive])
+
+
+func _test_camera_pull() -> void:
+	var sim := _sim()
+	var w := sim.world
+	# The NW tower stands at x -54..-34, y 10..38; a camera behind a car at the south wall of
+	# the dark block, looking through it, must be pulled in; an open street must not.
+	var car := Vector3(-44.0, 1.8, -8.0)  # in the street south of the tower
+	var behind_wall := Vector3(-44.0, 4.0, -30.0)  # north of it, inside the tower's footprint beyond
+	var through := ChaseCamera.clear_fraction(w, car, behind_wall, 0.45)
+	_check(through < 1.0, "a camera ray through a building is stopped", "fraction=%.2f" % through)
+	var open := ChaseCamera.clear_fraction(w, Vector3(-30.0, 1.8, 0.0), Vector3(-10.0, 4.0, 0.0), 0.45)
+	_check(open == 1.0, "an open street is not", "fraction=%.2f" % open)
+	# A parked wreck is low: a camera at head height is stopped by it, one high above passes over.
+	var low := ChaseCamera.clear_fraction(w, Vector3(13.5, 1.0, -10.0), Vector3(13.5, 1.0, -20.0), 0.45)
+	var high := ChaseCamera.clear_fraction(w, Vector3(13.5, 6.0, -10.0), Vector3(13.5, 6.0, -20.0), 0.45)
+	_check(low < 1.0 and high == 1.0, "a low camera is stopped by a wreck and a high one passes over", "low=%.2f high=%.2f" % [low, high])

@@ -5,6 +5,10 @@ extends RefCounted
 ## it reads the game it is handed (it keeps no reference to it) and acts on it through the pack's
 ## hooks and GameSim's place_car, escape and hull.
 ##
+## The presenter (the game scene) stops stepping GameSim on "mission_failed" and shows the fail menu;
+## retry, restart and quit are the menu's choices (GameSim.retry_mission, restart_mission). The sim
+## would otherwise go on: a timed-out mission leaves the car alive, with the pack still hunting.
+##
 ## States: ROAM (free roam; the next mission's start is lit), ACTIVE (a mission, one step at a
 ## time), FAILED (waiting for retry, restart or quit), ENDED (the car has gone out of the gate).
 ##
@@ -18,10 +22,6 @@ extends RefCounted
 ##   save {data}  (a save is asked for: write it with SaveStore)
 
 enum State { ROAM, ACTIVE, FAILED, ENDED }
-
-const MIN_RETRY_HULL := 60.0
-const HOLD_SPEED := 2.0  # m/s: a hold fills only below this
-const ROAM_PACK := 3
 
 var state: int = State.ROAM
 var next_mission := 0
@@ -212,6 +212,13 @@ func resume(game: GameSim, save: Dictionary) -> void:
 		start_mission(game, next_mission)
 
 
+## Shut the gate, saying so when it was open, so a drawn gate never stays open over a closed wall.
+func _close_gate(game: GameSim) -> void:
+	if game.world.gate["open"]:
+		game.world.gate["open"] = false
+		ev("gate_closed")
+
+
 func _enter_roam(game: GameSim) -> void:
 	state = State.ROAM
 	mission = -1
@@ -219,9 +226,9 @@ func _enter_roam(game: GameSim) -> void:
 	checkpoint = {}
 	_alert_all = false
 	_roam_wreck_reported = false
-	game.world.gate["open"] = false
-	game.pack.reset_pack(game.car, ROAM_PACK, false)
-	game.pack.set_size(ROAM_PACK)
+	_close_gate(game)
+	game.pack.reset_pack(game.car, StoryData.ROAM_PACK, false)
+	game.pack.set_size(StoryData.ROAM_PACK)
 
 
 func start_mission(game: GameSim, i: int) -> void:
@@ -232,8 +239,8 @@ func start_mission(game: GameSim, i: int) -> void:
 	checkpoint = {}
 	timers = {}
 	_alert_all = false
-	game.pack.alerted_spawns = false
-	game.world.gate["open"] = false
+	game.pack.stand_down()
+	_close_gate(game)
 	game.hull = GameSim.MAX_HULL
 	ev("mission_started", {"mission": i, "id": m["id"], "title": m["title"], "number": i + 1})
 	_apply(game, m.get("begin", {}))
@@ -308,7 +315,7 @@ func _step_active(dt: float, game: GameSim) -> void:
 			if _inside(game, s):
 				_end_step(game)
 		"hold":
-			var inside := _inside(game, s) and game.car.speed() < HOLD_SPEED
+			var inside := _inside(game, s) and game.car.speed() < StoryData.HOLD_SPEED
 			if inside:
 				hold = minf(hold + dt, float(s["seconds"]))
 			if inside != holding:
@@ -325,7 +332,8 @@ func _step_active(dt: float, game: GameSim) -> void:
 			if step_clock >= float(s["seconds"]):
 				_end_step(game)
 		"gate":
-			if game.world.gate["open"] and _inside(game, s):
+			# Lined up with the gap, not merely near the wall: the escape must not roll through bricks.
+			if game.world.gate["open"] and _inside(game, s) and game.world.in_gap(game.car):
 				_end_step(game)
 
 
@@ -357,7 +365,8 @@ func _fire_during(game: GameSim, s: Dictionary, clock: float) -> void:
 
 func _end_step(game: GameSim) -> void:
 	var s := step_data()
-	_apply(game, s.get("end", {}), step_i + 1)
+	var last: bool = step_i + 1 >= mission_data()["steps"].size()
+	_apply(game, s.get("end", {}), step_i + 1, last)
 	if state != State.ACTIVE:
 		return
 	if step_i + 1 >= mission_data()["steps"].size():
@@ -373,7 +382,7 @@ func _complete_mission(game: GameSim) -> void:
 	var final := next_mission >= StoryData.MISSIONS.size()
 	timers = {}
 	checkpoint = {}
-	_apply(game, m.get("end", {}))
+	_apply(game, m.get("end", {}), -1, true)
 	ev("mission_complete", {"mission": mission, "id": m["id"], "title": m["title"], "final": final})
 	if final:
 		state = State.ENDED
@@ -381,11 +390,14 @@ func _complete_mission(game: GameSim) -> void:
 		state = State.ROAM
 		_roam_wreck_reported = false
 		_alert_all = false
-		game.pack.alerted_spawns = false
-		game.world.gate["open"] = false
-		game.pack.set_size(ROAM_PACK)
-	last_save = save_data()
-	ev("save", {"data": last_save.duplicate(true)})
+		game.pack.stand_down()
+		_close_gate(game)
+		game.pack.set_size(StoryData.ROAM_PACK)
+	# The last mission asks for no save of its own: the car is still rolling out of the gate, and a
+	# save now (next "", ending not seen) would strand Continue. finish_story saves once it is over.
+	if not final:
+		last_save = save_data()
+		ev("save", {"data": last_save.duplicate(true)})
 
 
 ## The car has gone out of the gate and come to rest: the story is over. GameSim calls this.
@@ -399,9 +411,11 @@ func finish_story() -> void:
 # ----------------------------------------------------------------------------- effects
 
 
-func _apply(game: GameSim, fx: Dictionary, next_step: int = -1) -> void:
+## Apply an effect (see StoryData). `priority` makes its lines jump the radio queue: the closing
+## lines of a completed mission do.
+func _apply(game: GameSim, fx: Dictionary, next_step: int = -1, priority: bool = false) -> void:
 	for id in fx.get("lines", []):
-		line(id)
+		line(id, priority)
 	if fx.has("pack"):
 		game.pack.set_size(int(fx["pack"]))
 	if fx.has("alert"):
@@ -442,18 +456,28 @@ func line(id: String, priority: bool = false) -> void:
 	ev("line", {"id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": priority})
 
 
-## Creatures placed a ring's radius from a place, already hunting: the first free spot of eight tries
-## at a random bearing (the pack's own generator, so a seed replays), else the last one tried.
+## Creatures placed a ring's radius from a place, already hunting. Eight bearings from a random start
+## (the pack's own generator, so a seed replays): the first with a clear line from the place and at
+## least `clear` metres from the car, else the one furthest from the car. Never inside the car.
 func _spawn_hunting(game: GameSim, sp: Dictionary) -> void:
 	var center := StoryData.place_pos(sp["place"])
 	var ring := float(sp.get("ring", 8.0))
+	var clear := float(sp.get("clear", 6.0))
+	var car_at := game.car.body.position
 	for n in int(sp["count"]):
-		var p := center
+		var start := game.pack.rng.randf() * TAU
+		var best := center
+		var best_d := -1.0
 		for attempt in 8:
-			p = center + Vector2.from_angle(game.pack.rng.randf() * TAU) * ring
-			if game.world.line_clear(center, p, 0.6):
+			var p := center + Vector2.from_angle(start + attempt * TAU / 8.0) * ring
+			var d := p.distance_to(car_at)
+			if game.world.line_clear(center, p, 0.6) and d >= clear:
+				best = p
 				break
-		game.pack.place_hunting(p, game.car)
+			if d > best_d:
+				best_d = d
+				best = p
+		game.pack.place_hunting(best, game.car)
 
 
 # ----------------------------------------------------------------------------- failing and retrying
@@ -465,9 +489,7 @@ func _fail(game: GameSim, reason: String) -> void:
 	timers = {}
 	if reason == "wrecked":
 		totals["wrecks"] += 1
-	if game.world.gate["open"]:
-		game.world.gate["open"] = false
-		ev("gate_closed")
+	_close_gate(game)
 	var r: Dictionary = StoryData.REASONS[reason]
 	var m := mission_data()
 	ev("mission_failed", {"mission": mission, "id": m["id"], "title": m["title"], "reason": reason, "text": r["text"]})
@@ -484,10 +506,10 @@ func retry(game: GameSim) -> void:
 		restart_mission(game)
 		return
 	var cp := checkpoint
-	game.place_car(cp["pos"], float(cp["angle"]), maxf(float(cp["hull"]), MIN_RETRY_HULL))
+	game.place_car(cp["pos"], float(cp["angle"]), maxf(float(cp["hull"]), StoryData.RETRY_MIN_HULL))
 	game.pack.reset_pack(game.car, maxi(int(cp["pack"]), 0), bool(cp["alert_all"]))
 	game.pack.set_size(int(cp["pack"]))
-	game.world.gate["open"] = false
+	_close_gate(game)
 	state = State.ACTIVE
 	timers = {}
 	fail_reason = ""
@@ -505,6 +527,6 @@ func restart_mission(game: GameSim) -> void:
 	var pid: String = m["start"] if m["start"] != "" else "safe_start"
 	var place: Dictionary = StoryData.PLACES[pid]
 	game.place_car(place["pos"], float(place["angle"]), GameSim.MAX_HULL)
-	game.pack.reset_pack(game.car, int(m["begin"].get("pack", ROAM_PACK)), false)
+	game.pack.reset_pack(game.car, int(m["begin"].get("pack", StoryData.ROAM_PACK)), false)
 	ev("retry", {"to": "start"})
 	start_mission(game, mission)

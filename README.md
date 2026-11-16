@@ -106,8 +106,8 @@ command from anywhere with `--path` pointing at this folder.
    `car_test` replays scripted driving runs from `tests/car_reference.json` (made by Roadkill's
    own `car.js`, `body.js` and `world.js` collision code) through the GDScript port and compares
    position, velocity and heading every 0.125 s. To regenerate the reference:
-   `bun tests/reference/gen_reference.mjs` (reads `/Users/uptown/Projects/zabaca/games/games/roadkill/game`
-   or the path you pass).
+   `bun tests/reference/gen_reference.mjs [path]` (reads Roadkill's `car.js`, `body.js` and `world.js`
+   from the Roadkill `game` folder named on the command line, else the script's default location).
 
 5. Autopilot and screenshots (need a window and a GPU, so not `--headless`). Arguments after `--`
    are the game's:

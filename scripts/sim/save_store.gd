@@ -1,13 +1,13 @@
 class_name SaveStore
 extends RefCounted
-## The save and the settings as JSON in the player's data folder. A write goes to a temporary file
+## The save as JSON in the player's data folder, and the JSON file I/O the settings (Settings in
+## scripts/game/settings.gd, which owns their schema) go through too. A write goes to a temporary file
 ## and is then renamed over the target, so a crash mid-write never leaves a broken file. A save that
 ## cannot be read, or has an unknown version or the wrong shape, counts as no save and is kept aside
 ## (renamed to <path>.bad-<time>), never deleted. The path is a parameter so tests use their own.
 
 const VERSION := 1
 const SAVE_PATH := "user://save.json"
-const SETTINGS_PATH := "user://settings.json"
 
 
 ## Write `data` as JSON through a temporary file and a rename. False when it could not.
@@ -89,32 +89,4 @@ static func load_save(path: String = SAVE_PATH) -> Dictionary:
 
 
 static func write_save(data: Dictionary, path: String = SAVE_PATH) -> bool:
-	return write_json(path, data)
-
-
-## Settings: the defaults with every key the file holds (of the same kind of value) laid over them.
-## A missing file gives the defaults; a damaged one gives the defaults and is set aside.
-static func load_settings(defaults: Dictionary, path: String = SETTINGS_PATH) -> Dictionary:
-	var out := defaults.duplicate(true)
-	if not FileAccess.file_exists(path):
-		return out
-	var d: Variant = read_json(path)
-	if d == null:
-		set_aside(path)
-		return out
-	for k in defaults:
-		if not d.has(k):
-			continue
-		var want := typeof(defaults[k])
-		var got := typeof(d[k])
-		if want == got:
-			out[k] = d[k]
-		elif want == TYPE_INT and got == TYPE_FLOAT:
-			out[k] = int(d[k])
-		elif want == TYPE_FLOAT and got == TYPE_INT:
-			out[k] = float(d[k])
-	return out
-
-
-static func write_settings(data: Dictionary, path: String = SETTINGS_PATH) -> bool:
 	return write_json(path, data)

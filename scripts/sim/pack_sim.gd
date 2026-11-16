@@ -195,6 +195,11 @@ func set_size(n: int) -> void:
 	spawn_timer = minf(spawn_timer, 0.0)
 
 
+## The story's hook: creatures the director adds from now on are no longer alerted on arrival.
+func stand_down() -> void:
+	alerted_spawns = false
+
+
 ## A fresh pack of `count` creatures out of sight of the car, for a retry, a restart or a load.
 func reset_pack(car: CarSim, count: int, alerted: bool) -> void:
 	gaunts.clear()

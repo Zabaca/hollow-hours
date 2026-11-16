@@ -51,12 +51,17 @@ func height_at(p: Vector2) -> float:
 	return 0.0
 
 
+## Is the car lined up with the gate's gap: its centre within the gap's width less its own half width.
+func in_gap(car: CarSim) -> bool:
+	return absf(car.body.position.y - gate["pos"].y) <= float(gate["width"]) * 0.5 - car.hit_half_width
+
+
 ## The hardest hit this step as {"impact", "point", "kind"}: the car against the arena wall,
 ## posts and boxes, in the order world.js driveCar does it.
 func collide_car(car: CarSim, min_impact: float = 6.0) -> Array:
 	var hits: Array = []
 	var box := arena
-	if gate["open"] and absf(car.body.position.y - gate["pos"].y) <= float(gate["width"]) * 0.5 - car.hit_half_width:
+	if gate["open"] and in_gap(car):
 		box = arena.duplicate()
 		box["left"] = float(arena["left"]) - 60.0
 	var wall := SimCollide.keep_in_box(car, box, 0.35)

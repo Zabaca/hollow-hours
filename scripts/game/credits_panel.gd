@@ -28,7 +28,7 @@ func _ready() -> void:
 	pad.add_theme_constant_override("margin_left", 30)
 	outer.add_child(pad)
 	var col := VBoxContainer.new()
-	col.custom_minimum_size.x = 880.0
+	col.custom_minimum_size.x = 980.0
 	col.add_theme_constant_override("separation", 0)
 	pad.add_child(col)
 	var title := MenuStyle.label("CREDITS", 54, MenuStyle.BONE, 300, 10)
@@ -47,7 +47,7 @@ func _ready() -> void:
 	col.add_child(grid)
 	for pair in CREDITS:
 		var who := MenuStyle.label(String(pair[0]).to_upper(), 16, MenuStyle.DIM, 600, 5)
-		who.custom_minimum_size = Vector2(350, 34)
+		who.custom_minimum_size = Vector2(420, 34)
 		who.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var what := MenuStyle.label(pair[1], 23, MenuStyle.BONE, 500, 2)
 		what.custom_minimum_size = Vector2(560, 34)
@@ -58,7 +58,7 @@ func _ready() -> void:
 	col.add_child(gap)
 	var lic := MenuStyle.label(LICENCES, 14, Color(0.44, 0.47, 0.5), 500, 1)
 	lic.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lic.custom_minimum_size.x = 880
+	lic.custom_minimum_size.x = 980
 	col.add_child(lic)
 	var gap2 := Control.new()
 	gap2.custom_minimum_size.y = 16

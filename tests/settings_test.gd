@@ -19,6 +19,9 @@ func _ready() -> void:
 	_test_unknown_version_gives_defaults()
 	_test_bad_fields_keep_defaults_and_volumes_clamp()
 	_test_volumes_reach_buses()
+	_test_damaged_files_are_kept_aside()
+	_test_run_time_graphics_override_is_not_saved()
+	_test_mute_survives_a_new_audio_mix()
 	_cleanup()
 	print("")
 	print("settings_test: %d failed" % failures)
@@ -32,9 +35,10 @@ func _check(ok: bool, name: String, detail: String = "") -> void:
 
 
 func _cleanup() -> void:
-	for p in [PATH, PATH + ".tmp"]:
-		if FileAccess.file_exists(p):
-			DirAccess.remove_absolute(p)
+	var d := DirAccess.open("user://")
+	for f in d.get_files():
+		if f.begins_with("settings_test.json"):
+			d.remove(f)
 
 
 func _is_default() -> bool:
@@ -64,6 +68,7 @@ func _test_round_trip() -> void:
 	Settings.volumes["effects"] = 0.0
 	Settings.volumes["voice"] = 0.65
 	Settings.apply_preset(false)
+	Settings.saved_high = false  # the player's choice (set_graphics does both, and saves)
 	Settings.fullscreen = true
 	Settings.subtitles = false
 	var saved := Settings.save_file(PATH)
@@ -127,3 +132,63 @@ func _test_volumes_reach_buses() -> void:
 	var voice_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Voice"))
 	var master_db := AudioServer.get_bus_volume_db(0)
 	_check(absf(music_db - (-6.02)) < 0.05 and voice_db < -60.0 and absf(master_db) < 0.01, "the volumes are applied to their buses", "music=%.2f dB voice=%.1f dB master=%.2f dB" % [music_db, voice_db, master_db])
+
+
+func _aside() -> Array:
+	var out: Array = []
+	for f in DirAccess.open("user://").get_files():
+		if f.begins_with("settings_test.json.bad"):
+			out.append(f)
+	return out
+
+
+func _test_damaged_files_are_kept_aside() -> void:
+	_cleanup()
+	_write_raw("{\"version\": 1, \"volumes\": {\"master\": 0.")
+	Settings.load_file(PATH)
+	var first := _aside()
+	_check(first.size() == 1 and not FileAccess.file_exists(PATH), "a damaged settings file is kept aside, not deleted", str(first))
+	if first.size() == 1:
+		_check(FileAccess.get_file_as_string("user://" + first[0]).begins_with("{\"version\": 1"), "and kept as it was")
+	_write_raw(JSON.stringify({"version": 99, "volumes": {"master": 0.1}}))
+	Settings.load_file(PATH)
+	_check(_aside().size() == 2 and _is_default(), "so is a file of an unknown version", str(_aside()))
+	_cleanup()
+
+
+## --low is for one run: it must not end up as the saved choice when another setting changes.
+func _test_run_time_graphics_override_is_not_saved() -> void:
+	_cleanup()
+	var kept := Settings.file_path
+	Settings.file_path = PATH
+	Settings.defaults()
+	Settings.apply_preset(false)  # what main.gd does for --low
+	Settings.set_volume("music", 0.4)
+	var saved: Variant = SaveStore.read_json(PATH)
+	_check(saved != null and saved["graphics"] == "high" and not Settings.high, "--low is in force for the run but the saved choice stays High", str(saved))
+	Settings.set_graphics(false)
+	saved = SaveStore.read_json(PATH)
+	_check(saved["graphics"] == "low", "choosing Low in Settings saves it")
+	Settings.set_graphics(true)
+	saved = SaveStore.read_json(PATH)
+	_check(saved["graphics"] == "high" and Settings.high, "and choosing High saves that")
+	Settings.file_path = kept
+	Settings.defaults()
+	_cleanup()
+
+
+## Quit to menu builds a new AudioMix: the master bus stays muted, so the new one must know.
+func _test_mute_survives_a_new_audio_mix() -> void:
+	AudioMix.ensure_buses()
+	AudioServer.set_bus_mute(0, false)
+	var first := AudioMix.new()
+	first.toggle_mute()
+	var muted_now := AudioServer.is_bus_mute(0)
+	var second := AudioMix.new()  # a new round after Quit to menu
+	second.toggle_mute()
+	_check(muted_now and not AudioServer.is_bus_mute(0), "M after Quit to menu unmutes a bus the last round muted")
+	second.toggle_mute()
+	_check(AudioServer.is_bus_mute(0), "and mutes it again")
+	AudioServer.set_bus_mute(0, false)
+	first.free()
+	second.free()

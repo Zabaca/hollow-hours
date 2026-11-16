@@ -79,7 +79,9 @@ func revert_to_save() -> void:
 	if last.is_empty():
 		reset()
 	else:
+		var live: Dictionary = mission.totals.duplicate()  # the wreck, and the time and kills since the save, still count
 		continue_story(last)
+		mission.totals = live
 
 
 func retry_mission() -> void:

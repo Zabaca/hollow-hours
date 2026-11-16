@@ -1,6 +1,7 @@
 extends Node
-## Drives main.gd's autopilot route through GameSim headless and prints what happens each
-## second: position, speed, hull, creatures, and the events. A way to see the game without a screen.
+## Drives the demo route through GameSim headless and prints what happens each second: position,
+## speed, hull, creatures, and the events. A way to see the game without a screen. It keeps its own
+## copy of the route and driver; Autopilot (scripts/sim/autopilot.gd) is the shared one.
 ##
 ##   godot --headless --path . res://tests/probe.tscn
 

@@ -47,7 +47,7 @@ func _ready() -> void:
 		if a == "--demo":
 			demo = true
 		elif a == "--low":
-			Settings.apply_preset(false)
+			Settings.apply_preset(false)  # for this run only: Settings.saved_high keeps the player's choice
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
 		elif a == "--no-hud":

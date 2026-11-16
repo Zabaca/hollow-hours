@@ -20,7 +20,6 @@ var sfx_bus := -1
 var lowpass: AudioEffectLowPassFilter
 var duck := 0.0
 var threat := 0.0
-var muted := false
 var cooldowns := {}
 var rng := RandomNumberGenerator.new()
 
@@ -98,9 +97,9 @@ func _stream(file: String) -> AudioStream:
 	return load(path)
 
 
+## The bus is the truth (a new AudioMix after Quit to menu must not forget it was muted).
 func toggle_mute() -> void:
-	muted = not muted
-	AudioServer.set_bus_mute(0, muted)
+	AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
 
 
 ## A flat one-shot. `gap` stops the same sound stacking inside that many seconds.

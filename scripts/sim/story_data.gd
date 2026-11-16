@@ -16,7 +16,8 @@ extends RefCounted
 ##   lines [id]                      radio lines to play
 ##   pack n                          the pack's size from now on
 ##   alert {place, radius} | {all}   alert every Gaunt within radius of a place, or all of them
-##   spawn [{place, count, ring}]    Gaunts placed `ring` metres from a place, already hunting
+##   spawn [{place, count, ring, clear?}]   Gaunts placed `ring` metres from a place, already hunting,
+##                                   at least `clear` (default 6) metres from the car
 ##   timer {id, seconds, reason, label}   start a timer; it fails the mission with `reason` at zero
 ##   stop_timer id
 ##   gate "open"
@@ -33,7 +34,8 @@ const SPEAKERS := {
 }
 
 ## `label` is the name on the full map; `angle` is the heading a car placed there faces. A place
-## with `marker: false` is only a name on the map.
+## with `marker: false` is only a name on the map (the diner, motel, bar and pawn shop sit at their
+## buildings' centres in tools/blender/city.py).
 const PLACES := {
 	"safe_start": {"name": "the safe start", "pos": Vector2(-30.0, -2.5), "radius": 5.0, "angle": 0.0, "label": "", "marker": false},
 	"shop": {"name": "the 24-hour shop", "pos": Vector2(46.0, 7.0), "radius": 5.0, "angle": -PI / 2.0, "label": "24H", "marker": true},
@@ -139,6 +141,11 @@ const MISSIONS := [
 		],
 	},
 ]
+
+## Tuning numbers MissionSim reads.
+const RETRY_MIN_HULL := 60.0  # a retry from a checkpoint brings the car back with at least this hull
+const HOLD_SPEED := 2.0  # m/s: a hold fills only below this
+const ROAM_PACK := 3  # the pack's size in free roam
 
 ## The sky's lightening once the story is over, for free roam after the last mission.
 const ENDING_DAWN := 0.3

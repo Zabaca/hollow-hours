@@ -11,7 +11,11 @@ const VOLUME_BUSES := {
 }
 const VOLUME_ORDER := ["master", "music", "effects", "car", "ambience", "voice"]
 
+## The preset in force (F3, Graphics in Settings, or the --low flag for one run).
 static var high := true
+## The player's own choice, the one a saved file holds. Differs from `high` only while a
+## run-time override such as --low is in force, so the override never reaches the file.
+static var saved_high := true
 static var sdfgi := true
 static var ssr := true
 static var volumetric := true
@@ -49,6 +53,7 @@ static func defaults() -> void:
 	for k in volumes:
 		volumes[k] = 1.0
 	apply_preset(true)
+	saved_high = true
 	fullscreen = false
 	subtitles = true
 
@@ -57,7 +62,7 @@ static func to_dict() -> Dictionary:
 	return {
 		"version": VERSION,
 		"volumes": volumes.duplicate(),
-		"graphics": "high" if high else "low",
+		"graphics": "high" if saved_high else "low",
 		"fullscreen": fullscreen,
 		"subtitles": subtitles,
 	}
@@ -75,41 +80,33 @@ static func from_dict(d: Dictionary) -> void:
 	var g: Variant = d.get("graphics")
 	if g is String and g == "low":
 		apply_preset(false)
+		saved_high = false
 	if d.get("fullscreen") is bool:
 		fullscreen = d["fullscreen"]
 	if d.get("subtitles") is bool:
 		subtitles = d["subtitles"]
 
 
-## Write through a temporary file and a rename, so a crash mid-write never leaves a broken file.
+## Write the settings (SaveStore does it through a temporary file and a rename).
 static func save_file(path: String = "") -> bool:
-	if path == "":
-		path = file_path
-	var tmp := path + ".tmp"
-	var f := FileAccess.open(tmp, FileAccess.WRITE)
-	if f == null:
-		return false
-	f.store_string(JSON.stringify(to_dict(), "\t"))
-	f.close()
-	return DirAccess.rename_absolute(tmp, path) == OK
+	return SaveStore.write_json(path if path != "" else file_path, to_dict())
 
 
-## Returns true when a readable file was loaded; a missing, damaged or unknown-version file
-## leaves the defaults.
+## Returns true when a readable file was loaded. A missing file leaves the defaults; a damaged
+## or unknown-version one leaves the defaults and is kept aside (SaveStore.set_aside), not deleted.
 static func load_file(path: String = "") -> bool:
 	if path == "":
 		path = file_path
 	defaults()
 	if not FileAccess.file_exists(path):
 		return false
-	var json := JSON.new()
-	if json.parse(FileAccess.get_file_as_string(path)) != OK:
-		return false
-	var parsed: Variant = json.data
-	if not (parsed is Dictionary):
+	var parsed: Variant = SaveStore.read_json(path)
+	if parsed == null:
+		SaveStore.set_aside(path)
 		return false
 	var version: Variant = (parsed as Dictionary).get("version")
 	if not (version is float or version is int) or int(version) != VERSION:
+		SaveStore.set_aside(path)
 		return false
 	from_dict(parsed)
 	return true
@@ -145,6 +142,7 @@ static func set_volume(key: String, value: float) -> void:
 ## The graphics preset as a player choice: applied by the caller's scene, remembered here.
 static func set_graphics(is_high: bool) -> void:
 	apply_preset(is_high)
+	saved_high = is_high
 	save_file()
 
 

@@ -13,12 +13,14 @@ extends Node
 ## ordinary lines still waiting, so no stale call plays after a retry.
 
 signal quit_to_menu
+signal ending_started  # the car is through the gate: first light, the HUD gives way
 signal world_reset  # a retry, restart or revert moved the car: reset the camera, the creature views, the effects
 
 const FAIL_DELAY_WRECKED := 1.4  # seconds to see the wreck before the menu
 const FAIL_DELAY := 0.6
 const REVERT_DELAY := 2.8  # a wreck in free roam: seconds before it goes back to the last save
-const ENDING_SECONDS := 9.0
+const PULLBACK_SECONDS := 11.0  # the slow pull-back from the stopped car
+const FADE_SECONDS := 2.6  # to black, after the credits
 
 var game: GameSim
 var hud: StoryHud
@@ -31,7 +33,13 @@ var has_checkpoint := false
 var fail_text := ""
 var _fail_in := -1.0
 var _revert_in := -1.0
-var _end_in := -1.0
+## The ending, in order: "" (not yet), "rollout" (the car rolls out of the gate), "pullback" (it has
+## stopped; the camera draws back), "roll" (the credits), "fade" (to black), then back to the title.
+var ending := ""
+var credits_roll: CreditsRoll
+var blackout := CanvasLayer.new()
+var _black := ColorRect.new()
+var _ending_t := 0.0
 var _blips_key := ""
 
 
@@ -49,6 +57,16 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 	fail_menu.quit_to_menu.connect(_on_quit)
 	map_screen = MapScreen.new()
 	add_child(map_screen)
+	credits_roll = CreditsRoll.new()
+	add_child(credits_roll)
+	credits_roll.finished.connect(_on_roll_finished)
+	blackout.layer = 30
+	blackout.process_mode = Node.PROCESS_MODE_ALWAYS
+	_black.color = Color(0, 0, 0, 0)
+	_black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	blackout.add_child(_black)
+	add_child(blackout)
 	radio = Radio.new()
 	add_child(radio)
 	hud.subtitle_source = radio
@@ -59,8 +77,21 @@ func blocks_pause() -> bool:
 	return fail_menu.is_open or map_screen.is_open
 
 
+## How light the sky should be: the mission's own, and first light in full once the car is through the gate.
 func dawn_target() -> float:
-	return game.mission.dawn_amount()
+	return 1.0 if ending != "" else game.mission.dawn_amount()
+
+
+## 0 to 1 over the pull-back (and 1 after it): the camera draws back along it.
+func pullback_progress() -> float:
+	if ending == "pullback":
+		return clampf(_ending_t / PULLBACK_SECONDS, 0.0, 1.0)
+	return 1.0 if ending in ["roll", "fade"] else 0.0
+
+
+## How far the music has been hushed for the ending, 0 to 1.
+func hush() -> float:
+	return 0.0 if ending == "" else (1.0 if ending != "rollout" else 0.4)
 
 
 # ----------------------------------------------------------------------------- events
@@ -78,8 +109,16 @@ func on_event(e: Dictionary) -> void:
 			hud.notice("Checkpoint")
 		"gate_open":
 			hud.notice("The gate is open")
+		"escaped":
+			ending = "rollout"
+			_ending_t = 0.0
+			hud.fade_out(2.2)
+			hud.hide_card()
+			ending_started.emit()
 		"mission_complete":
-			hud.show_card("Mission complete", String(e["title"]))
+			# The last mission's completion is the ending itself, not a card.
+			if not bool(e.get("final", false)):
+				hud.show_card("Mission complete", String(e["title"]))
 		"mission_failed":
 			radio.drop_ordinary()
 			fail_text = String(e["text"])
@@ -94,8 +133,8 @@ func on_event(e: Dictionary) -> void:
 			hud.hide_card()
 		"story_complete":
 			SaveStore.unlock_survive(save_path)  # outlives the save: starting over must not hide Survive the Night
-			_end_in = ENDING_SECONDS
-			hud.show_card("The end", "First light", "", ENDING_SECONDS - 3.0)
+			ending = "pullback"
+			_ending_t = 0.0
 
 
 # ----------------------------------------------------------------------------- every frame
@@ -129,10 +168,28 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 		if _revert_in < 0.0:
 			game.revert_to_save()
 			_after_reset()
-	if _end_in >= 0.0:
-		_end_in -= delta
-		if _end_in < 0.0:
-			quit_to_menu.emit()
+	_step_ending(delta)
+
+
+func _step_ending(delta: float) -> void:
+	match ending:
+		"pullback":
+			_ending_t += delta
+			if _ending_t >= PULLBACK_SECONDS:
+				ending = "roll"
+				credits_roll.start()
+		"fade":
+			_ending_t += delta
+			_black.color.a = clampf(_ending_t / FADE_SECONDS, 0.0, 1.0)
+			if _ending_t >= FADE_SECONDS + 0.6:
+				ending = "done"
+				quit_to_menu.emit()
+
+
+func _on_roll_finished() -> void:
+	if ending == "roll":
+		ending = "fade"
+		_ending_t = 0.0
 
 
 func _objective_text(o: Dictionary) -> String:

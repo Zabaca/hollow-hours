@@ -23,11 +23,7 @@ Nits:
 
 ## From the slice 3 review (missions on screen, merged c314d0a)
 
-Slice 4 replaces the stub ending: on story_complete the presenter shows a "First light" card and returns to the title after 9 s.
-
 Nits:
-- Continue after the ending (next "") shows "Free roam" and lands in a free roam with no objective, indefinitely.
-- story_dawn starts at 0 on every scene load, so Continue into mission 3 opens at full night and lightens over about 5 s.
 - `--mission=N` without `--save=` writes the completion save into the player's real save file.
 - The subtitle layer (23) sits above the map (22) and the pause menu (20), so a line mid-speech stays drawn over them.
 - StoryHud.subtitle_source is untyped; type it Radio.

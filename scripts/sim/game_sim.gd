@@ -12,7 +12,8 @@ extends RefCounted
 enum Phase { PLAYING, WRECKED, DAWN, ESCAPED }
 
 const NIGHT_LENGTH := 300.0  # seconds until first light
-const ESCAPE_TIME := 4.0  # seconds the car takes to roll out of the gate and come to rest
+const ESCAPE_TIME := 5.0  # seconds the car takes to roll out of the gate and come to rest
+const ESCAPE_DISTANCE := 26.0  # metres out from the gate it comes to rest, on the road outside
 const MAX_HULL := 100.0
 const CRASH := 6.0  # m/s into a wall that counts as a crash (Roadkill's threshold)
 const BUMP := 1.5  # m/s into a wall that is still a knock you can hear
@@ -40,7 +41,7 @@ var seed_value := 1
 var story_mode := false
 var mission: MissionSim  # story mode only
 var escape_t := 0.0
-var escape_speed := 0.0
+var escape_from := Vector2.ZERO
 var story_done := false
 
 
@@ -302,17 +303,18 @@ func escape() -> void:
 		return
 	phase = Phase.ESCAPED
 	escape_t = 0.0
-	escape_speed = maxf(car.speed(), 10.0)
+	escape_from = car.body.position
 	pack.start_dawn()
 
 
 func _step_escape(dt: float) -> void:
 	escape_t += dt
 	var dir: Vector2 = world.gate["dir"]
+	var end: Vector2 = Vector2(world.gate["pos"]) + dir * ESCAPE_DISTANCE
 	var u := clampf(escape_t / ESCAPE_TIME, 0.0, 1.0)
-	var v := escape_speed * (1.0 - u) * (1.0 - u)
-	car.body.velocity = dir * v
-	car.body.position += dir * v * dt
+	# Out along a gentle slowing curve onto the road's centre line, to rest at `end`.
+	car.body.position = escape_from.lerp(end, 1.0 - (1.0 - u) * (1.0 - u))
+	car.body.velocity = (end - escape_from) * (2.0 * (1.0 - u) / ESCAPE_TIME)
 	car.body.angle = lerp_angle(car.body.angle, dir.angle(), minf(1.0, 4.0 * dt))
 	car.body.angular_velocity = 0.0
 	car.body.force = Vector2.ZERO  # nothing to spend while it rolls out

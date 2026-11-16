@@ -117,9 +117,14 @@ func _build_menu() -> void:
 	save = SaveStore.load_save(Session.save_path)
 	var new_game := _item("New Game", _new_game)
 	var cont := _item("Continue", _continue)
-	cont.set_enabled(not save.is_empty())
-	if not save.is_empty():
-		cont.note = "Mission %d" % (StoryData.mission_index(str(save["next"])) + 1) if str(save["next"]) != "" else "Free roam"
+	# A finished story has nothing to continue into: Continue is greyed and says so, and Survive the Night
+	# (below) is the way to play on.
+	var finished := not save.is_empty() and str(save["next"]) == ""
+	cont.set_enabled(not save.is_empty() and not finished)
+	if finished:
+		cont.note = "The end"
+	elif not save.is_empty():
+		cont.note = "Mission %d" % (StoryData.mission_index(str(save["next"])) + 1)
 	if (not save.is_empty() and bool(save["ending_seen"])) or SaveStore.survive_unlocked(Session.save_path):
 		_item("Survive the Night", _survive)
 	_item("Settings", _open_settings)

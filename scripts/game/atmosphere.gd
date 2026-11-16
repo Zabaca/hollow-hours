@@ -190,7 +190,8 @@ func set_dawn(a: float) -> void:
 	sky_mat.ground_horizon_color = sky_mat.sky_horizon_color
 	sky_mat.sky_energy_multiplier = lerpf(0.7, 1.4, dawn_amount)
 	env.fog_light_color = NIGHT_FOG.lerp(DAWN_FOG, dawn_amount)
-	env.set("volumetric_fog_density", lerpf(0.032, 0.02, dawn_amount))
+	env.set("volumetric_fog_density", lerpf(0.032, 0.011, dawn_amount))
+	env.fog_density = lerpf(0.006, 0.0035, dawn_amount)
 	env.set("volumetric_fog_emission", Color(0.03, 0.04, 0.065).lerp(Color(0.3, 0.26, 0.24), dawn_amount))
 	moon.light_energy = lerpf(0.3, 0.9, dawn_amount)
 	moon.light_color = Color(0.45, 0.55, 0.8).lerp(Color(1.0, 0.82, 0.65), dawn_amount)

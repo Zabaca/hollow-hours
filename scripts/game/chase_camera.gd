@@ -85,7 +85,14 @@ static func clear_fraction(world: SimWorld, from: Vector3, to: Vector3, pad: flo
 	var boxes: Array = world.boxes.duplicate()
 	var a: Dictionary = world.arena
 	var far := 400.0
-	boxes.append({"x0": -far, "y0": -far, "x1": a["left"], "y1": far, "kind": "perimeter"})
+	if world.gate["open"]:
+		# The west wall has a gap where the gate stands: through it the way is clear.
+		var g: Dictionary = world.gate
+		var half := float(g["width"]) * 0.5
+		boxes.append({"x0": -far, "y0": float(g["pos"].y) + half, "x1": a["left"], "y1": far, "kind": "perimeter"})
+		boxes.append({"x0": -far, "y0": -far, "x1": a["left"], "y1": float(g["pos"].y) - half, "kind": "perimeter"})
+	else:
+		boxes.append({"x0": -far, "y0": -far, "x1": a["left"], "y1": far, "kind": "perimeter"})
 	boxes.append({"x0": a["right"], "y0": -far, "x1": far, "y1": far, "kind": "perimeter"})
 	boxes.append({"x0": -far, "y0": -far, "x1": far, "y1": a["bottom"], "kind": "perimeter"})
 	boxes.append({"x0": -far, "y0": a["top"], "x1": far, "y1": far, "kind": "perimeter"})
@@ -118,6 +125,22 @@ static func clear_fraction(world: SimWorld, from: Vector3, to: Vector3, pad: flo
 			continue  # no hit, or the start is inside this box
 		best = minf(best, tmin)
 	return best
+
+
+## The ending: the camera leaves the car's shoulder and swings round to its front while rising and
+## drawing back, until the stopped car is small on the empty road with the quarter behind it. `u` is
+## 0 to 1; it takes over from update_camera at the chase camera's own place, so there is no jump.
+func update_pullback(car_pos: Vector2, car_angle: float, ground: float, u: float) -> void:
+	var e := u * u * (3.0 - 2.0 * u)
+	var behind := car_angle + PI
+	var a := behind + e * deg_to_rad(150.0)
+	var radius := lerpf(dist + 2.6, 22.0, e)
+	var height := lerpf(3.5 + 1.1, 8.5, e)
+	var at := car_pos + Vector2.from_angle(a) * radius
+	var fwd := Vector3(cos(car_angle), 0.0, -sin(car_angle))
+	var focus := GM.to3(car_pos, ground + 1.1) + fwd * lerpf(2.6, 0.0, e) + Vector3(0.0, lerpf(0.0, 3.2, e), 0.0)
+	look_at_from_position(GM.to3(at, ground + height), focus, Vector3.UP)
+	fov = lerpf(66.0, 50.0, e)
 
 
 ## Pull the wanted camera position in so it is never inside or behind a wall: quickly when a

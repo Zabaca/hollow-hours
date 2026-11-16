@@ -9,6 +9,7 @@ extends Node3D
 
 var game: GameSim
 var city: City
+var gate_view: GateView
 var atmos: Atmosphere
 var car_view: CarView
 var cam: ChaseCamera
@@ -32,6 +33,7 @@ var cam_log := false
 var crash_us := 0
 var tick_started_us := 0
 var tick_no := 0
+var debug_gate := ""  # --gate=open|opening: the west gate open from the start, or opening 1.5 s in
 var debug_start := PackedFloat64Array()
 var debug_drive := Vector2(INF, 0.0)  # --drive=throttle,turn: constant controls instead of the autopilot
 var shot_taken := false
@@ -59,6 +61,8 @@ func _ready() -> void:
 			cam_log = true
 		elif a == "--audio-log":
 			audio_log = true
+		elif a.begins_with("--gate="):
+			debug_gate = a.trim_prefix("--gate=")
 		elif a.begins_with("--start="):
 			# --start=x,y,angle puts the car there (map metres, radians)
 			debug_start = a.trim_prefix("--start=").split_floats(",")
@@ -83,6 +87,9 @@ func _ready() -> void:
 	city = City.new()
 	add_child(city)
 	city.build(CityLayout.DATA)
+	gate_view = GateView.new()
+	add_child(gate_view)
+	gate_view.setup(game.world)
 	atmos = Atmosphere.new()
 	add_child(atmos)
 	car_view = CarView.new()
@@ -114,6 +121,9 @@ func _ready() -> void:
 		presenter.save_path = Session.save_path
 		presenter.quit_to_menu.connect(_quit_to_menu)
 		presenter.world_reset.connect(_reset_views)
+		presenter.ending_started.connect(func() -> void: hud.fade_out(2.2))
+		# The sky starts where the story is, not at night.
+		story_dawn = presenter.dawn_target()
 		pause_menu.map_screen = presenter.map_screen
 		pause_menu.map_requested.connect(presenter.open_map)
 		presenter.map_screen.closed.connect(pause_menu.focus_map_row)
@@ -125,6 +135,14 @@ func _ready() -> void:
 	prev_pos = game.car.body.position
 	prev_angle = game.car.body.angle
 	fx.fade_to(0.0)
+	if debug_gate == "open":
+		game.world.gate["open"] = true
+		gate_view.set_open(true, true)
+	elif debug_gate == "opening":
+		get_tree().create_timer(1.5).timeout.connect(func() -> void: gate_view.set_open(true))
+	if presenter != null:
+		atmos.set_dawn(story_dawn)
+		fx.dawn = story_dawn * 0.6
 	started_ms = Time.get_ticks_msec()
 	if Session.screen.begins_with("pause"):
 		# --screen=pause: a frame of the pause menu over the game, for screenshots
@@ -149,7 +167,8 @@ func _make_game() -> GameSim:
 	return g
 
 
-## --screen=map|fail|complete: open that story screen over the mission, for a screenshot.
+## --screen=map|fail|complete|ending: open that story screen over the mission, for a screenshot. The ending
+## puts the car on the avenue with the gate open and drives it out, as reaching the gate would.
 func _story_screen() -> void:
 	match Session.screen:
 		"map":
@@ -158,6 +177,15 @@ func _story_screen() -> void:
 			game.damage(1000.0, "dev")
 		"complete":
 			presenter.on_event({"type": "mission_complete", "title": "BATTERIES", "id": "batteries", "mission": 0, "final": false})
+		"ending":
+			game.world.gate["open"] = true
+			gate_view.set_open(true, true)
+			game.place_car(Vector2(-62.0, 0.0), PI, GameSim.MAX_HULL)
+			game.car.body.velocity = Vector2(-14.0, 0.0)
+			game.escape()
+			for id in ["end_vera", "end_ruck"]:
+				presenter.on_event({"type": "line", "id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": true})
+			presenter.on_event({"type": "escaped"})
 	if Session.shot_path != "":
 		await get_tree().create_timer(Session.shot_at, true, false, true).timeout
 		Session.save_shot_and_quit(get_tree(), Session.shot_path)
@@ -243,6 +271,7 @@ func _reset_views() -> void:
 	for id in views:
 		views[id].queue_free()
 	views.clear()
+	gate_view.set_open(bool(game.world.gate["open"]), true)
 	fx.desat = 0.0
 	fx.dawn = 0.0
 	fx.fade = 0.6
@@ -279,7 +308,13 @@ func _process(delta: float) -> void:
 	var pos := prev_pos.lerp(car.body.position, alpha)
 	var ang := lerp_angle(prev_angle, car.body.angle, alpha)
 	car_view.sync(game, game.world, pos, ang, delta)
-	cam.update_camera(delta, pos, ang, car.body.velocity, car_view.ground, car.boosting)
+	var ending := presenter != null and presenter.ending in ["pullback", "roll", "fade", "done"]
+	if ending:
+		cam.update_pullback(pos, ang, car_view.ground, presenter.pullback_progress())
+		gate_view.track(GM.to3(pos, 1.2))
+	else:
+		cam.update_camera(delta, pos, ang, car.body.velocity, car_view.ground, car.boosting)
+		gate_view.track(Vector3.INF)
 	_sync_creatures(delta)
 	if cam_log and crash_us != 0 and Time.get_ticks_usec() - crash_us < 1800000:
 		print("CAMLOG t=%4d ms tick=%d dt=%.4f ts=%.2f speed=%.1f vel_deg=%4.0f car_deg=%4.0f cam_yaw_deg=%4.0f trauma=%.2f fov=%.1f" % [
@@ -299,8 +334,10 @@ func _process(delta: float) -> void:
 	# Dawn creeps in over the last stretch of the night; in the story the sky lightens a touch with each mission.
 	var dawn := clampf((game.time - (GameSim.NIGHT_LENGTH - 45.0)) / 75.0, 0.0, 1.0)
 	if presenter != null:
-		story_dawn = move_toward(story_dawn, presenter.dawn_target(), delta * 0.04)
+		# Slowly with each mission; first light, once the car is through the gate, comes up in seconds.
+		story_dawn = move_toward(story_dawn, presenter.dawn_target(), delta * (0.12 if presenter.ending != "" else 0.04))
 		dawn = story_dawn
+		audio.hush = move_toward(audio.hush, presenter.hush(), delta * 0.25)
 	if absf(dawn - atmos.dawn_amount) > 0.002:
 		atmos.set_dawn(dawn)
 		fx.dawn = dawn * 0.6
@@ -431,6 +468,13 @@ func _on_event(e: Dictionary) -> void:
 			audio.muffle(1.0)
 		"dawn":
 			audio.play("thunder", -8.0, 1.0, "Ambience")
+		"gate_open":
+			gate_view.set_open(true)
+			audio.play("gate_klaxon", -4.0, 1.0, "SFX")
+			audio.play_at("gate_leaves", gate_view.centre + Vector3(-2.0, 2.0, 0.0), 2.0, 1.0, 140.0)
+		"gate_closed":
+			gate_view.set_open(false)
+			audio.play_at("gate_leaves", gate_view.centre + Vector3(-2.0, 2.0, 0.0), 2.0, 1.0, 140.0)
 
 
 ## --audio-log: how long from the start of the physics tick that found the crash to the play()

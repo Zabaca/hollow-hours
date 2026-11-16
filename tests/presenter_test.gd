@@ -22,6 +22,7 @@ func _ready() -> void:
 	_clean()
 	_test_radio_order()
 	_test_map_view()
+	_test_gate_view()
 	_test_mission_start_on_screen()
 	_test_hold_and_timer()
 	_test_subtitles_setting()
@@ -34,6 +35,7 @@ func _ready() -> void:
 	_test_full_map()
 	_test_title_continue()
 	_test_unlock_outlives_the_save()
+	_test_ending_returns_to_the_title()
 	_clean()
 	print("")
 	print("presenter_test: %d failed" % failures)
@@ -155,6 +157,26 @@ func _until_quiet(radio: Radio) -> void:
 func _listen(r: Rig) -> void:
 	r.presenter.radio.advance(1.0)
 	_feed(r)
+
+
+func _test_gate_view() -> void:
+	var world := SimWorld.from_layout(CityLayout.DATA)
+	var gv := GateView.new()
+	add_child(gv)
+	gv.setup(world)
+	var shut_z: float = gv.leaves[1]["node"].position.z
+	_check(gv.leaves.size() == 2 and gv.units.size() == 2 and gv.lamps.size() == 2, "the gate has two leaves, two lamps and two searchlights")
+	_check(gv.lamps[0]["light"].light_color.r > 0.9 and gv.lamps[0]["light"].light_color.g < 0.3, "its lamps are red while it is shut")
+	gv.set_open(true)
+	gv._process(GateView.OPEN_SECONDS * 0.5)
+	_check(absf(gv.lamps[0]["light"].light_color.g - 0.55) < 0.05, "amber while it opens")
+	gv._process(GateView.OPEN_SECONDS)
+	var open_z: float = gv.leaves[1]["node"].position.z
+	_check(absf(open_z - shut_z) > GateView.SLIDE * 0.95 and gv.lamps[0]["light"].light_color.g > 0.9 and gv.lamps[0]["light"].light_color.r < 0.2, "the leaves roll apart and the lamps go green", "moved %.1f m" % absf(open_z - shut_z))
+	gv.set_open(false)
+	gv._process(GateView.OPEN_SECONDS * 1.1)
+	_check(absf(gv.leaves[1]["node"].position.z - shut_z) < 0.01, "and it shuts again")
+	gv.free()
 
 
 func _test_map_view() -> void:
@@ -418,6 +440,48 @@ func _test_unlock_outlives_the_save() -> void:
 	var rows := _title_rows()
 	_check("Survive the Night:on" in rows and rows[1] == "Continue:off", "the title still offers Survive the Night", str(rows))
 
+## The ending: the car goes through the gate (first light), stops (the camera draws back), the credits
+## roll, it fades to black and the title comes back. Nothing is a card and nothing waits on a key.
+func _test_ending_returns_to_the_title() -> void:
+	quits = 0
+	var r := _rig("west_gate")
+	var p := r.presenter
+	_check(p.ending == "" and p.dawn_target() < 1.0, "before the gate the night is not over")
+	p.on_event({"type": "mission_complete", "title": "WEST GATE", "id": "west_gate", "mission": 2, "final": true})
+	_check(p.hud.card_kicker.text != "MISSION COMPLETE", "the last mission shows no completion card")
+	var started := [0]
+	p.ending_started.connect(func() -> void: started[0] += 1)
+	p.on_event({"type": "escaped"})
+	_check(p.ending == "rollout" and started[0] == 1 and is_equal_approx(p.dawn_target(), 1.0), "driving out of the gate starts the ending and brings first light")
+	p.on_event({"type": "story_complete"})
+	_check(p.ending == "pullback" and is_equal_approx(p.pullback_progress(), 0.0), "once the car has stopped the camera starts to draw back")
+	_check(SaveStore.survive_unlocked(SAVE), "and Survive the Night is unlocked")
+	p.update(StoryPresenter.PULLBACK_SECONDS * 0.5, Vector2.ZERO, 0.0)
+	_check(absf(p.pullback_progress() - 0.5) < 0.01 and not p.credits_roll.playing, "half way through the pull-back, no credits yet")
+	p.update(StoryPresenter.PULLBACK_SECONDS * 0.6, Vector2.ZERO, 0.0)
+	_check(p.ending == "roll" and p.credits_roll.playing, "then the credits roll")
+	p.credits_roll.elapsed = CreditsRoll.SECONDS - 0.01
+	p.credits_roll._process(0.1)
+	_check(p.ending == "fade" and not p.credits_roll.playing, "when they end it fades to black")
+	p.update(StoryPresenter.FADE_SECONDS * 0.5, Vector2.ZERO, 0.0)
+	_check(quits == 0 and p._black.color.a > 0.3, "the screen goes dark first", "alpha=%.2f" % p._black.color.a)
+	p.update(StoryPresenter.FADE_SECONDS, Vector2.ZERO, 0.0)
+	p.update(1.0, Vector2.ZERO, 0.0)
+	_check(quits == 1 and p._black.color.a >= 0.99, "and then it returns to the title, once", "quits=%d" % quits)
+	p.update(1.0, Vector2.ZERO, 0.0)
+	_check(quits == 1, "and only once")
+	_drop(r)
+	# A finished story has nothing to continue into: the title greys Continue and offers Survive the Night.
+	var done := _save_at("")
+	done["done"] = ["batteries", "pharmacist", "west_gate"]
+	done["ending_seen"] = true
+	var f := FileAccess.open(SAVE, FileAccess.WRITE)
+	f.store_string(JSON.stringify(done))
+	f.close()
+	var rows := _title_rows()
+	_check(rows[1] == "Continue:off" and "Survive the Night:on" in rows, "after the ending Continue is greyed, not an empty free roam", str(rows))
+
+
 func _test_title_continue() -> void:
 	_clean()
 	var plain := _title_rows()
@@ -441,7 +505,7 @@ func _test_title_continue() -> void:
 	f.store_string(JSON.stringify(done))
 	f.close()
 	var after := _title_rows()
-	_check("Survive the Night:on" in after and after[1] == "Continue:on", "after the ending the old round is offered as Survive the Night", str(after))
+	_check("Survive the Night:on" in after and after[1] == "Continue:off", "after the ending the old round is offered as Survive the Night", str(after))
 
 
 func _make_title() -> Control:

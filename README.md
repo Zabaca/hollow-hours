@@ -146,7 +146,8 @@ command from anywhere with `--path` pointing at this folder.
    to photograph a moment, e.g. a hold at the shop:
    `-- --mission=1 --seed=11 --start=46,7,-1.57 --drive=0,0 --shot-game=2.7 --shot=/tmp/hold.png`.
 
-   The west gate and the ending: `--gate=open|opening` shows the gate open (or opening 1.5 s in), and
+   The west gate and the ending: `--gate=open|opening` shows the gate open (or opening 1.5 s in), `--cam-side=H`
+   puts a low camera H metres up and 7 m to the car's left (for judging how it sits on the road), and
    `--screen=ending` puts the car on the avenue with the gate open and drives it out as reaching the gate
    would (the pull-back starts about 8 s in and the credits about 19 s in, 3 s of that being the screen's own
    delay; use `--quit-after 12000`).

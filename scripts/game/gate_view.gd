@@ -9,6 +9,9 @@ extends Node3D
 const LEAF_W := 4.1
 const LEAF_H := 4.2
 const OPEN_SECONDS := 3.6
+const BEAM := preload("res://shaders/searchlight_beam.gdshader")
+const BEAM_LENGTH := 90.0
+const BEAM_SPREAD := 7.0  # metres across the far end of the visible cone
 const LAMP_LIGHT := 0.22  # share of the lamp glass's brightness thrown as light
 const SLIDE := 6.1  # metres each leaf rolls out from its closed place
 const RAIL_X := 0.16  # the leaves hang this far in from the gate's x: on the wall's inner face, in front of the piers
@@ -143,14 +146,32 @@ func _build_searchlights() -> void:
 		spot.spot_angle = 7.5
 		spot.spot_attenuation = 0.6
 		spot.spot_range = 150.0
-		spot.light_energy = 6.0
+		spot.light_energy = 7.0
 		spot.light_color = Color(1.0, 0.95, 0.84)
-		spot.light_volumetric_fog_energy = 0.7
+		spot.light_volumetric_fog_energy = 2.2
 		spot.shadow_enabled = false
 		# A SpotLight3D shines down its own -Z: turn it to the head's +X (the head is aimed with look_at).
 		spot.rotation.y = -PI / 2.0
 		spot.position = Vector3(1.2, 0.0, 0.0)
 		head.add_child(spot)
+		# The cone itself, drawn: the fog's own scattering alone is too faint to read from a distance.
+		var cone := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = BEAM_SPREAD * 0.5  # +Y is the far end once it is turned to lie along +X
+		cm.bottom_radius = 0.4
+		cm.height = BEAM_LENGTH
+		cm.radial_segments = 24
+		cm.rings = 1
+		cm.cap_top = false
+		cm.cap_bottom = false
+		cone.mesh = cm
+		var bmat := ShaderMaterial.new()
+		bmat.shader = BEAM
+		cone.material_override = bmat
+		cone.rotation.z = -PI / 2.0
+		cone.position = Vector3(1.2 + BEAM_LENGTH * 0.5, 0.0, 0.0)
+		cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		head.add_child(cone)
 		units.append({"head": head, "side": side, "unit": unit})
 
 
@@ -196,9 +217,9 @@ func _aim(delta: float) -> void:
 		elif target_open:
 			target = centre + Vector3(2.0, 0.5, side * 0.6)
 		else:
-			# Shut: the beams walk along the wall, one each way, never quite meeting.
-			var sweep := sin(_time * 0.35 + (0.0 if side < 0 else 2.2)) * 18.0
-			target = centre + Vector3(1.5, 0.5, sweep)
+			# Shut: the beams sweep the sky over the wall and into the quarter, one each way, never quite meeting.
+			var sweep := sin(_time * 0.35 + (0.0 if side < 0 else 2.2)) * 20.0
+			target = centre + Vector3(14.0, 11.0 + 5.0 * sin(_time * 0.21 + side), sweep)
 		var dir := target - head.global_position
 		if dir.length() < 0.1:
 			continue

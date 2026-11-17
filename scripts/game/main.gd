@@ -33,6 +33,7 @@ var cam_log := false
 var crash_us := 0
 var tick_started_us := 0
 var tick_no := 0
+var debug_cam_side := 0.0  # --cam-side=H: a low camera H metres up, 7 m to the car's left, for looking at how it sits on the road
 var debug_gate := ""  # --gate=open|opening: the west gate open from the start, or opening 1.5 s in
 var debug_start := PackedFloat64Array()
 var debug_drive := Vector2(INF, 0.0)  # --drive=throttle,turn: constant controls instead of the autopilot
@@ -61,6 +62,8 @@ func _ready() -> void:
 			cam_log = true
 		elif a == "--audio-log":
 			audio_log = true
+		elif a.begins_with("--cam-side="):
+			debug_cam_side = float(a.trim_prefix("--cam-side="))
 		elif a.begins_with("--gate="):
 			debug_gate = a.trim_prefix("--gate=")
 		elif a.begins_with("--start="):
@@ -321,6 +324,9 @@ func _process(delta: float) -> void:
 	else:
 		cam.update_camera(delta, pos, ang, car.body.velocity, car_view.ground, car.boosting)
 		gate_view.track(Vector3.INF)
+	if debug_cam_side > 0.0:
+		var side_dir := Vector2.from_angle(ang + PI / 2.0)
+		cam.look_at_from_position(GM.to3(pos + side_dir * 7.0, debug_cam_side), GM.to3(pos, 0.7), Vector3.UP)
 	_sync_creatures(delta)
 	if cam_log and crash_us != 0 and Time.get_ticks_usec() - crash_us < 1800000:
 		print("CAMLOG t=%4d ms tick=%d dt=%.4f ts=%.2f speed=%.1f vel_deg=%4.0f car_deg=%4.0f cam_yaw_deg=%4.0f trauma=%.2f fov=%.1f" % [

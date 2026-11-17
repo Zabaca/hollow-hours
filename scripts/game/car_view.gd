@@ -32,6 +32,28 @@ var shell_mats: Array = []
 var boost_glow := 0.0
 
 
+## A soft dark pool on the road under the car. The moon's own shadow is thin and to one side (and gone at
+## dawn), so without it the tyres seem to rest on nothing, most of all on the wet road's reflections.
+func _contact_shadow() -> void:
+	var quad := QuadMesh.new()
+	quad.size = Vector2(5.6, 2.9)
+	var blob := MeshInstance3D.new()
+	blob.mesh = quad
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_texture = GM.soft_dot()
+	m.albedo_color = Color(0.0, 0.0, 0.0, 0.7)
+	m.disable_receive_shadows = true
+	blob.material_override = m
+	blob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	blob.rotation.x = -PI / 2.0
+	blob.rotation.z = PI / 2.0  # long side along the car (x forward)
+	blob.position.y = 0.03
+	blob.layers = 1
+	add_child(blob)
+
+
 func build() -> void:
 	var scene: PackedScene = load("res://assets/models/bruiser.glb")
 	model = scene.instantiate()
@@ -43,6 +65,7 @@ func build() -> void:
 		steers[k] = model.find_child("steer_" + k, true, false)
 	for k in ["FL", "FR", "RL", "RR"]:
 		wheels[k] = model.find_child("wheel_" + k, true, false)
+	_contact_shadow()
 	_lights()
 	_spray()
 	_mark_pool()

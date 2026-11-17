@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_title_continue()
 	_test_unlock_outlives_the_save()
 	_test_ending_returns_to_the_title()
+	_test_gate_open_line_does_not_play_after_the_closing_lines()
 	_clean()
 	print("")
 	print("presenter_test: %d failed" % failures)
@@ -595,6 +596,29 @@ func _test_ending_returns_to_the_title() -> void:
 	f.close()
 	var rows := _title_rows()
 	_check(rows[1] == "Continue:off" and "Survive the Night:on" in rows, "after the ending Continue is greyed, not an empty free roam", str(rows))
+
+
+## The reviewer's sequence: the gate opens (Ruck's "Gate's open" is queued behind the opening squelch), the
+## car reaches it at once and the escape fires. The ordinary line must not play after the closing lines.
+func _test_gate_open_line_does_not_play_after_the_closing_lines() -> void:
+	var r := _rig("west_gate")
+	var p := r.presenter
+	p.radio.clear()
+	_until_quiet(p.radio)
+	p.on_event({"type": "line", "id": "gate_open", "speaker": "ruck", "priority": false})
+	_check(p.radio.queued_ids() == ["gate_open"], "the gate's own line is queued behind the squelch")
+	for id in StoryData.ENDING_LINES:
+		p.on_event({"type": "line", "id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": true})
+	p.on_event({"type": "escaped"})
+	p.on_event({"type": "story_complete"})
+	var played: Array = []
+	for i in 600:
+		p.radio.advance(0.5)
+		var id: String = p.radio.current_subtitle().get("id", "")
+		if id != "" and (played.is_empty() or played.back() != id):
+			played.append(id)
+	_check(played == ["end_vera", "end_ruck"], "only the closing lines play, in order, and never Gate's open after them", str(played))
+	_drop(r)
 
 
 func _test_title_continue() -> void:

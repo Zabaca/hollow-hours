@@ -23,6 +23,9 @@ func _ready() -> void:
 	_test_radio_order()
 	_test_map_view()
 	_test_gate_view()
+	_test_gate_piers_outside_the_wall()
+	_test_car_rests_on_the_road_after_the_escape()
+	_test_flags_never_touch_the_players_save()
 	_test_mission_start_on_screen()
 	_test_hold_and_timer()
 	_test_subtitles_setting()
@@ -131,8 +134,8 @@ func _test_radio_order() -> void:
 	_listen(r)
 	_check(radio.current_subtitle().get("id", "") == "bat_call_1", "a line is up once the call has opened")
 	line.call("bat_shop", false)
-	line.call("end_vera", true)
-	line.call("end_ruck", true)
+	line.call("wrecked", true)
+	line.call("ph_failed", true)
 	line.call("bat_loaded", false)
 	_check(radio.current_subtitle()["id"] == "bat_call_1", "the line speaking is never cut off")
 	var order: Array = []
@@ -141,7 +144,7 @@ func _test_radio_order() -> void:
 		var id: String = radio.current_subtitle().get("id", "")
 		if id != "" and (order.is_empty() or order.back() != id):
 			order.append(id)
-	_check(order == ["bat_call_1", "end_vera", "end_ruck", "bat_shop", "bat_loaded"], "priority lines jump the queue but keep their order, one at a time", str(order))
+	_check(order == ["bat_call_1", "wrecked", "ph_failed", "bat_shop", "bat_loaded"], "priority lines jump the queue but keep their order, one at a time", str(order))
 	_drop(r)
 
 
@@ -177,6 +180,111 @@ func _test_gate_view() -> void:
 	gv._process(GateView.OPEN_SECONDS * 1.1)
 	_check(absf(gv.leaves[1]["node"].position.z - shut_z) < 0.01, "and it shuts again")
 	gv.free()
+	var gate_x: float = world.gate["pos"].x
+	var wall_ok := true
+	var gv2 := GateView.new()
+	add_child(gv2)
+	gv2.setup(world)
+	for l in gv2.leaves:
+		var lx: float = l["node"].position.x
+		# GM maps map x to Godot x; the leaves hang on the wall's inner face, at or just inside the gate's x.
+		if lx < gate_x or lx > gate_x + 0.5:
+			wall_ok = false
+	for lp in gv2.lamps:
+		if lp["mesh"].position.x < gate_x:
+			wall_ok = false
+	_check(wall_ok, "the leaves and lamps hang on the wall's inner face, not behind it", "gate x=%.1f" % gate_x)
+	gv2.free()
+
+
+## After the escape the car is at rest on the road outside: the view sits on the ground, level, and no
+## part of it hovers above the asphalt or sinks below it.
+func _test_car_rests_on_the_road_after_the_escape() -> void:
+	var game := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
+	game.pack.director_on = false
+	game.pack.gaunts.clear()
+	game.world.gate["open"] = true
+	game.place_car(Vector2(-66.0, 0.5), PI, GameSim.MAX_HULL)
+	game.car.body.velocity = Vector2(-20.0, 0.0)
+	game.escape()
+	var view := CarView.new()
+	add_child(view)
+	view.build()
+	for i in int((GameSim.ESCAPE_MAX_TIME + 1.0) / DT):
+		game.step(DT, IDLE)
+		game.take_events()
+		if i % 2 == 0:
+			view.sync(game, game.world, game.car.body.position, game.car.body.angle, DT * 2.0)
+	for i in 120:
+		view.sync(game, game.world, game.car.body.position, game.car.body.angle, 1.0 / 60.0)
+	var lowest := INF
+	var stack: Array = [view]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if n is MeshInstance3D and n.mesh != null:
+			var box: AABB = (n as MeshInstance3D).global_transform * (n as MeshInstance3D).mesh.get_aabb()
+			lowest = minf(lowest, box.position.y)
+	_check(absf(view.position.y) < 0.02 and absf(view.roll) < 0.003 and absf(view.pitch) < 0.003, "the car view rests on the road, level", "y=%.3f roll=%.4f pitch=%.4f" % [view.position.y, view.roll, view.pitch])
+	# The model's tyres reach 0.175 m below its origin whenever it is driven (the bruiser mesh), so it sits in the
+	# road's skin rather than above it; what matters here is that nothing hovers.
+	_check(lowest > -0.25 and lowest < 0.05, "and its lowest point (the tyres) is at road level, not hovering", "lowest=%.3f m" % lowest)
+	view.queue_free()
+
+
+## Nothing of the gate's frame may stand inside the arena: the sim has no collider for it. Scans the city
+## mesh for anything tall near the gate that is east of the wall line.
+func _test_gate_piers_outside_the_wall() -> void:
+	var scene: PackedScene = load("res://assets/models/city.glb")
+	var root := scene.instantiate()
+	add_child(root)
+	var inside := 0
+	var piers := 0
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if not n is MeshInstance3D or n.mesh == null:
+			continue
+		var mi: MeshInstance3D = n
+		var xf := mi.global_transform
+		for s in mi.mesh.get_surface_count():
+			var arrays := mi.mesh.surface_get_arrays(s)
+			for v: Vector3 in arrays[Mesh.ARRAY_VERTEX]:
+				var w := xf * v
+				var map := GM.from3(w)
+				if absf(map.y) < 8.0 and map.x < -66.0 and map.x > -73.0 and w.y > 5.0:
+					piers += 1
+					if map.x > -70.0 + 0.001:
+						inside += 1
+	_check(piers > 20 and inside == 0, "the gate's piers and lintel are there and none of them reaches into the arena past the wall line", "frame vertices=%d inside=%d" % [piers, inside])
+	root.queue_free()
+
+
+## A story run started by a flag must write its save somewhere that is not the player's: an earlier
+## screenshot run overwrote a real save. (Session.apply_args takes the argument list so this can be checked.)
+func _test_flags_never_touch_the_players_save() -> void:
+	var kept := Session.save_path
+	var real := SaveStore.SAVE_PATH
+	var cases := [
+		["--story"], ["--mission=2"], ["--screen=ending"], ["--screen=map", "--mission=1"], ["--screen=fail"],
+		["--screen=complete"], ["--continue"], ["--mission=3", "--gate=open", "--seed=4"],
+	]
+	var bad: Array = []
+	for args in cases:
+		Session.reset()
+		Session.apply_args(args)
+		if Session.save_path == real or SaveStore.unlocks_path(Session.save_path) == SaveStore.unlocks_path(real) or Session.save_path != Session.SCRATCH_SAVE_PATH:
+			bad.append(args)
+	_check(bad.is_empty(), "every story flag defaults to the scratch save, never the player's", str(bad))
+	Session.reset()
+	Session.apply_args(["--mission=2", "--save=user://elsewhere.json"])
+	_check(Session.save_path == "user://elsewhere.json", "and --save= still chooses the path")
+	Session.reset()
+	Session.apply_args(["--demo", "--shot-at=3"])
+	_check(Session.mode == "survival" and Session.save_path == real, "while the old round's flags leave the real path alone (it writes no save)")
+	Session.reset()
+	Session.save_path = kept
 
 
 func _test_map_view() -> void:
@@ -447,27 +555,34 @@ func _test_ending_returns_to_the_title() -> void:
 	var r := _rig("west_gate")
 	var p := r.presenter
 	_check(p.ending == "" and p.dawn_target() < 1.0, "before the gate the night is not over")
+	p.radio.say("gate_call_2")  # a stale ordinary call still queued when the car reaches the gate
+	for id in StoryData.ENDING_LINES:
+		p.on_event({"type": "line", "id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": true})
 	p.on_event({"type": "mission_complete", "title": "WEST GATE", "id": "west_gate", "mission": 2, "final": true})
 	_check(p.hud.card_kicker.text != "MISSION COMPLETE", "the last mission shows no completion card")
 	var started := [0]
 	p.ending_started.connect(func() -> void: started[0] += 1)
 	p.on_event({"type": "escaped"})
 	_check(p.ending == "rollout" and started[0] == 1 and is_equal_approx(p.dawn_target(), 1.0), "driving out of the gate starts the ending and brings first light")
+	_check("gate_call_2" not in p.radio.queued_ids() and "end_vera" not in p.radio.queued_ids(), "the stale call is dropped, and the closing lines wait for the car to stop", str(p.radio.queued_ids()))
 	p.on_event({"type": "story_complete"})
 	_check(p.ending == "pullback" and is_equal_approx(p.pullback_progress(), 0.0), "once the car has stopped the camera starts to draw back")
+	_check(p.radio.queued_ids() == ["end_vera", "end_ruck"] or p.radio.current.get("id", "") == "end_vera", "and then Vera and Ruck speak, in that order", str(p.radio.queued_ids()))
+	_check(p.blocks_pause() == false, "pausing is still allowed during the pull-back")
 	_check(SaveStore.survive_unlocked(SAVE), "and Survive the Night is unlocked")
 	p.update(StoryPresenter.PULLBACK_SECONDS * 0.5, Vector2.ZERO, 0.0)
 	_check(absf(p.pullback_progress() - 0.5) < 0.01 and not p.credits_roll.playing, "half way through the pull-back, no credits yet")
 	p.update(StoryPresenter.PULLBACK_SECONDS * 0.6, Vector2.ZERO, 0.0)
-	_check(p.ending == "roll" and p.credits_roll.playing, "then the credits roll")
+	_check(p.ending == "roll" and p.credits_roll.playing and p.blocks_pause(), "then the credits roll, and nothing can be opened over them")
 	p.credits_roll.elapsed = CreditsRoll.SECONDS - 0.01
 	p.credits_roll._process(0.1)
-	_check(p.ending == "fade" and not p.credits_roll.playing, "when they end it fades to black")
+	_check(p.ending == "fade" and not p.credits_roll.playing and p.blocks_pause(), "when they end it fades to black, still unpausable")
+	_check(p.credits_roll.visible and is_equal_approx(p.pullback_progress(), 1.0), "the last credit line stays up through the fade, and the camera holds its place")
 	p.update(StoryPresenter.FADE_SECONDS * 0.5, Vector2.ZERO, 0.0)
 	_check(quits == 0 and p._black.color.a > 0.3, "the screen goes dark first", "alpha=%.2f" % p._black.color.a)
 	p.update(StoryPresenter.FADE_SECONDS, Vector2.ZERO, 0.0)
 	p.update(1.0, Vector2.ZERO, 0.0)
-	_check(quits == 1 and p._black.color.a >= 0.99, "and then it returns to the title, once", "quits=%d" % quits)
+	_check(quits == 1 and p._black.color.a >= 0.99 and p.blocks_pause() and is_equal_approx(p.pullback_progress(), 1.0), "and then it returns to the title, once", "quits=%d" % quits)
 	p.update(1.0, Vector2.ZERO, 0.0)
 	_check(quits == 1, "and only once")
 	_drop(r)

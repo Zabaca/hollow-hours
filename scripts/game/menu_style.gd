@@ -17,6 +17,16 @@ const LIGA := 1818847073
 ## "lnum": lining figures, so 100 reads as a number and not as old-style letters.
 const LNUM := 1819178349
 
+## Canvas layers, lowest to highest, so no screen's number is a magic one.
+const LAYER_HUD := 5
+const LAYER_STORY_HUD := 6
+const LAYER_PAUSE := 20
+const LAYER_FAIL := 21
+const LAYER_MAP := 22
+const LAYER_SUBTITLES := 23  # above every menu: the wreck call stays readable under the fail menu
+const LAYER_CREDITS := 24
+const LAYER_BLACKOUT := 30
+
 static var _fonts := {}
 
 
@@ -91,3 +101,8 @@ static func heading(text: String, px: int = 64, tracking: int = 14) -> Control:
 	holder.add_child(r)
 	col.add_child(holder)
 	return col
+
+
+## Fade a control's whole tree out (the ending: the HUD goes quietly). The tween belongs to `host`.
+static func fade_out(host: Node, ctl: Control, seconds: float) -> void:
+	host.create_tween().tween_property(ctl, "modulate:a", 0.0, seconds)

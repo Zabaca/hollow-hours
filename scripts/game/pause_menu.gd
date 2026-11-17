@@ -27,7 +27,7 @@ var map_screen: MapScreen  # the full map, which sits above this menu while it i
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 20
+	layer = MenuStyle.LAYER_PAUSE
 	visible = false
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shade.mouse_filter = Control.MOUSE_FILTER_STOP

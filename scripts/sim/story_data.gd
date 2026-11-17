@@ -147,6 +147,9 @@ const RETRY_MIN_HULL := 60.0  # a retry from a checkpoint brings the car back wi
 const HOLD_SPEED := 2.0  # m/s: a hold fills only below this
 const ROAM_PACK := 3  # the pack's size in free roam
 
+## The closing lines of the last mission, spoken once the car has stopped outside the gate (the presenter holds them).
+const ENDING_LINES := ["end_vera", "end_ruck"]
+
 ## The sky's lightening once the story is over, for free roam after the last mission.
 const ENDING_DAWN := 0.3
 

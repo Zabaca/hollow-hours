@@ -40,6 +40,7 @@ var credits_roll: CreditsRoll
 var blackout := CanvasLayer.new()
 var _black := ColorRect.new()
 var _ending_t := 0.0
+var _held_lines: Array = []  # the closing lines, until the story completes
 var _blips_key := ""
 
 
@@ -60,7 +61,7 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 	credits_roll = CreditsRoll.new()
 	add_child(credits_roll)
 	credits_roll.finished.connect(_on_roll_finished)
-	blackout.layer = 30
+	blackout.layer = MenuStyle.LAYER_BLACKOUT
 	blackout.process_mode = Node.PROCESS_MODE_ALWAYS
 	_black.color = Color(0, 0, 0, 0)
 	_black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -74,7 +75,8 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 
 ## True while something the presenter shows holds the world still: no pause menu on top of it.
 func blocks_pause() -> bool:
-	return fail_menu.is_open or map_screen.is_open
+	# Nothing opens over the credits, the fade or the way back to the title.
+	return fail_menu.is_open or map_screen.is_open or ending in ["roll", "fade", "done"]
 
 
 ## How light the sky should be: the mission's own, and first light in full once the car is through the gate.
@@ -86,7 +88,7 @@ func dawn_target() -> float:
 func pullback_progress() -> float:
 	if ending == "pullback":
 		return clampf(_ending_t / PULLBACK_SECONDS, 0.0, 1.0)
-	return 1.0 if ending in ["roll", "fade"] else 0.0
+	return 1.0 if ending in ["roll", "fade", "done"] else 0.0
 
 
 ## How far the music has been hushed for the ending, 0 to 1.
@@ -103,13 +105,18 @@ func on_event(e: Dictionary) -> void:
 			_fail_in = -1.0
 			hud.show_card("Mission %d" % int(e["number"]), String(e["title"]))
 		"line":
-			radio.on_event(e)
+			# The closing lines wait for the car to stop: first light, a quiet moment, then Vera and Ruck.
+			if String(e["id"]) in StoryData.ENDING_LINES and not _ending_over():
+				_held_lines.append(e)
+			else:
+				radio.on_event(e)
 		"checkpoint":
 			has_checkpoint = true
 			hud.notice("Checkpoint")
 		"gate_open":
 			hud.notice("The gate is open")
 		"escaped":
+			radio.drop_ordinary()  # nothing stale plays into the ending; the held closing lines are not in the queue
 			ending = "rollout"
 			_ending_t = 0.0
 			hud.fade_out(2.2)
@@ -129,12 +136,16 @@ func on_event(e: Dictionary) -> void:
 			_revert_in = REVERT_DELAY
 			hud.show_card("", "Wrecked", "Back to where you last saved", 1.6)
 		"retry", "roam":
+			_held_lines = []
 			radio.clear()
 			hud.hide_card()
 		"story_complete":
 			SaveStore.unlock_survive(save_path)  # outlives the save: starting over must not hide Survive the Night
 			ending = "pullback"
 			_ending_t = 0.0
+			for held in _held_lines:
+				radio.on_event(held)
+			_held_lines = []
 
 
 # ----------------------------------------------------------------------------- every frame
@@ -169,6 +180,10 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 			game.revert_to_save()
 			_after_reset()
 	_step_ending(delta)
+
+
+func _ending_over() -> bool:
+	return ending in ["pullback", "roll", "fade", "done"]
 
 
 func _step_ending(delta: float) -> void:

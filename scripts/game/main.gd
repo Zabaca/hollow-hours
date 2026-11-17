@@ -167,6 +167,11 @@ func _make_game() -> GameSim:
 	return g
 
 
+## The leaves rolling, heard from the gate.
+func _gate_leaves_sound() -> void:
+	audio.play_at("gate_leaves", gate_view.centre + Vector3(-2.0, 2.0, 0.0), 2.0, 1.0, 140.0)
+
+
 ## --screen=map|fail|complete|ending: open that story screen over the mission, for a screenshot. The ending
 ## puts the car on the avenue with the gate open and drives it out, as reaching the gate would.
 func _story_screen() -> void:
@@ -182,8 +187,9 @@ func _story_screen() -> void:
 			gate_view.set_open(true, true)
 			game.place_car(Vector2(-62.0, 0.0), PI, GameSim.MAX_HULL)
 			game.car.body.velocity = Vector2(-14.0, 0.0)
+			presenter.radio.clear()  # the mission's opening call is still queued in a run that skips the mission
 			game.escape()
-			for id in ["end_vera", "end_ruck"]:
+			for id in StoryData.ENDING_LINES:
 				presenter.on_event({"type": "line", "id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": true})
 			presenter.on_event({"type": "escaped"})
 	if Session.shot_path != "":
@@ -471,10 +477,12 @@ func _on_event(e: Dictionary) -> void:
 		"gate_open":
 			gate_view.set_open(true)
 			audio.play("gate_klaxon", -4.0, 1.0, "SFX")
-			audio.play_at("gate_leaves", gate_view.centre + Vector3(-2.0, 2.0, 0.0), 2.0, 1.0, 140.0)
+			_gate_leaves_sound()
 		"gate_closed":
+			# A restart or retry has already put the leaves shut (world_reset): no sound for what was not seen.
+			if gate_view.open_amount > 0.05:
+				_gate_leaves_sound()
 			gate_view.set_open(false)
-			audio.play_at("gate_leaves", gate_view.centre + Vector3(-2.0, 2.0, 0.0), 2.0, 1.0, 140.0)
 
 
 ## --audio-log: how long from the start of the physics tick that found the crash to the play()

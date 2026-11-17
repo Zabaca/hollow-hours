@@ -39,7 +39,7 @@ var _subtitle_id := ""
 
 
 func _ready() -> void:
-	layer = 6
+	layer = MenuStyle.LAYER_STORY_HUD
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -63,7 +63,7 @@ func _process(_delta: float) -> void:
 
 ## The ending: the objective, radar and bars go quietly.
 func fade_out(seconds: float) -> void:
-	create_tween().tween_property(root, "modulate:a", 0.0, seconds)
+	MenuStyle.fade_out(self, root, seconds)
 
 
 ## Show or hide the whole HUD (the --no-hud flag).
@@ -204,7 +204,7 @@ func _build_subtitles() -> void:
 	col.add_child(speaker_label)
 	_text(subtitle_label, 26, MenuStyle.BONE, 500, 1)
 	col.add_child(subtitle_label)
-	subtitle_layer.layer = 23
+	subtitle_layer.layer = MenuStyle.LAYER_SUBTITLES
 	subtitle_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(subtitle_layer)
 	subtitle_layer.add_child(subtitle_panel)

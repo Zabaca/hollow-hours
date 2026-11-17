@@ -134,7 +134,7 @@ func update_pullback(car_pos: Vector2, car_angle: float, ground: float, u: float
 	var e := u * u * (3.0 - 2.0 * u)
 	var behind := car_angle + PI
 	var a := behind + e * deg_to_rad(150.0)
-	var radius := lerpf(dist + 2.6, 22.0, e)
+	var radius := lerpf(dist, 22.0, e)  # the chase camera rests `dist` behind the car
 	var height := lerpf(3.5 + 1.1, 8.5, e)
 	var at := car_pos + Vector2.from_angle(a) * radius
 	var fwd := Vector3(cos(car_angle), 0.0, -sin(car_angle))

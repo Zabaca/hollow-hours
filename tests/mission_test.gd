@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_gate_trigger()
 	_test_gate_needs_the_gap()
 	_test_camera_through_the_gap()
+	_test_escape_keeps_the_speed()
 	_test_restart_closes_the_gate()
 	_test_open_gate_gap()
 	_test_no_dawn_clock()
@@ -611,7 +612,7 @@ func _test_gate_trigger() -> void:
 	var midway := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
 	midway.continue_story(sim.mission.last_save)
 	_check(midway.mission.objective()["kind"] == "start" and midway.mission.objective()["place"] == "shop", "quitting during the roll-out resumes at mission 3's start, not in an empty roam")
-	e = _run(sim, GameSim.ESCAPE_TIME + 0.5)
+	e = _run(sim, GameSim.ESCAPE_MAX_TIME + 0.5)
 	var saves := _of(e, "save")
 	_check(_has(e, "story_complete") and saves.size() == 1 and saves[0]["data"]["ending_seen"] == true and saves[0]["data"]["next"] == "", "the story completes and asks for a final save", str(_of(e, "story_complete")))
 	var rest: Vector2 = sim.car.body.position
@@ -662,6 +663,31 @@ func _test_gate_needs_the_gap() -> void:
 	sim.car.body.velocity = Vector2(-10.0, 0.0)
 	e = _run(sim, 0.5, {"throttle": 1.0, "turn": 0.0, "handbrake": false, "boost": false})
 	_check(_has(e, "escaped"), "lined up with the gap it does")
+
+
+## Crossing the gate must not change how fast the car is going: the roll-out starts at its own speed.
+func _test_escape_keeps_the_speed() -> void:
+	for v0 in [30.0, 14.0, 6.0, 0.5]:
+		var sim := _story()
+		sim.take_events()
+		sim.world.gate["open"] = true
+		sim.place_car(Vector2(-66.0, 0.5), PI, GameSim.MAX_HULL)
+		sim.car.body.velocity = Vector2(-v0, 0.0)
+		sim.escape()
+		var worst := 0.0
+		var prev := sim.car.speed()
+		var first := -1.0
+		for i in int(round((GameSim.ESCAPE_MAX_TIME + 0.5) / DT)):
+			sim.step(DT, IDLE)
+			sim.take_events()
+			var v := sim.car.speed()
+			if first < 0.0:
+				first = v
+			worst = maxf(worst, absf(v - prev))
+			prev = v
+		var rest: Vector2 = sim.car.body.position
+		_check(absf(first - v0) < v0 * 0.08 + 0.3 and worst < 0.5, "a car crossing the gate at %d m/s rolls on at that speed, no snap" % int(v0), "first step %.1f, worst change per step %.2f m/s" % [first, worst])
+		_check(absf(rest.x - (float(sim.world.arena["left"]) - GameSim.ESCAPE_DISTANCE)) < 0.5 and sim.car.speed() < 0.1 and sim.escape_time <= GameSim.ESCAPE_MAX_TIME, "and still comes to rest on the road outside", "rest %s after %.1f s" % [str(rest), sim.escape_time])
 
 
 func _test_camera_through_the_gap() -> void:

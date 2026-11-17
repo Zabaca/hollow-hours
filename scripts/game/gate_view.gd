@@ -1,16 +1,17 @@
 class_name GateView
 extends Node3D
-## The west gate as the player sees it. Blender builds the gap in the wall, the piers and the road outside
-## (tools/blender/city.py); this draws what moves: two steel leaves that roll apart along the wall's
-## outside face, the lamps on the piers (red while it is shut, flashing amber as it opens, green once it
+## The west gate as the player sees it. Blender builds the gap in the wall, the piers (outside the sim's
+## wall) and the road outside (tools/blender/city.py); this draws what moves: two steel leaves that roll
+## apart along the wall's inner face, the lamps on the piers (red while it is shut, flashing amber as it opens, green once it
 ## is open) and the cordon's two searchlights beyond the wall, which sweep the wall until the gate opens
 ## and then hold on the gap. `track` points them at something else (the car, in the ending).
 
 const LEAF_W := 4.1
 const LEAF_H := 4.2
 const OPEN_SECONDS := 3.6
+const LAMP_LIGHT := 0.22  # share of the lamp glass's brightness thrown as light
 const SLIDE := 6.1  # metres each leaf rolls out from its closed place
-const RAIL_X := -1.9  # the leaves hang this far out from the gate's x (outside the wall's face)
+const RAIL_X := 0.16  # the leaves hang this far in from the gate's x: on the wall's inner face, in front of the piers
 
 var open_amount := 0.0
 var target_open := false
@@ -23,7 +24,9 @@ var _time := 0.0
 var _track := Vector3.INF
 
 
+## Build the leaves, lamps and searchlights where the world's gate record puts them, in the gate's state now.
 func setup(world: SimWorld) -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS  # the leaves finish closing under the fail menu, not frozen part way
 	var g: Dictionary = world.gate
 	centre = GM.to3(g["pos"])
 	half_width = float(g["width"]) * 0.5
@@ -90,14 +93,14 @@ func _build_lamps() -> void:
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		m.albedo_color = Color(1.0, 0.1, 0.08)
 		mesh.material_override = m
-		mesh.position = centre + Vector3(0.95, 4.9, side * (half_width + 0.7))
+		mesh.position = centre + Vector3(0.3, 4.9, side * (half_width + 0.7))
 		add_child(mesh)
 		var light := OmniLight3D.new()
-		light.omni_range = 10.0
-		light.light_energy = 1.6
+		light.omni_range = 8.0
+		light.light_energy = 0.35
 		light.light_color = Color(1.0, 0.1, 0.08)
 		light.shadow_enabled = false
-		light.position = mesh.position + Vector3(0.6, 0.0, 0.0)
+		light.position = mesh.position + Vector3(1.5, 0.0, 0.0)
 		add_child(light)
 		lamps.append({"mesh": mesh, "light": light, "mat": m})
 
@@ -180,7 +183,7 @@ func _pose() -> void:
 			energy = 1.4 + 1.0 * (0.5 + 0.5 * sin(_time * 2.0))
 		lp["mat"].albedo_color = col * (energy / 2.4 if energy < 2.4 else 1.0)
 		lp["light"].light_color = col
-		lp["light"].light_energy = energy
+		lp["light"].light_energy = energy * LAMP_LIGHT  # the glass is bright; the light it throws on the piers is not
 
 
 func _aim(delta: float) -> void:

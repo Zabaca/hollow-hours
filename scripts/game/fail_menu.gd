@@ -17,7 +17,7 @@ var is_open := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 21
+	layer = MenuStyle.LAYER_FAIL
 	visible = false
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shade.mouse_filter = Control.MOUSE_FILTER_STOP

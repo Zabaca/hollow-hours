@@ -24,7 +24,6 @@ Nits:
 ## From the slice 3 review (missions on screen, merged c314d0a)
 
 Nits:
-- `--mission=N` without `--save=` writes the completion save into the player's real save file.
 - The subtitle layer (23) sits above the map (22) and the pause menu (20), so a line mid-speech stays drawn over them.
 - StoryHud.subtitle_source is untyped; type it Radio.
 - Before the first checkpoint, the fail menu's "Retry mission" does the same as "Restart mission" below it.
@@ -56,4 +55,10 @@ Nits:
 - The escape's rest distance is fixed at 26 m, so a 30 m/s crossing ends with a hard stop (about 28 m/s squared, a visible nose dip). Lengthen the rest distance for high entry speeds (the road runs out to 44 m).
 - GateView runs PROCESS_MODE_ALWAYS, so its lamps, searchlights and leaves keep moving under the pause menu. Run it Always only while the fail menu is up.
 - city.py's gate_frame docstring says the whole frame stays outside x = -70, but the rail sits just inside (0.12 m high).
-- README's `--screen=ending` timings are stale: the pull-back starts at about 7 s and the credits at about 18 s.
+
+## From the follow-on review (beams and contact shadow, merged)
+
+Nits:
+- The beam cones are 90 m long and only depth-tested, so from inside the quarter a cone can show passing through a building, and in the ending it ends in a hard line on the road. Check this with a windowed shot from inside the quarter looking west while the gate is shut.
+- The beams also sweep the sky in Survive the Night, because GateView is built in both modes.
+- The contact shadow (now along the car) still only lightly darkens the tyres (alpha about 0.17 there). Tune its size and falloff by hand. On a kerb, half of it hides under the sidewalk.

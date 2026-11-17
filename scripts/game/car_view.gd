@@ -47,8 +47,8 @@ func _contact_shadow() -> void:
 	m.disable_receive_shadows = true
 	blob.material_override = m
 	blob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Laid flat; the quad's long side (its x) then runs along the car, which drives along x.
 	blob.rotation.x = -PI / 2.0
-	blob.rotation.z = PI / 2.0  # long side along the car (x forward)
 	blob.position.y = 0.03
 	blob.layers = 1
 	add_child(blob)

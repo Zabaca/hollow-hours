@@ -149,7 +149,7 @@ command from anywhere with `--path` pointing at this folder.
    The west gate and the ending: `--gate=open|opening` shows the gate open (or opening 1.5 s in), `--cam-side=H`
    puts a low camera H metres up and 7 m to the car's left (for judging how it sits on the road), and
    `--screen=ending` puts the car on the avenue with the gate open and drives it out as reaching the gate
-   would (the pull-back starts about 8 s in and the credits about 19 s in, 3 s of that being the screen's own
+   would (the pull-back starts about 7 s in and the credits about 18 s in, 3 s of that being the screen's own
    delay; use `--quit-after 12000`).
 
    Menu screenshots: `--screen=title|settings|controls|credits|confirm|pause|pause-settings` opens that screen

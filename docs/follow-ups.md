@@ -49,29 +49,11 @@ Nits:
 - Survive the Night's dawn fog now thins (the spec said unchanged; the lead accepted it).
 - The Bruiser's tyres reach 0.175 m below the model's origin, so the car sits in the road's skin (this is how it always drives); the pull-back's high angle and the wet road's reflections can read as hovering.
 
-## From the voices review (slice 5, merged)
+## From the followups-2 review (merged)
 
 Nits:
-- clear() during the opening squelch plays the closing static for a call that never spoke.
-- _music_duck takes the first Amplify on the Music bus.
-- say() or clear() before the node is in the tree errors.
-- radio.gd builds the path twice, and advance()'s OPENING and GAP branches are identical.
-- voices.ts copies balance(), buy() and the run loop from generate.ts, hardcodes `godot` instead of honouring $GODOT, re-converts all 21 files on a run with no ids, and exits 0 when a line fails.
-- generate.ts's header says tools/audio/out is git-ignored, but the raw takes are committed on purpose. Fix the header.
-
-## From the slice 4 review (the West Gate and the ending, merged)
-
-Should-fix (in the followups-2 round):
-- **Speed snap at the gate.** The escape lerps from the trigger to a fixed spot, so a car arriving at 30 m/s drops to about 12 m/s in one tick, and the chase camera's FOV and distance snap. Start the curve at the car's own speed.
-- **Pause during the credits.** Pause and Map still open in the roll's first second, and the roll then eats the next key as a skip. Pausing during the fade leaves an invisible live menu under the blackout. Block pause and the map once the ending reaches roll, fade or done.
-- **Piers stick into the arena with no collider.** They reach 0.7 m past the sim wall at x = -70, and the shut leaves sit about 1.8 m behind the wall. Keep the piers outside x = -70 and put the leaves at the wall's inner face.
-- **Screenshot flags write the real save.** `--screen=ending` and `--mission` without `--save=` overwrote the player's save on 2026-11-16 (it was moved aside to agent-run-aside/). Story screenshot flags should default to a scratch save path.
-- **The pull-back jumps 2.6 m.** It starts at dist + 2.6 while the chase camera rests at dist. Lerp the radius from dist.
-- **The last credit line vanishes before the fade.** _end() hides the roll; keep it visible through the fade.
-
-Nits:
-- hud.gd: fade_out sits under use_story_layout's doc comment. fade_out is duplicated in hud.gd and story_hud.gd. The gate_leaves play_at line appears twice in main.gd. Docs are missing on CreditsRoll.start and skip and GateView.setup. gate_view.gd's shape comments are stale. city.py's gate_frame has an unused `ax`. CanvasLayer numbers 24 and 30 are magic.
-- Survive the Night's dawn fog now thins (the spec said unchanged; the lead accepted it).
-- The closing lines play as the car crosses the gate, before the pull-back. The spec placed them after.
-- pullback_progress() returns 0 at done, so the camera snaps back under the black.
-- The fail menu freezes the gate leaves about 17% closed. A restart during the gate run plays a stray gate_leaves sound.
+- The gate leaves stand up to 0.36 m inside the arena (gate_view.gd RAIL_X), so a car against the shut gate or sliding past the open leaves clips them slightly. Moving the ribs to the leaf's outer face would cut it to about 0.1 m.
+- The escape's rest distance is fixed at 26 m, so a 30 m/s crossing ends with a hard stop (about 28 m/s squared, a visible nose dip). Lengthen the rest distance for high entry speeds (the road runs out to 44 m).
+- GateView runs PROCESS_MODE_ALWAYS, so its lamps, searchlights and leaves keep moving under the pause menu. Run it Always only while the fail menu is up.
+- city.py's gate_frame docstring says the whole frame stays outside x = -70, but the rail sits just inside (0.12 m high).
+- README's `--screen=ending` timings are stale: the pull-back starts at about 7 s and the credits at about 18 s.

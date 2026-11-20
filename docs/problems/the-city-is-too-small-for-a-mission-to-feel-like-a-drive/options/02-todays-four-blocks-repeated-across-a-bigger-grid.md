@@ -2,8 +2,11 @@
 problem: the-city-is-too-small-for-a-mission-to-feel-like-a-drive
 title: Today's four hand-made blocks repeated, turned and mirrored across a grid about three times as wide and as tall, with new signs on the copies
 summary: The cheapest bigger city. The same street grid and size as option 01 (about 400 by 300 m, 36 blocks, legs of 19 to 34 seconds at 60 km/h), but instead of a kit of new block types, today's four blocks (the towers, the gas station block, the park, the dense block) are copied across it, each copy turned or mirrored and given its own windows, roof clutter and shop signs. The landmarks, the story's places, the drive content and the simulation work are option 01's. About 13 to 19 agent hours with the detail pass (9 to 13 without), no money spent; the city repeats itself.
-status: proposed
+status: rejected
+reason: "The owner chose to keep the quarter as it is and go on to a next city through the west gate (2026-11-20, relayed by the lead session); this option grew the quarter. Its idea of reusing the quarter's blocks is weighed in option 04's trade-offs."
 ---
+
+> Written in the first round, for growing the quarter. Its references to option 01 are to that round's option 01, which is now a short record; the pieces this option shared with it carry over into option 04.
 
 ## Solution
 

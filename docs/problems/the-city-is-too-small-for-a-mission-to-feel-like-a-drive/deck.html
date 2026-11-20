@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Every mission drive in Hollow Hours lasts a few seconds</title>
+<title>The story ends at the west gate, and its city is too small for a drive</title>
 <!-- Source of every number:
-  The repository at commit 0198563, read Nov 20, 2026: the arena is x -70 to 70 and y -54 to 54 (140 by 108 m); streets every 64 m and 48 m, 14 m wide, four blocks; the story's places: start (-30, -2.5), shop (46, 7), hotel (60, -16), park hut (-32, -9), pharmacy (-44, 4), west gate (-70, 0); straight-line legs 18, 27, 77, 92, 106 and 131 m; at 60 km/h (16.7 m/s) 1.1, 1.6, 4.6, 5.5, 6.4 and 7.9 s; the car's top speed on the flat about 110 km/h (README); 12 of the 21 radio lines name a place or a time; the city model is 2.2 MB; saves hold mission names only.
-  The lead session, Nov 20, 2026: the owner's words, his yes to planning a bigger city, the leg distances, the stopgap of at least 90 m a leg, the 66 MB signed Mac build, the creature's 6% of frame time on an M3 Ultra, the 30 to 60 s and two-to-three-times suggestions.
-  The encounters review (docs/follow-ups.md): at 60 km/h on a straight the pack is near-harmless; danger sits at corners, stops and crashes.
-  The options' own estimates: sizes for 2, 3 and 4 rings of blocks (396 by 300, 524 by 396, 652 by 492 m; 36, 64, 100 blocks); legs estimated along the grid between the sketched places (about 310 to 560 m for 2 rings, scaled by 1.32 and 1.65 for 3 and 4 rings); agent hours per slice (option 1: 3-4, 5-7, 3-5, 4-6; option 2: 3-4, 3-4, 3-5, 4-6; option 3: 5-7, 8-12, 3-4, 3-5, 4-6). The map on slide 6 is a sketch: places approximate, roadblocks illustrative. -->
+  The repository at commit 99eeb89, read Nov 20, 2026: the quarter is x -70 to 70 and y -54 to 54 (140 by 108 m), four blocks; since the checkpoint spread the legs are 94, 99, 90, 106, 92 and 131 m in a straight line (5.4 to 7.9 s at 60 km/h, 3.6 to 5.2 s at 90 km/h); the ending rolls the car out, brings first light, plays the closing lines, draws the camera back and rolls 17 s of credits ending "Red got out."; the save holds mission names only, and its check sets aside a save whose next mission is not the one after those done; the credits log: 631 credits for 21 lines (1,361 characters) and four effects, about 170 more for four re-voiced lines; a Gaunt's top speed is 17.5 to 20.5 m/s (63 to 74 km/h); a crash costs up to 36 hull; the city model is 2.2 MB; voiced lines are about 40 to 80 KB.
+  The lead session, Nov 20, 2026: the owner's words ("keep what we have but wasn't the plan to be able to escape this city and go to the next?"), the 66 MB signed Mac build, the creature's 6% of frame time on an M3 Ultra, the 30 to 60 s and two-to-three-times suggestions.
+  The encounters review (docs/follow-ups.md): at 60 km/h on a straight the pack is near-harmless; creatures ahead are run down 83% of the time.
+  The options' own estimates: city sizes 396 by 300, 524 by 396, 652 by 492 m (36, 64, 100 blocks); legs along the grid with the places at the far sides (about 300 to 560 m at three times, scaled by 1.32 and 1.65); about 24 new lines, about 1,600 characters, about 750 credits at the measured rate plus up to 200 for three effects; option 04's slices 4-5, 6-8, 5-7, 3-4, 1-2 and 4-6 agent hours; option 05 adds 4-6 hours and about 4 lines; the road about 1.2 km (72 s at 60 km/h, 48 s at 90 km/h); the first round's option 01 at 15 to 22 hours. The diagram on slide 5 is a sketch to scale: places approximate. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -65,12 +65,13 @@
   th { font-size: 0.78em; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
   td.n, th.n { text-align: right; }
   tr.hl td { background: var(--accent-wash); font-weight: 600; }
+  tr.out td { color: var(--muted); }
   table.dense { font-size: 0.86em; }
 
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3em; align-items: start; }
   .cols.three { grid-template-columns: repeat(3, 1fr); gap: 1.4em; }
-  .cols.map { grid-template-columns: 0.95fr 1fr; gap: 2.2em; align-items: center; }
-  .cols.map svg { width: 100%; height: auto; display: block; }
+  .diagram { min-height: 0; }
+  .diagram svg { flex: 1 1 0; min-height: 0; width: 100%; height: 100%; display: block; }
   .card { background: var(--wash); border-radius: 0.5em; padding: 1.1em 1.3em; }
   .card h3 { font: 700 1.05em/1.2 var(--display); margin: 0 0 0.5em; }
   .card.us { background: var(--accent-wash); }
@@ -99,7 +100,7 @@
     html { scroll-snap-type: none; }
     .slide { width: 100%; aspect-ratio: auto; min-height: 100svh; font-size: 15px; padding: 2.2em 1.25em 4.5em; }
     h2 { font-size: 1.9em; }
-    .stats, .cols, .cols.three, .cols.map { grid-template-columns: 1fr; gap: 1.2em; max-width: none; }
+    .stats, .cols, .cols.three { grid-template-columns: 1fr; gap: 1.2em; max-width: none; }
     .cover { flex-direction: column-reverse; padding: 0; }
     .cover h1 { font-size: 2.1em; }
     .end h2 { font-size: 1.9em; overflow-wrap: anywhere; }
@@ -109,6 +110,7 @@
     ol.steps li { grid-template-columns: 1.8em 1fr; }
     ol.steps .when { grid-column: 2; }
     .wrap-x { overflow-x: auto; }
+    .diagram svg { flex: none; height: auto; }
   }
 
   @page { size: 13.333in 7.5in; margin: 0; }
@@ -126,130 +128,137 @@
 <section class="slide cover">
   <div class="text">
     <div class="kicker">Problem &middot; Hollow Hours &middot; November 2026</div>
-    <h1>Every mission drive in Hollow Hours lasts a few seconds, because the whole city is 140 m across</h1>
-    <p>Three ways to build a city about three times as wide and as tall, so each leg is a drive of tens of seconds. They differ in how much of today's city they keep and how varied the new one is.</p>
+    <h1>The story ends at the west gate, and its city is too small for a mission to feel like a drive</h1>
+    <p>You chose to keep the quarter and go on to the next city. Two ways to get there; growing the quarter stays on record as the road not taken.</p>
     <div class="foot"><div class="mark"><b>Zabaca</b><span>PLAN FOR THE OWNER</span></div><div>Nov 20, 2026</div></div>
   </div>
 </section>
 
 <section class="slide">
-  <div class="kicker">What it costs today</div>
-  <h2>At 60 km/h the longest mission leg takes 8 seconds, and the shortest about one</h2>
+  <div class="kicker">Where it stands</div>
+  <h2>Every leg is now 5 to 8 seconds at 60 km/h, as far apart as the quarter allows, and the story stops at the gate</h2>
   <div class="body">
     <div class="stats">
-      <div class="stat"><b>140 m</b><p>from wall to wall: 8 seconds end to end at 60 km/h</p></div>
-      <div class="stat"><b>18<em> to </em>131 m</b><p>the story's legs, the park hut to the pharmacy up to the hotel to the west gate</p></div>
-      <div class="stat"><b>90 m</b><p>the stopgap being built now: every leg at least this, about 5 seconds, inside today's city</p></div>
+      <div class="stat"><b>140 m</b><p>the quarter from wall to wall: 8 seconds end to end at 60 km/h</p></div>
+      <div class="stat"><b>90<em> to </em>131 m</b><p>every leg since the checkpoint spread, in a straight line</p></div>
+      <div class="stat"><b>The gate</b><p>where the story ends today: first light, then the credits; no next city</p></div>
     </div>
-    <p class="muted small">Read in the game's code on Nov 20, 2026; distances are straight lines between the story's places.</p>
-  </div>
-  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
-</section>
-
-<section class="slide">
-  <div class="kicker">How big</div>
-  <h2>Three times as wide and tall makes a leg 19 to 34 seconds; 30 to 60 needs about five times</h2>
-  <div class="body">
-    <div class="wrap-x"><table class="dense">
-      <tr><th>City</th><th>Size</th><th class="n">Blocks</th><th>A mission leg at 60 km/h</th><th>At 90 km/h</th></tr>
-      <tr><td>Today</td><td>140 by 108 m</td><td class="n">4</td><td>1 to 8 s</td><td>under 6 s</td></tr>
-      <tr class="hl"><td>About 3 times (recommended)</td><td>about 400 by 300 m</td><td class="n">36</td><td>19 to 34 s</td><td>12 to 22 s</td></tr>
-      <tr><td>About 4 times</td><td>about 520 by 400 m</td><td class="n">64</td><td>25 to 44 s</td><td>16 to 30 s</td></tr>
-      <tr><td>About 5 times</td><td>about 650 by 490 m</td><td class="n">100</td><td>31 to 55 s</td><td>20 to 37 s</td></tr>
-    </table></div>
-    <p class="muted small">Estimates along the streets between the places on slide 6, before any detour; corners, roadblocks and the pack add time in play. The city can grow later: in options 1 and 2 its size is one setting.</p>
+    <p class="muted small">Read in the game's code on Nov 20, 2026, after the checkpoint spread and its four re-voiced lines.</p>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 
 <section class="slide">
   <div class="kicker">All the options</div>
-  <h2>Three ways to build it, from repeating today's blocks to a whole new street plan</h2>
+  <h2>Two ways on from the gate, and the bigger quarter you turned away from</h2>
   <div class="body">
     <div class="wrap-x"><table class="dense">
-      <tr><th></th><th>1. Districts round today's quarter</th><th>2. Today's blocks repeated</th><th>3. A new irregular plan</th></tr>
-      <tr><td><b>New blocks</b></td><td>Filled from a kit of block types: towers, brick rows, yards, houses, a park</td><td>Copies of today's four, turned and mirrored, new signs</td><td>A new generator, blocks of many shapes</td></tr>
-      <tr><td><b>Today's quarter</b></td><td>Kept, at the centre</td><td>Kept, at the centre</td><td>Replaced</td></tr>
-      <tr><td><b>Streets</b></td><td>Today's grid, a canal and bridges</td><td>Today's grid, a canal and bridges</td><td>A diagonal boulevard, a bending river road</td></tr>
-      <tr><td><b>Agent hours</b></td><td>15 to 22 (11 to 16 without the detail pass)</td><td>13 to 19 (9 to 13)</td><td>23 to 34 (19 to 28)</td></tr>
-      <tr><td><b>The catch</b></td><td>Reads as a grid</td><td>The same four blocks nine times over</td><td>The car's feel against angled walls is new and untested</td></tr>
+      <tr><th></th><th>4. Straight into a second city</th><th>5. A highway run, then the city</th><th>1. Grow the quarter (set aside)</th></tr>
+      <tr><td><b>After the gate</b></td><td>A card, "The next night", and the harbour city loads</td><td>The same card, then a dead highway into the city</td><td>No next city; the quarter grows round itself</td></tr>
+      <tr><td><b>The long drives</b></td><td>Chapter 2's legs, about 20 to 35 s each</td><td>The same, plus a road of about 70 s</td><td>About 20 to 35 s, in a bigger quarter</td></tr>
+      <tr><td><b>New story</b></td><td>3 missions, about 24 lines</td><td>4 missions, about 28 lines</td><td>None</td></tr>
+      <tr><td><b>Agent hours</b></td><td>19 to 26 (23 to 32 with the detail pass)</td><td>23 to 32 (27 to 38)</td><td>15 to 22 (with the detail pass)</td></tr>
+      <tr><td><b>The catch</b></td><td>The journey between is told by a card</td><td>A fast car outruns the pack on a clear road; the road's danger must be built in</td><td>Changes the quarter you chose to keep</td></tr>
     </table></div>
-    <p class="muted small">All three keep the radio as it is, put danger on the drives the same way, and spend no money.</p>
+    <p class="muted small">Options 2 and 3 of the first round (copying the quarter's blocks, an irregular street plan) also grew or replaced the quarter and are set aside with option 1.</p>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 
 <section class="slide">
   <div class="kicker">Recommendation</div>
-  <h2>Recommended: option 1, districts round today's quarter, filled from a kit of block types</h2>
+  <h2>Recommended: option 4, straight into a second, larger city after a card at the gate</h2>
   <div class="body">
     <ul class="tight">
-      <li><b>A city that does not repeat itself</b>, for 2 to 3 agent hours more than copying today's blocks.</li>
-      <li><b>Today's streets stay</b> at the centre, with the pharmacy run-down tuned there and the tests that drive on the avenue.</li>
-      <li><b>The car feels the same</b>: walls stay square to the map, so its collisions remain the ones checked against Roadkill.</li>
-      <li><b>8 to 12 agent hours less than a new street plan</b>, and it can still grow: a third ring of blocks is one setting and moving the landmarks out.</li>
+      <li><b>It is the direct answer</b> to escaping this city and going to the next, and the quarter stays exactly as you know it.</li>
+      <li><b>The long drives live in chapter 2's missions</b>, in a city where the roadblocks, bridges and ambushes make slowing down the danger.</li>
+      <li><b>4 to 6 agent hours less than the highway</b>, with no long straight where a fast car outruns the pack.</li>
+      <li><b>The highway can still come later</b>: it slots in front of the city's east edge without undoing anything.</li>
     </ul>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 
 <section class="slide">
-  <div class="kicker">The city in option 1</div>
-  <h2>Moving three landmarks to far corners makes every mission leg cross the city</h2>
+  <div class="kicker">Option 4, to scale</div>
+  <h2>The quarter stays chapter 1; a city eight times its area is chapter 2, one cut away</h2>
+  <div class="body diagram">
+    <svg viewBox="-150 -30 830 392" role="img" aria-label="To scale: the harbour city, about 400 by 300 m, beside the quarter, 140 by 108 m, joined by the cut at the west gate">
+      <rect x="0" y="0" width="396" height="300" fill="#f4f5f7" stroke="#1f2328" stroke-width="3"/>
+      <g fill="#c4cad1">
+        <rect x="13" y="13" width="50" height="34"/><rect x="77" y="13" width="50" height="34"/><rect x="141" y="13" width="50" height="34"/><rect x="205" y="13" width="50" height="34"/><rect x="269" y="13" width="50" height="34"/><rect x="333" y="13" width="50" height="34"/>
+        <rect x="13" y="61" width="50" height="34"/><rect x="77" y="61" width="50" height="34"/><rect x="141" y="61" width="50" height="34"/><rect x="205" y="61" width="50" height="34"/><rect x="269" y="61" width="50" height="34"/><rect x="333" y="61" width="50" height="34"/>
+        <rect x="13" y="109" width="50" height="34"/><rect x="77" y="109" width="50" height="34"/><rect x="141" y="109" width="50" height="34"/><rect x="205" y="109" width="50" height="34"/><rect x="269" y="109" width="50" height="34"/><rect x="333" y="109" width="50" height="34"/>
+        <rect x="13" y="157" width="50" height="34"/><rect x="77" y="157" width="50" height="34"/><rect x="141" y="157" width="50" height="34"/><rect x="205" y="157" width="50" height="34"/><rect x="269" y="157" width="50" height="34"/><rect x="333" y="157" width="50" height="34"/>
+        <rect x="13" y="205" width="50" height="34"/><rect x="77" y="205" width="50" height="34"/><rect x="141" y="205" width="50" height="34"/><rect x="205" y="205" width="50" height="34"/><rect x="269" y="205" width="50" height="34"/><rect x="333" y="205" width="50" height="34"/>
+      </g>
+      <g fill="#a9b4bf"><rect x="13" y="253" width="50" height="34"/><rect x="77" y="253" width="50" height="34"/><rect x="141" y="253" width="50" height="34"/><rect x="205" y="253" width="50" height="34"/><rect x="269" y="253" width="50" height="34"/><rect x="333" y="253" width="50" height="34"/></g>
+      <rect x="63" y="0" width="14" height="300" fill="#6b9bf0"/>
+      <g fill="#f4f5f7" stroke="#77808c" stroke-width="0.8"><rect x="63" y="47" width="14" height="14"/><rect x="63" y="143" width="14" height="14"/><rect x="63" y="239" width="14" height="14"/></g>
+      <rect x="-4" y="140" width="8" height="20" fill="#c2412d"/>
+      <g fill="#2459b8" stroke="#fff" stroke-width="1.5">
+        <circle cx="390" cy="150" r="6"/><circle cx="40" cy="30" r="6"/><circle cx="356" cy="268" r="6"/><circle cx="40" cy="270" r="6"/>
+      </g>
+      <g fill="#e0a21a" stroke="#fff" stroke-width="1.5"><circle cx="230" cy="30" r="5"/><circle cx="110" cy="150" r="5"/><circle cx="356" cy="102" r="5"/></g>
+      <g font-family="Inter, sans-serif" font-size="13" fill="#1f2328" font-weight="600">
+        <text x="-10" y="146" text-anchor="end">Lift bridge</text>
+        <text x="-10" y="162" text-anchor="end" font-weight="400" fill="#77808c">the way out</text>
+        <text x="52" y="34">Ruck's truck</text>
+        <text x="344" y="272" text-anchor="end">Field hospital</text>
+        <text x="52" y="274">Fuel depot (docks)</text>
+        <text x="380" y="140" text-anchor="end">Start</text>
+        <text x="242" y="34" font-weight="400">generators</text>
+      </g>
+      <text x="198" y="-12" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#1f2328">The harbour city, about 400 by 300 m (chapter 2)</text>
+      <rect x="490" y="96" width="140" height="108" fill="#eaf1fd" stroke="#2f6fde" stroke-width="2"/>
+      <g fill="#c4cad1"><rect x="503" y="109" width="50" height="34"/><rect x="567" y="109" width="50" height="34"/><rect x="503" y="157" width="50" height="34"/><rect x="567" y="157" width="50" height="34"/></g>
+      <rect x="486" y="146" width="8" height="8" fill="#2459b8"/>
+      <text x="560" y="84" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#1f2328">The quarter, 140 by 108 m</text>
+      <text x="560" y="224" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" fill="#77808c">chapter 1, unchanged</text>
+      <path d="M484 150 L404 150" stroke="#1f2328" stroke-width="2" stroke-dasharray="5 4" fill="none"/>
+      <path d="M404 150 L413 145 L413 155 Z" fill="#1f2328"/>
+      <g font-family="Inter, sans-serif" font-size="12" fill="#1f2328" text-anchor="middle">
+        <text x="444" y="126">the west gate,</text><text x="444" y="140">a card, the cut</text>
+      </g>
+      <g font-family="Inter, sans-serif" font-size="12" fill="#77808c">
+        <rect x="0" y="318" width="12" height="12" fill="#6b9bf0"/><text x="18" y="328">river and bridges</text>
+        <rect x="140" y="318" width="12" height="12" fill="#a9b4bf"/><text x="158" y="328">docks</text>
+        <circle cx="236" cy="324" r="6" fill="#e0a21a"/><text x="248" y="328">generator posts (mission 5)</text>
+        <text x="0" y="350">A sketch to scale; places approximate.</text>
+      </g>
+    </svg>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Chapter 2, for you to approve or change</div>
+  <h2>The next night, in the harbour city: a rescue, a fuel run and an escape over a lift bridge</h2>
   <div class="body">
-    <div class="cols map">
-      <svg viewBox="-62 -6 464 318" role="img" aria-label="Sketch of the bigger city: a six by six grid of blocks with today's quarter at the centre, a canal in the west, and the mission places in the corners">
-        <rect x="0" y="0" width="396" height="300" fill="#f4f5f7" stroke="#1f2328" stroke-width="3"/>
-        <g fill="#c4cad1">
-          <rect x="13" y="13" width="50" height="34"/><rect x="77" y="13" width="50" height="34"/><rect x="141" y="13" width="50" height="34"/><rect x="205" y="13" width="50" height="34"/>
-          <rect x="13" y="61" width="50" height="34"/><rect x="77" y="61" width="50" height="34"/><rect x="141" y="61" width="50" height="34"/><rect x="205" y="61" width="50" height="34"/><rect x="269" y="61" width="50" height="34"/><rect x="333" y="61" width="50" height="34"/>
-          <rect x="13" y="109" width="50" height="34"/><rect x="77" y="109" width="50" height="34"/><rect x="269" y="109" width="50" height="34"/><rect x="333" y="109" width="50" height="34"/>
-          <rect x="13" y="157" width="50" height="34"/><rect x="77" y="157" width="50" height="34"/><rect x="269" y="157" width="50" height="34"/><rect x="333" y="157" width="50" height="34"/>
-          <rect x="13" y="205" width="50" height="34"/><rect x="77" y="205" width="50" height="34"/><rect x="141" y="205" width="50" height="34"/><rect x="205" y="205" width="50" height="34"/><rect x="269" y="205" width="50" height="34"/><rect x="333" y="205" width="50" height="34"/>
-          <rect x="13" y="253" width="50" height="34"/><rect x="77" y="253" width="50" height="34"/><rect x="141" y="253" width="50" height="34"/><rect x="205" y="253" width="50" height="34"/><rect x="269" y="253" width="50" height="34"/><rect x="333" y="253" width="50" height="34"/>
-        </g>
-        <rect x="269" y="13" width="114" height="34" fill="#bcd5b4"/>
-        <g fill="#eaf1fd" stroke="#2f6fde" stroke-width="1.5">
-          <rect x="141" y="109" width="50" height="34"/><rect x="205" y="109" width="50" height="34"/><rect x="141" y="157" width="50" height="34"/><rect x="205" y="157" width="50" height="34"/>
-        </g>
-        <rect x="63" y="0" width="14" height="300" fill="#6b9bf0"/>
-        <g fill="#f4f5f7" stroke="#77808c" stroke-width="0.8">
-          <rect x="63" y="47" width="14" height="14"/><rect x="63" y="143" width="14" height="14"/><rect x="63" y="239" width="14" height="14"/>
-        </g>
-        <text transform="translate(73.5,228) rotate(-90)" font-family="Inter, sans-serif" font-size="9" fill="#fff">CANAL</text>
-        <g fill="#c2412d">
-          <rect x="292" y="143" width="4" height="10"/><rect x="164" y="47" width="4" height="14"/><rect x="319" y="220" width="14" height="4"/>
-        </g>
-        <rect x="189" y="145.5" width="11" height="3" fill="#1f2328"/>
-        <rect x="-2" y="144" width="5" height="12" fill="#2459b8"/>
-        <g font-family="Inter, sans-serif" font-size="10" fill="#1f2328" text-anchor="middle">
-          <text x="230" y="171">Today's</text><text x="230" y="183">quarter</text>
-          <text x="-6" y="153" text-anchor="end" font-weight="600">West gate</text>
-          <text x="38" y="34" font-weight="600">24H shop</text>
-          <text x="358" y="274" font-weight="600">Hotel</text>
-          <text x="300" y="34" font-weight="600">Park hut</text>
-          <text x="166" y="130" font-weight="600">Pharmacy</text>
-          <text x="294" y="177" font-weight="600">Start</text>
-        </g>
-        <g fill="#2459b8" stroke="#fff" stroke-width="1.5">
-          <circle cx="48" cy="48" r="5"/><circle cx="386" cy="270" r="5"/><circle cx="348" cy="30" r="5"/><circle cx="154" cy="146" r="5"/><circle cx="318" cy="152" r="5"/>
-        </g>
-        <g font-family="Inter, sans-serif" font-size="9" fill="#77808c">
-          <rect x="0" y="306" width="10" height="4" fill="#c2412d"/><text x="14" y="311">roadblocks (where shown: an illustration)</text>
-        </g>
-      </svg>
-      <div>
-        <table class="dense">
-          <tr><th>Leg</th><th class="n">At 60 km/h</th><th class="n">Today</th></tr>
-          <tr><td>Start to the 24H shop</td><td class="n">23 s</td><td class="n">5 s</td></tr>
-          <tr><td>The shop to the hotel</td><td class="n">34 s</td><td class="n">2 s</td></tr>
-          <tr><td>The park hut to the pharmacy</td><td class="n">19 s</td><td class="n">1 s</td></tr>
-          <tr><td>The pharmacy to the hotel</td><td class="n">21 s</td><td class="n">6 s</td></tr>
-          <tr><td>The hotel to the west gate</td><td class="n">30 s</td><td class="n">8 s</td></tr>
-        </table>
-        <p class="muted small" style="margin-top:0.8em">A sketch: places approximate. The pharmacy stays put; the old hotel, gas station and hut go dark or go, so each exists once.</p>
-      </div>
-    </div>
+    <p>The cordon burned the quarter at first light and took Red, Vera and Teo across the river to its camp. By the next dusk the camp's radio had gone quiet: the Gaunts came up there too.</p>
+    <div class="wrap-x"><table class="dense">
+      <tr><th>Mission</th><th>What happens</th></tr>
+      <tr><td><b>4 Dead Convoy</b></td><td>Ruck's truck went off the ring road on the far side of the city: reach it, hold while he drags himself in, bring him to the field hospital.</td></tr>
+      <tr><td><b>5 Floodlights</b></td><td>The hospital's lights keep the pack off it and its generators are failing: take fuel from the docks to three generator posts before the lights die.</td></tr>
+      <tr><td><b>6 The Lift Bridge</b></td><td>The only road out is up: get everyone to its control house, hold out while Teo brings it down, cross before it lifts again. First light; the credits.</td></tr>
+    </table></div>
+    <p class="muted small">Working names, all original. About 24 new radio lines, written from this once you approve it.</p>
+  </div>
+  <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">How big</div>
+  <h2>Three times the quarter makes a chapter 2 leg about 20 to 35 seconds; 30 to 60 needs five times</h2>
+  <div class="body">
+    <div class="wrap-x"><table class="dense">
+      <tr><th>The harbour city</th><th>Size</th><th class="n">Blocks</th><th>A leg at 60 km/h</th><th>At 90 km/h</th></tr>
+      <tr class="out"><td>The quarter, for comparison</td><td>140 by 108 m</td><td class="n">4</td><td>5 to 8 s</td><td>4 to 5 s</td></tr>
+      <tr class="hl"><td>About 3 times (recommended)</td><td>about 400 by 300 m</td><td class="n">36</td><td>19 to 34 s</td><td>12 to 22 s</td></tr>
+      <tr><td>About 4 times</td><td>about 520 by 400 m</td><td class="n">64</td><td>25 to 44 s</td><td>16 to 30 s</td></tr>
+      <tr><td>About 5 times</td><td>about 650 by 490 m</td><td class="n">100</td><td>31 to 55 s</td><td>20 to 37 s</td></tr>
+    </table></div>
+    <p class="muted small">Estimates along the streets with the places at the far sides, before any detour; corners, roadblocks and the pack add time in play. The size is one setting, so the city can grow after you have driven it.</p>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
@@ -262,56 +271,58 @@
       <ul class="tight">
         <li><b>Roadblocks and squeezes.</b> Wrecks, a jackknifed truck and barriers cut the straight routes: every leg forces a turn or a squeeze down to about 30 km/h.</li>
         <li><b>Ambushes.</b> Two or three Gaunts wait beside the squeezes and bridge ends, out of the headlights, and come from the side.</li>
-        <li><b>The pack follows you.</b> New Gaunts arrive ahead of the car; ones left far behind drop out. No corner of the city is safe.</li>
-        <li><b>Lit refuges</b> at a few junctions and the gas station; dark avenues between.</li>
+        <li><b>The pack follows you.</b> New Gaunts arrive ahead of the car; ones left far behind drop out.</li>
+        <li><b>A route on the radar</b> and the map, and a radar that sees further at speed.</li>
       </ul>
-      <div class="card us"><h3>Why there</h3><p>Today a fast car on a straight is near-harmless: creatures ahead are run down 83% of the time. The danger sits at corners, stops and crashes, so the city makes more of those.</p></div>
+      <div class="card us"><h3>Why there</h3><p>Today a fast car on a straight is near-harmless: creatures ahead are run down 83% of the time, and a Gaunt tops out at 63 to 74 km/h. The danger sits at corners, stops and crashes, so the city makes more of those.</p></div>
     </div>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 
 <section class="slide">
-  <div class="kicker">What else moves</div>
-  <h2>The rest moves with the city at no cost: no radio line is re-recorded</h2>
+  <div class="kicker">What else changes</div>
+  <h2>Saves carry on into chapter 2, and the credits move to the far side of the lift bridge</h2>
   <div class="body">
     <div class="cols three">
-      <div class="card"><h3>The radio</h3><p>12 of the 21 lines name a place or a time, and every one stays true: the hotel's east door, the shop's south door, the pharmacy on the avenue's north side, the gate at its end, sixty and twenty seconds.</p></div>
-      <div class="card"><h3>The map</h3><p>A route along the streets to the objective on the radar and the map; the radar sees further at speed; the west gate is marked during the last minute.</p></div>
-      <div class="card"><h3>The gate and the old round</h3><p>The gate moves to the new west wall, ending unchanged. Survive the Night keeps its start, in the whole bigger city. Saves carry on.</p></div>
+      <div class="card"><h3>Saves and Continue</h3><p>Continue opens the city your next mission is in. A save that had already finished the story carries on into chapter 2 instead of being thrown out.</p></div>
+      <div class="card"><h3>The ending</h3><p>The quarter ends at first light with Vera and Ruck, then the card. The credits roll after the lift bridge; "The end" moves with them.</p></div>
+      <div class="card"><h3>Survive the Night</h3><p>Still unlocked by escaping the quarter and played there; once chapter 2 is done, also in the harbour city.</p></div>
     </div>
+    <p class="muted small">One city is loaded at a time, so the quarter costs nothing in chapter 2. The map and radar show whichever city you are in.</p>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 
 <section class="slide">
   <div class="kicker">The order</div>
-  <h2>Four slices in option 1, about 15 to 22 agent hours, the detail pass last and optional</h2>
+  <h2>Five slices in option 4, about 19 to 26 agent hours, and the detail pass as an optional sixth</h2>
   <div class="body">
     <ol class="steps">
-      <li><span><b>Ready for a big city</b>, under the hood; nothing changes on screen</span><span class="when">3 to 4 h</span></li>
-      <li><span><b>The bigger city, plain</b>, with the story moved in; then you drive the whole story</span><span class="when">5 to 7 h, your 30 min</span></li>
-      <li><span><b>Things on the drive</b>: ambushes, the route on the radar; then you play it again</span><span class="when">3 to 5 h, your 30 min</span></li>
-      <li><span><b>The detail pass</b>: textures, bevelled edges, more props, on every block, after your yes</span><span class="when">4 to 6 h, your 10 min</span></li>
+      <li><span><b>Ready for a second city</b>, under the hood; nothing changes on screen</span><span class="when">4 to 5 h</span></li>
+      <li><span><b>The harbour city, plain, and the cut</b>; you escape and drive it</span><span class="when">6 to 8 h, your 20 min</span></li>
+      <li><span><b>Chapter 2's missions</b> with subtitles, ambushes, the route; you play it</span><span class="when">5 to 7 h, your 45 min</span></li>
+      <li><span><b>The lift bridge and the credits</b>; you play the last mission through</span><span class="when">3 to 4 h, your 15 min</span></li>
+      <li><span><b>Chapter 2's voices</b>, after your yes on the spend</span><span class="when">1 to 2 h, your 10 min</span></li>
+      <li><span><b>The detail pass</b>: textures, bevelled edges, props, after your yes</span><span class="when">4 to 6 h, your 10 min</span></li>
     </ol>
-    <p class="muted small">The detail pass you were offered is folded in here: done once in the block kit, it lands on all 36 blocks. Done first on today's four, it would be redone for 32 new ones.</p>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 
 <section class="slide">
   <div class="kicker">Cost and risk</div>
-  <h2>No money is spent; the open risk is whether a city eight times the size runs smoothly</h2>
+  <h2>A small capped voice spend; the open risk is whether a city eight times the quarter runs smoothly</h2>
   <div class="body">
     <div class="cols">
       <div class="card"><h3>Cost</h3><ul class="tight">
-        <li>15 to 22 agent hours (11 to 16 without the detail pass)</li>
-        <li>No voice or image spend</li>
-        <li>Your time: four answers, two 30-minute plays, a 10-minute look</li>
+        <li>19 to 26 agent hours (23 to 32 with the detail pass)</li>
+        <li>About 950 ElevenLabs credits expected for about 24 lines and three effects, capped at 1,500</li>
+        <li>Your time: six answers, then about 1 hour 40 minutes of play across the slices</li>
       </ul></div>
       <div class="card"><h3>Not yet verified</h3><ul class="tight">
         <li>Frame time on a weak graphics card, never measured; measured on the Mac from slice 2</li>
-        <li>The download, aimed near 75 to 80 MB (66 MB today)</li>
+        <li>The download, aimed near 75 to 80 MB (66 MB today), and the load at the cut</li>
         <li>How long a leg takes in play, and whether straights still feel safe</li>
       </ul></div>
     </div>
@@ -321,24 +332,25 @@
 
 <section class="slide">
   <div class="kicker">Yours to decide</div>
-  <h2>Four answers from you; slice 1 waits only on the first</h2>
+  <h2>Six answers from you; slice 1 waits only on the first</h2>
   <div class="body">
     <div class="wrap-x"><table class="dense">
       <tr><th>Question</th><th>Recommended</th><th>Waits on it</th></tr>
-      <tr><td>Which option?</td><td>Option 1</td><td>Every slice</td></tr>
-      <tr><td>How long a mission drive?</td><td>About 20 to 35 seconds (3 times today's city), grown later if still short</td><td>Slice 2</td></tr>
-      <tr><td>Move the hotel, gas station and park hut to far corners, the pharmacy staying?</td><td>Yes: it makes every leg cross the city with no line changed</td><td>Slice 2</td></tr>
-      <tr><td>The detail pass as the last slice, after you have played the city plain?</td><td>Yes</td><td>Slice 4</td></tr>
+      <tr><td>Which option?</td><td>Option 4</td><td>Every slice</td></tr>
+      <tr><td>Chapter 2's story as sketched?</td><td>Approve it; rename or swap any mission now</td><td>Slice 3</td></tr>
+      <tr><td>How big is the harbour city?</td><td>About 3 times the quarter, grown later if still short</td><td>Slice 2</td></tr>
+      <tr><td>Up to 1,500 ElevenLabs credits for chapter 2's voices?</td><td>Yes (about 950 expected)</td><td>Slice 5</td></tr>
+      <tr><td>Credits after the lift bridge, the quarter ending on a "next night" card?</td><td>Yes</td><td>Slice 2</td></tr>
+      <tr><td>The detail pass last, after you have played it plain?</td><td>Yes</td><td>Slice 6</td></tr>
     </table></div>
-    <p class="muted small">If you have a weaker computer the game should run well on, one drive on it after slice 2 settles the frame-time question.</p>
   </div>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 
 <section class="slide end">
   <div class="kicker">Next step</div>
-  <h2>Next, your pick of option and size; slice 1 can start on the pick alone</h2>
-  <p style="margin-top:1.4em">Then the bigger city, plain, ready for your first drive through it about 8 to 11 agent hours later (slices 1 and 2).</p>
+  <h2>Next, your pick of option; slice 1 can start on the pick alone</h2>
+  <p style="margin-top:1.4em">Your first drive out of the gate into the harbour city comes after slices 1 and 2, about 10 to 13 agent hours later.</p>
   <div class="foot"><div class="mark"><b>Zabaca</b><span>HOLLOW HOURS</span></div></div>
 </section>
 

@@ -2,8 +2,11 @@
 problem: the-city-is-too-small-for-a-mission-to-feel-like-a-drive
 title: A new city generator with an irregular street plan (a diagonal boulevard, a river road that bends, blocks of many shapes), replacing today's grid and quarter
 summary: The most city-like route. A new Blender generator lays out a street network that is not a grid (a diagonal boulevard, a river with a bending road beside it, odd-shaped blocks and plazas) about 400 by 300 m, fills it with buildings, and places the landmarks so the radio's lines stay true. The simulation learns walls at any angle, which the car's collisions (ported from Roadkill and checked against it) do not handle today. Today's quarter is replaced. About 23 to 34 agent hours with the detail pass (19 to 28 without), no money spent; the most memorable city and the biggest change to how the car feels against walls.
-status: proposed
+status: rejected
+reason: "The owner chose to keep the quarter as it is and go on to a next city through the west gate (2026-11-20, relayed by the lead session); this option replaced the quarter. An irregular street plan for the next city is weighed in option 04's trade-offs."
 ---
+
+> Written in the first round, for growing the quarter. Its references to option 01 are to that round's option 01, which is now a short record; the pieces this option shared with it carry over into option 04.
 
 ## Solution
 

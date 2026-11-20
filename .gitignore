@@ -5,3 +5,4 @@ build/
 tools/blender/__pycache__/
 tools/blender/previews/
 node_modules/
+tools/blender/concepts/__pycache__/

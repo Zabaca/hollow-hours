@@ -226,13 +226,19 @@ key) in the environment. With neither it signs and stops. Only the macOS export 
 ## Remaking the assets
 
 Blender 5.3 headless, foreground, one script per asset (the output is committed, so this is only
-needed when changing a model):
+needed when changing a model). The creature also needs ImageMagick (`magick` on the PATH; `brew install imagemagick`) to write its skin
+textures, and Cycles to bake them (about 30 s):
 
 ```
 Blender --background --python-exit-code 1 --python tools/blender/car.py
-Blender --background --python-exit-code 1 --python tools/blender/creature.py       # add -- preview for contact sheets
+Blender --background --python-exit-code 1 --python tools/blender/creature.py       # add -- preview for contact sheets of the clips (ONLY=sprint:0,4,8 picks frames, VIEWSIDE=front)
 Blender --background --python-exit-code 1 --python tools/blender/city.py           # also rewrites scripts/game/city_layout.gd
 ```
+
+The creature (the Gaunt) is `tools/blender/creature.py`, built on the shared geometry in `tools/blender/gk.py`. The other two looks
+considered for it, and the Gaunt it replaced, are kept in `tools/blender/concepts/` with the scripts that render the comparison shots.
+In the game, `godot --path . --resolution 1600x900 --audio-driver Dummy res://tests/creature_shots.tscn -- --drive=0,0 --no-hud --seed=3 --start=-30,0,0 --scenario=lit --cam=front --out=/tmp/gaunt.png`
+saves a frame of one creature in a given state (stalk, lit, sprint, wind, leap, latch, thrown, stunned, missed, dead; see the file's header).
 
 Sound: `ELEVENLABS_API_KEY=... bun tools/audio/generate.ts [name ...]` buys only what is missing from
 `tools/audio/out/` and converts to `assets/audio/` (mp3 one-shots, cross-faded wav loops). Roadkill's

@@ -67,7 +67,6 @@ Nits:
 
 - The autopilot is a weak driver against a pack that fights (the guard in mission_test runs it with the creatures live and the hull held, and it finishes on every seed tried only with the 3:00 shutter and its kill-step tactics: charge on the avenue, no dodging there). It is a proxy, not a measure of how a person fares: hand play is still the test of the pharmacy run-down and of the shop's 4-second hold.
 - A hunter that is hugging the car (cooldown running, 1 to 2 m off the flank) runs alongside and cannot be hit: kills come from the front. A bump or knock does not kill it.
-- The stunned creature plays the "dead" clip with dim eyes; a stagger or get-up clip would read better (creature animations are being redesigned elsewhere).
 - Hunters lead a fast car: above about 80 km/h a pursuer runs ahead of the car on the intercept it computed, so the pack is harmless from behind at that speed. Only a dent on a very fast run-down was added.
 - The spec's 2:00 shutter is now 3:00 (StoryData.SHUTTER_SECONDS); the option file still says 2:00.
 
@@ -82,3 +81,11 @@ Nits:
 - autopilot.gd's kill step hard-codes the avenue's coordinates.
 - The "lands clear" check passes at exactly its 2.5 m threshold.
 - Throw-off at a crawl is still long (5 km/h: swerves 4.1 s, slide 2.4 s).
+
+## From the creature review (the new Gaunt, squash-merged)
+
+Nits:
+- On LATCHED to THROWN the side-slot offset (0.45 m) drops to 0 in one frame.
+- Hand tests still open: whether a creature on a side slot sinks into the door, whether a latched creature blocks the chase camera in hard turns, and frame time on a weak graphics card.
+- The wind-up crouch at 10 m is a faint rim in dark fog; the rim strength (0.55 in gaunt_view.gd) is the lever.
+- The model is built by script and still reads simple up close (tube-like limbs, a plain jaw). A sculpted model is the owner's open decision.

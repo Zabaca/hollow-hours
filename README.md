@@ -50,7 +50,7 @@ tumbles and gets up; carry on straight, or crawl, and it takes hold. One on the 
 and drags it back; shake it off with a handbrake slide, hard swerves or by scraping that side of the
 car along a wall or wreck (the bar under "SOMETHING IS ON THE CAR" fills as you do). A creature you shake
 off is thrown clear, stunned for a moment and cannot take hold again for four seconds. Run the others
-down: it takes the car's own speed into them, about 25 km/h (32 km/h for one lying stunned or in mid-leap),
+down: it takes the car's own speed into them, about 25 km/h (32 km/h for one lying stunned, 29 km/h for one in mid-leap),
 so charging a crouching creature head-on at 45 km/h or more kills it, and each kill puts a little boost back
 (above 60 km/h the impact dents the car too). First light is five minutes away.
 

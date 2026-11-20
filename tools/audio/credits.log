@@ -1,3 +1,4 @@
 # ElevenLabs credits used, one line per purchase. The counter lags a purchase by a few minutes,
 # so each figure was read after it had settled.
 2026-11-16 slice 5 (21 voiced lines, 1,361 characters with cue words, eleven_v4, and four effects: radio_squelch_in, radio_static_out, gate_klaxon, gate_leaves): used 631 credits
+2026-11-20 checkpoint spread (4 re-voiced lines, 370 characters with cue words: bat_call_2, bat_shop, bat_done, ph_done): counter had not moved when read; expect roughly 170 credits at slice 5's rate

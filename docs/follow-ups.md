@@ -88,4 +88,4 @@ Nits:
 - On LATCHED to THROWN the side-slot offset (0.45 m) drops to 0 in one frame.
 - Hand tests still open: whether a creature on a side slot sinks into the door, whether a latched creature blocks the chase camera in hard turns, and frame time on a weak graphics card.
 - The wind-up crouch at 10 m is a faint rim in dark fog; the rim strength (0.55 in gaunt_view.gd) is the lever.
-- The model is built by script and still reads simple up close (tube-like limbs, a plain jaw). A sculpted model is the owner's open decision.
+- The model is built by script and still reads simple up close (tube-like limbs, a plain jaw). Decided 2026-11-20: keep the script-built model. One free image-to-3D try (Hunyuan3D 2.1, shape only) only smoothed the same shapes and grew a second pair of arms, and the owner judged ours better. Improve the creature in tools/blender/gaunt_body.py; a generator would need a realistic painted concept as input to be worth another try.

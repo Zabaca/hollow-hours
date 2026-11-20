@@ -21,6 +21,8 @@ extends RefCounted
 ##   retry {to: checkpoint|start}                   roam {next}            roam_wrecked
 ##   save {data}  (a save is asked for: write it with SaveStore)
 
+const WALL_GAP := 3.5  # placed creatures stand at least this far from a wall, so the car can reach them
+
 enum State { ROAM, ACTIVE, FAILED, ENDED }
 
 var state: int = State.ROAM
@@ -466,18 +468,34 @@ func _spawn_hunting(game: GameSim, sp: Dictionary) -> void:
 	var car_at := game.car.body.position
 	for n in int(sp["count"]):
 		var start := game.pack.rng.randf() * TAU
+		if sp.has("bearings"):
+			start = float((sp["bearings"] as Array)[n % (sp["bearings"] as Array).size()])
 		var best := center
-		var best_d := -1.0
+		var best_score := -INF
 		for attempt in 8:
+			# With a given bearing the first try is that exact spot; the rest fan out from it.
 			var p := center + Vector2.from_angle(start + attempt * TAU / 8.0) * ring
 			var d := p.distance_to(car_at)
-			if game.world.line_clear(center, p, 0.6) and d >= clear:
+			# Out in the street, where the car can get at it: a few metres from every wall, with a clear line.
+			var open := _wall_gap(game.world, p) >= WALL_GAP and game.world.line_clear(center, p, 0.6)
+			if open and d >= clear:
 				best = p
 				break
-			if d > best_d:
-				best_d = d
+			var score := (1000.0 if open else 0.0) + minf(d, clear)
+			if score > best_score:
+				best_score = score
 				best = p
 		game.pack.place_hunting(best, game.car)
+
+
+## How far a point is from the nearest building, wreck or prop (0 inside one).
+func _wall_gap(world: SimWorld, p: Vector2) -> float:
+	var best := INF
+	for b in world.boxes:
+		var dx := maxf(maxf(float(b["x0"]) - p.x, 0.0), p.x - float(b["x1"]))
+		var dy := maxf(maxf(float(b["y0"]) - p.y, 0.0), p.y - float(b["y1"]))
+		best = minf(best, Vector2(dx, dy).length())
+	return best
 
 
 # ----------------------------------------------------------------------------- failing and retrying

@@ -5,16 +5,32 @@ extends RefCounted
 ## tests can run it; Gaunt3D reads the state to draw it.
 ##
 ## Life of a creature: LURK (still, in shadow) -> STALK (creeps, freezes in light) -> HUNT (sprints,
-## leads the car, flanks) -> WIND (0.3 s crouch) -> LEAP (0.5 s ballistic jump to where the car
-## will be) -> LATCHED (clings and tears at the car until shaken off) -> THROWN -> DOWN -> HUNT.
+## leads the car, flanks) -> WIND (0.6 s crouch, the tell) -> LEAP (0.5 s ballistic jump along the
+## line the car was taking when it launched) -> LATCHED (clings and tears at the car until shaken off) -> THROWN -> DOWN -> HUNT.
 ## A creature the car hits fast enough dies (roadkill). The director keeps the pack topped up
 ## from dark spawn points, bigger as the night wears on, and at first light the survivors flee.
 
+## A pounce, in the order the driver sees it: the creature stops and crouches (WIND_TIME, with a hiss and
+## a flare of its eyes: the tell), then leaps along the line the car was taking when it launched
+## (LEAP_TIME) and does not steer in the air. Swerve, brake or boost inside that window and it lands
+## behind or beside you.
 const LEAP_TIME := 0.5
-const WIND_TIME := 0.3
+const WIND_TIME := 0.6
+const WIND_ANIM := 0.3  # how much of the pounce clip is the crouch (the view stretches it over WIND_TIME)
 const MAX_LEAP := 11.5
+const LEAP_REACH := 0.4  # a leaping creature's claws: how far past the car's body it still holds on
 const GRAVITY := 24.0
-const RUNDOWN_SPEED := 6.5  # closing speed (m/s) at which a ram kills
+## Running one down needs the CAR's own speed into it: RUNDOWN_SPEED (25 km/h) for a creature up and about,
+## DOWN_KILL_SPEED (32 km/h) for one lying stunned (a slow roll over it only shoves it aside).
+const RUNDOWN_SPEED := 7.0
+const LEAP_KILL_SPEED := 8.0  # the car's own speed into a creature in mid-leap that kills it (29 km/h)
+const DOWN_KILL_SPEED := 9.0
+const RAM_LATCH_SPEED := 5.0  # a hunter that reaches a car slower than this (18 km/h) takes hold at once
+const SHAKE_MAX := 2.2  # the most effort that counts, so even a slide takes about a second and the bar is seen to fill
+const GRIP := 2.0  # seconds a clinging creature holds against full shaking
+const RELATCH_LOCK := 4.0  # a creature that has been thrown cannot take hold again for this long
+const THROW_STUN := 1.5
+const MISS_STUN := 0.7
 const GRAB_DRAG := 140.0  # N per (m/s) per 80 kg (Roadkill CAR.grabDrag)
 const GAUNT_MASS := 70.0
 const MAX_LATCHED := 4
@@ -409,12 +425,12 @@ func _hunt(g: GauntSim, dt: float, car: CarSim) -> void:
 	_steer(g, goal, g.max_speed, dt, 42.0)
 	g.chitter_t -= dt
 	# Pounce when close enough that the leap can reach where the car will be.
-	if g.cooldown <= 0.0 and d > 2.5 and d < 14.0 and car.speed() < 27.0 and world.line_clear(g.pos, car_pos, 0.3):
+	if g.cooldown <= 0.0 and d > 1.0 and d < 14.0 and car.speed() < 27.0 and world.line_clear(g.pos, car_pos, 0.3):
 		var land := car_pos + car.body.velocity * (WIND_TIME + LEAP_TIME * 0.5)
 		if g.pos.distance_to(land) <= MAX_LEAP:
 			g.vel *= 0.3
 			g.set_state(GauntSim.State.WIND)
-			ev("wind", g)
+			ev("pounce_windup", g, {"duration": WIND_TIME})
 
 
 func _wind(g: GauntSim, dt: float, car: CarSim) -> void:
@@ -425,51 +441,77 @@ func _wind(g: GauntSim, dt: float, car: CarSim) -> void:
 	if g.t >= WIND_TIME:
 		var land := car_pos + car.body.velocity * LEAP_TIME
 		if g.pos.distance_to(land) > MAX_LEAP + 1.5 or not world.line_clear(g.pos, land, 0.3):
-			g.cooldown = 0.8
+			g.cooldown = 1.0
 			g.set_state(GauntSim.State.HUNT)
 			return
 		g.leap_from = g.pos
 		g.leap_to = land
+		g.leap_car_vel = car.body.velocity
 		g.heading = (land - g.pos).angle()
 		g.set_state(GauntSim.State.LEAP)
 		ev("leap", g)
 
 
 func _leap(g: GauntSim, dt: float, car: CarSim) -> void:
+	# The leap was committed at launch (_wind): it flies the line it was given and does not steer.
 	var u := clampf(g.t / LEAP_TIME, 0.0, 1.0)
 	g.pos = g.leap_from.lerp(g.leap_to, u)
 	g.z = 1.3 * 4.0 * u * (1.0 - u)
 	g.vel = (g.leap_to - g.leap_from) / LEAP_TIME
-	if u > 0.25:
-		var hit := SimCollide.circle_vs_car(car, g.pos, 0.55)
-		if not hit.is_empty() and g.z < 2.3:
+	if u > 0.35:
+		var hit := SimCollide.circle_vs_car(car, g.pos, 0.45 + LEAP_REACH * 0.5)
+		if not hit.is_empty() and g.z < 1.9:
 			_latch_or_bounce(g, car, hit)
 			return
 	if u >= 1.0:
+		# Nothing there: it lands, skids and tumbles, and gets up a moment later.
 		g.z = 0.0
-		g.vel *= 0.5
-		g.cooldown = 1.6
+		g.vel *= 0.45
 		g.pos = world.resolve_circle(g.pos, g.radius)
-		g.set_state(GauntSim.State.HUNT)
+		g.cooldown = 2.4
+		g.stun = MISS_STUN
+		g.set_state(GauntSim.State.DOWN)
 		ev("land", g, {"missed": true})
+		ev("pounce_missed", g)
+
+
+## How likely a creature that reaches the car holds on. It planned for the car as it was at launch, so the
+## further the car's velocity has moved from that (a swerve, a hard brake, a boost) the less it is where
+## the claws expected, and a faster car is harder to grab at all.
+func latch_chance(g: GauntSim, car: CarSim) -> float:
+	var planned := g.leap_car_vel
+	var base := clampf(1.05 - planned.length() / 24.0, 0.12, 0.95)
+	var off := (car.body.velocity - planned).length()
+	return clampf(base * (1.0 - clampf(off / 6.0, 0.0, 0.9)), 0.03, 0.95)
 
 
 func _latch_or_bounce(g: GauntSim, car: CarSim, hit: Dictionary) -> void:
-	var chance := clampf(1.1 - car.speed() / 38.0, 0.4, 1.0)
-	if rng.randf() < chance and latched().size() < MAX_LATCHED:
+	# A leaper that meets the car's front at speed is run down in the air, the same as one on the ground:
+	# charging a crouching creature is a way to beat it, as dodging is.
+	var n0: Vector2 = hit["normal"]
+	var point: Vector2 = hit["point"]
+	var car_into := car.body.velocity_at(point).dot(n0)
+	if car_into >= LEAP_KILL_SPEED:
+		_run_down(g, car, n0, point, car_into, car_into - g.vel.dot(n0))
+		return
+	if rng.randf() < latch_chance(g, car) and latched().size() < MAX_LATCHED:
 		var slot := _pick_slot(g, car)
 		if slot >= 0:
-			g.slot = slot
-			g.stamina = 3.0
-			g.claw_t = 0.4
-			g.vel = Vector2.ZERO
-			g.set_state(GauntSim.State.LATCHED)
-			ev("latch", g, {"slot": slot})
+			_take_hold(g, slot)
 			return
-	# Glanced off the car: thrown aside.
+	# Glanced off the car: thrown clear.
 	var n: Vector2 = hit["normal"]
-	_throw(g, car, n, 5.0)
+	_throw(g, car, n, 8.0)
 	ev("bounce", g)
+
+
+func _take_hold(g: GauntSim, slot: int, via: String = "pounce") -> void:
+	g.slot = slot
+	g.stamina = GRIP
+	g.claw_t = 0.4
+	g.vel = Vector2.ZERO
+	g.set_state(GauntSim.State.LATCHED)
+	ev("latch", g, {"slot": slot, "via": via})
 
 
 func _pick_slot(g: GauntSim, car: CarSim) -> int:
@@ -489,6 +531,29 @@ func _pick_slot(g: GauntSim, car: CarSim) -> int:
 	return best
 
 
+## How hard the driver is shaking: 0 (driving along) to about 4 (a handbrake slide). It does not depend on
+## speed alone, so a driver who is crawling can still rock the car, and the same inputs always count.
+func shake_effort(car: CarSim) -> float:
+	var speed := car.speed()
+	var e := 0.0
+	if car.handbrake > 0.5 and speed > 2.5:
+		e += 0.9
+	e += car.slide_amount() * 0.9
+	if speed > 1.5:
+		e += maxf(0.0, absf(car.body.angular_velocity) - 0.4) * 2.0
+	if car.boosting:
+		e += 0.5
+	return minf(e, SHAKE_MAX)
+
+
+## 0 (just landed) to 1 (about to let go) for the creature clinging least well, or -1 with none on the car.
+func shake_progress() -> float:
+	var best := -1.0
+	for g in latched():
+		best = maxf(best, 1.0 - clampf(g.stamina / GRIP, 0.0, 1.0))
+	return best
+
+
 func _latched(g: GauntSim, dt: float, car: CarSim) -> void:
 	var s: Dictionary = SLOTS[g.slot]
 	g.pos = car.body.to_world(s["local"])
@@ -497,17 +562,11 @@ func _latched(g: GauntSim, dt: float, car: CarSim) -> void:
 	g.vel = car.body.velocity
 	# It holds on until the car is thrown about hard enough: a spin, a handbrake slide, a hard swerve.
 	var w := absf(car.body.angular_velocity)
-	var drain := 0.0
-	if car.handbrake > 0.5 and car.speed() > 5.0:
-		drain += 1.8
-	drain += car.slide_amount() * 1.6
-	if w > 1.0 and car.speed() > 4.0:
-		drain += w * 0.9
-	if car.boosting:
-		drain += 0.5
-	g.stamina = minf(3.0, g.stamina - drain * dt + (0.35 * dt if drain == 0.0 else 0.0))
-	if w > 1.8 or g.stamina <= 0.0:
-		_throw(g, car, _side_of(g, car), 8.0)
+	var effort := shake_effort(car)
+	# Holding on slowly gets easier again when the driver stops shaking, but never fully: it is a short fight.
+	g.stamina = minf(GRIP, g.stamina - effort * dt + (0.3 * dt if effort < 0.3 else 0.0))
+	if w > 3.2 or g.stamina <= 0.0:
+		_throw(g, car, _side_of(g, car), 9.0)
 		ev("thrown", g, {"shaken": true})
 		return
 	g.claw_t -= dt
@@ -516,19 +575,45 @@ func _latched(g: GauntSim, dt: float, car: CarSim) -> void:
 		ev("claw", g)
 
 
+## The car scrapes or hits something at `point` (GameSim calls this for every bump and crash): a creature
+## clinging on the side that took the knock is raked off against it, the others only lose a little grip.
+## "That side" is worked out in the car's own frame, because a wall meets a car at a corner or along an edge,
+## often well away from the slot itself: a side slot is hit by contact on its side of the car (left or right of
+## the middle), the hood slots by contact at the front, the trunk slot at the back. The roof is out of reach.
+func scrape(car: CarSim, point: Vector2, impact: float) -> void:
+	var local := car.body.to_local(point)
+	for g in latched():
+		var slot: Vector2 = SLOTS[g.slot]["local"]
+		var reached := false
+		if absf(slot.y) > 0.5 and slot.x < 1.0:
+			reached = signf(local.y) == signf(slot.y) and absf(local.y) > 0.4  # a side
+		elif slot.x > 0.9:
+			reached = local.x > 0.9  # the hood
+		elif slot.x < -1.0:
+			reached = local.x < -0.9  # the trunk
+		if reached:
+			_throw(g, car, _side_of(g, car), 7.0)
+			ev("thrown", g, {"shaken": true, "scraped": true})
+		else:
+			g.stamina -= impact * 0.08
+
+
 func _side_of(g: GauntSim, car: CarSim) -> Vector2:
 	var local: Vector2 = SLOTS[g.slot]["local"] if g.slot >= 0 else Vector2(0, 1)
 	var sgn := signf(local.y) if absf(local.y) > 0.1 else (1.0 if car.body.angular_velocity >= 0.0 else -1.0)
 	return Vector2(-sin(car.body.angle), cos(car.body.angle)) * sgn
 
 
+## Throw a clinging or glancing creature clear: it leaves to the side with a little of the car's way, flies
+## about half a second and lands well off the car's line, stunned, and cannot take hold again for a while.
 func _throw(g: GauntSim, car: CarSim, dir: Vector2, power: float) -> void:
-	g.vel = car.body.velocity * 0.7 + dir.normalized() * power
+	g.vel = car.body.velocity * 0.3 + dir.normalized() * power
 	g.vz = 6.5
 	g.z = maxf(g.z, 0.4)
 	g.tumble = 0.0
 	g.tumble_rate = rng.randf_range(6.0, 11.0) * (1.0 if rng.randf() < 0.5 else -1.0)
 	g.slot = -1
+	g.cooldown = RELATCH_LOCK
 	g.set_state(GauntSim.State.THROWN)
 
 
@@ -545,16 +630,12 @@ func _thrown(g: GauntSim, dt: float, car: CarSim) -> void:
 		g.pos = fixed
 	if g.z <= 0.0:
 		g.z = 0.0
-		var sp := g.vel.length()
-		ev("land", g, {"speed": sp, "missed": false})
-		if sp > 14.0 and rng.randf() < 0.4:
-			g.set_state(GauntSim.State.DEAD)
-			kills += 1
-			ev("died", g, {"how": "thrown"})
-			return
-		g.stun = 1.0
-		g.vel *= 0.25
+		ev("land", g, {"speed": g.vel.length(), "missed": false})
+		# Nothing about being thrown kills it: it skids to a stop, stunned, and gets up angry.
+		g.stun = THROW_STUN
+		g.vel *= 0.3
 		g.set_state(GauntSim.State.DOWN)
+		ev("stunned", g, {"duration": THROW_STUN})
 
 
 func _down(g: GauntSim, dt: float, car: CarSim) -> void:
@@ -567,6 +648,7 @@ func _down(g: GauntSim, dt: float, car: CarSim) -> void:
 		g.cooldown = maxf(g.cooldown, 1.8)
 		g.alert = true
 		g.set_state(GauntSim.State.HUNT)
+		ev("recovered", g)
 
 
 func _flee(g: GauntSim, dt: float, car: CarSim) -> void:
@@ -577,34 +659,42 @@ func _flee(g: GauntSim, dt: float, car: CarSim) -> void:
 	_steer(g, goal, 20.0, dt, 40.0)
 
 
-## A creature the car runs into: killed at speed, shoved or grabbed slowly.
+func _run_down(g: GauntSim, car: CarSim, n: Vector2, point: Vector2, car_into: float, closing: float) -> void:
+	g.set_state(GauntSim.State.DEAD)
+	g.z = 0.0
+	g.vel = n * closing * 0.6
+	kills += 1
+	car.body.apply_impulse(-n * GAUNT_MASS * closing * 0.6, point)
+	ev("roadkill", g, {"speed": car_into, "closing": closing, "point": point})
+
+
+## A creature the car runs into. What happens depends on the CAR's speed into it, not on how fast the creature
+## was coming: killed at RUNDOWN_SPEED (a lying, stunned one only at DOWN_KILL_SPEED, so a roll over one you
+## just shook off does nothing to it), grabbed by a hunter that reaches a slow car, otherwise shoved aside.
 func _ram(g: GauntSim, car: CarSim) -> void:
 	var hit := SimCollide.circle_vs_car(car, g.pos, g.radius)
 	if hit.is_empty():
 		return
 	var n: Vector2 = hit["normal"]  # from the car toward the creature
 	var point: Vector2 = hit["point"]
-	var closing := car.body.velocity_at(point).dot(n) - g.vel.dot(n)
+	var car_into := car.body.velocity_at(point).dot(n)
+	var closing := car_into - g.vel.dot(n)
 	g.pos += n * float(hit["depth"])
-	if closing >= RUNDOWN_SPEED:
-		g.set_state(GauntSim.State.DEAD)
-		g.vel = n * closing * 0.6
-		kills += 1
-		car.body.apply_impulse(-n * GAUNT_MASS * closing * 0.6, point)
-		ev("roadkill", g, {"speed": closing, "point": point})
+	var need := DOWN_KILL_SPEED if g.state == GauntSim.State.DOWN else RUNDOWN_SPEED
+	if car_into >= need:
+		_run_down(g, car, n, point, car_into, closing)
+		return
+	if g.state == GauntSim.State.DOWN:
+		# Lying in the road: pushed along, unhurt.
+		g.vel += n * maxf(car_into, 0.0) * 0.8
 		return
 	if closing > 1.0:
-		g.vel += n * closing * 1.1
-		g.stun = 0.0
-		# Too slow to run down: a hunter takes hold instead of being shoved.
-		if g.state == GauntSim.State.HUNT and car.speed() < 9.0 and latched().size() < MAX_LATCHED:
+		g.vel += n * closing * 0.6
+		# A hunter that reaches a slow car takes hold (a gaunt that was just thrown cannot, for a while).
+		if g.state == GauntSim.State.HUNT and g.cooldown <= 0.0 and car.speed() < RAM_LATCH_SPEED and latched().size() < MAX_LATCHED:
 			var slot := _pick_slot(g, car)
 			if slot >= 0:
-				g.slot = slot
-				g.stamina = 3.0
-				g.claw_t = 0.4
-				g.set_state(GauntSim.State.LATCHED)
-				ev("latch", g, {"slot": slot})
+				_take_hold(g, slot, "ram")
 
 
 ## A hard crash or violent move: each latched creature may be thrown off.

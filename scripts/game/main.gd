@@ -457,9 +457,14 @@ func _on_event(e: Dictionary) -> void:
 			cam.add_trauma(0.12)
 		"leap":
 			audio.play_at("creature_pounce", _p3(e), 1.0, audio.rng.randf_range(0.95, 1.1), 90.0)
-		"wind":
-			if audio.rng.randf() < 0.5:
-				audio.play_at("creature_hiss", _p3(e), -2.0, 1.0, 60.0, 0.5)
+		"pounce_windup":
+			# The tell: a hiss from the crouch, always heard, so a driver can learn to read it.
+			audio.play_at("creature_hiss", _p3(e), 3.0, audio.rng.randf_range(0.9, 1.05), 90.0, 0.3)
+		"pounce_missed":
+			audio.play_at("creature_screech_3", _p3(e), -2.0, 0.9, 70.0, 0.4)
+			audio.play_at("stomp", _p3(e), -6.0, 0.7, 40.0)
+		"stunned":
+			audio.play_at("creature_thrown", _p3(e), -3.0, 0.85, 70.0)
 		"chitter":
 			audio.play_at("creature_chitter", _p3(e), -2.0, audio.rng.randf_range(0.9, 1.1), 90.0)
 		"freeze":

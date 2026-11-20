@@ -43,10 +43,16 @@ speak their last lines, the camera draws slowly back round the stopped car, a sh
 and the game returns to the title, where Continue now reads "The end" (greyed) and Survive the Night is offered.
 
 How to survive: creatures stay out of your headlights and the few live street lamps while they
-stalk you, then sprint, flank and pounce. A creature that lands on the car claws at the hull and
-drags the car back. Shake it off with a handbrake slide or a hard swerve; run the others down
-(about 25 km/h closing speed kills one, and each kill puts a little boost back). First light is
-five minutes away.
+stalk you, then sprint, flank and pounce. A pounce is a tell you can read: the creature stops and
+crouches for over half a second (a hiss, its eyes flaring), then leaps along the line the car was
+taking and does not steer in the air. Swerve, brake hard or boost and it lands behind or beside you,
+tumbles and gets up; carry on straight, or crawl, and it takes hold. One on the car claws at the hull
+and drags it back; shake it off with a handbrake slide, hard swerves or by scraping that side of the
+car along a wall or wreck (the bar under "SOMETHING IS ON THE CAR" fills as you do). A creature you shake
+off is thrown clear, stunned for a moment and cannot take hold again for four seconds. Run the others
+down: it takes the car's own speed into them, about 25 km/h (32 km/h for one lying stunned or in mid-leap),
+so charging a crouching creature head-on at 45 km/h or more kills it, and each kill puts a little boost back
+(above 60 km/h the impact dents the car too). First light is five minutes away.
 
 ## Layout
 
@@ -165,6 +171,11 @@ command from anywhere with `--path` pointing at this folder.
 
 ## Probe and software rendering
 
+`godot --headless --path . res://tests/encounter_probe.tscn [-- pounce|throw|thrown]` measures the encounter
+loop with scripted human-like drivers: the latch rate per pounce at 0 to 80 km/h for a driver who holds
+straight, wanders, swerves, brakes or boosts; how long it takes to throw one off and with what; and what
+happens to a creature just thrown. It prints tables and asserts nothing (pack_test pins the rules).
+
 `godot --headless --path . res://tests/probe.tscn` drives the autopilot round the town through the sim
 for 70 seconds and prints position, speed, hull, creature states and events each second.
 
@@ -241,8 +252,9 @@ The Voice bus (a 300 to 3,400 Hz radio with a little grit) is in `scripts/game/a
 
 Everything below is a constant to edit; none of it has been balanced by playing.
 
-- Pack and creature: `scripts/sim/pack_sim.gd` (sprint speed in `spawn_one`, `LEAP_TIME`, `MAX_LEAP`,
-  `RUNDOWN_SPEED`, notice range, the 45 s "restless" ramp, `pack_size_for`), `scripts/sim/game_sim.gd`
+- Pack and creature: `scripts/sim/pack_sim.gd` (sprint speed in `spawn_one`, `WIND_TIME` (the tell),
+  `LEAP_TIME`, `MAX_LEAP`, `latch_chance`, `GRIP` and `shake_effort` (how long it takes to throw one off),
+  `RELATCH_LOCK`, `THROW_STUN`, `RUNDOWN_SPEED`, `DOWN_KILL_SPEED`, `RAM_LATCH_SPEED`, notice range, the 45 s "restless" ramp, `pack_size_for`), `scripts/sim/game_sim.gd`
   (`NIGHT_LENGTH`, `CLAW_DPS`, crash damage).
 - Look: `scripts/game/atmosphere.gd` (fog density and colour, glow, moon, rain amount), headlights in
   `scripts/game/car_view.gd` (`light_energy`, `spot_angle`), lamp brightness in `scripts/game/city.gd`

@@ -22,6 +22,8 @@ var center := Label.new()
 var sub := Label.new()
 var hint := Label.new()
 var warn := Label.new()
+var grip_back := ColorRect.new()
+var grip_fill := ColorRect.new()
 var intro_time := 7.0
 var story := false
 var hull_label := Label.new()
@@ -129,6 +131,19 @@ func _ready() -> void:
 	warn.offset_top = 64
 	warn.offset_bottom = 104
 	warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# How close a creature on the car is to being shaken off: fills as you swerve, slide or scrape it.
+	grip_back.color = Color(1, 1, 1, 0.14)
+	grip_back.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	grip_back.offset_left = -110
+	grip_back.offset_right = 110
+	grip_back.custom_minimum_size = Vector2(220, 5)
+	grip_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grip_fill.color = Color(0.95, 0.85, 0.7, 0.95)
+	grip_fill.size = Vector2(0, 5)
+	grip_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grip_back.add_child(grip_fill)
+	grip_back.visible = false
+	root.add_child(grip_back)
 	for l in [timer_label, speed_label, unit_label, kills_label, center, sub, hint, warn]:
 		root.add_child(l)
 	show_intro()
@@ -190,6 +205,11 @@ func update_hud(game: GameSim, latched: int, delta: float) -> void:
 	boost_fill.color = BOOST_COLOR if not game.dry else Color(0.5, 0.5, 0.52, 0.7)
 	hull_fill.color = HULL_COLOR if game.hull > 30.0 else Color(1.0, 0.14, 0.1, 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.015))
 	warn.text = "SOMETHING IS ON THE CAR" if latched > 0 else ""
+	var shaken := game.pack.shake_progress()
+	grip_back.visible = latched > 0 and shaken >= 0.0
+	grip_back.offset_top = warn.offset_top + 34.0
+	grip_back.offset_bottom = grip_back.offset_top + 5.0
+	grip_fill.size.x = 220.0 * clampf(shaken, 0.0, 1.0)
 	if intro_time > 0.0 and not story:
 		intro_time -= delta
 		var a := clampf(intro_time / 2.0, 0.0, 1.0)

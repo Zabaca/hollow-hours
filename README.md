@@ -149,8 +149,8 @@ command from anywhere with `--path` pointing at this folder.
    its start; `--seed=N` fixes the pack; `--save=PATH` reads and writes the save there (for Continue
    screenshots). A story run started by a flag with no `--save=` uses `user://dev_save.json`, never the player's
    `save.json`, so screenshot runs cannot overwrite a real save. Combine them with `--start=x,y,angle`, `--drive=0,0` and `--shot-game=SECONDS` (game time)
-   to photograph a moment, e.g. a hold at the shop:
-   `-- --mission=1 --seed=11 --start=46,7,-1.57 --drive=0,0 --shot-game=2.7 --shot=/tmp/hold.png`.
+   to photograph a moment, e.g. a hold at the motel office:
+   `-- --mission=1 --seed=11 --start=-20.5,41.5,3.14 --drive=0,0 --shot-game=2.7 --shot=/tmp/hold.png`.
 
    The west gate and the ending: `--gate=open|opening` shows the gate open (or opening 1.5 s in), `--cam-side=H`
    puts a low camera H metres up and 7 m to the car's left (for judging how it sits on the road), and

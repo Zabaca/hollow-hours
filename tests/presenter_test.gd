@@ -321,11 +321,11 @@ func _test_mission_start_on_screen() -> void:
 	var r := _rig()
 	var h := r.presenter.hud
 	_listen(r)
-	_check(h.objective_label.text == "Drive to the 24-hour shop at the gas station" and h.objective_label.visible, "the objective line shows the first step", h.objective_label.text)
+	_check(h.objective_label.text == "Drive to the motel office on the north road" and h.objective_label.visible, "the objective line shows the first step", h.objective_label.text)
 	_check(h.card_kicker.text == "MISSION 1" and h.card_title.text == "BATTERIES", "a title card opens the mission", "%s / %s" % [h.card_kicker.text, h.card_title.text])
 	_check(r.presenter.radio.current_subtitle()["id"] == "bat_call_1" and h.subtitle_panel.visible and h.speaker_label.text == "VERA" and h.subtitle_label.text.replace("\n", " ").begins_with("Red car on the avenue."), "Vera's call is subtitled with her name", h.subtitle_label.text)
 	var blips: Array = h.radar.blips
-	_check(blips.size() == 1 and blips[0]["kind"] == "objective" and blips[0]["place"] == "shop", "the shop is the radar's amber blip")
+	_check(blips.size() == 1 and blips[0]["kind"] == "objective" and blips[0]["place"] == "motel", "the motel office is the radar's amber blip")
 	_check(r.presenter.markers.shown() == 1, "and has a marker in the world")
 	_check(not h.hold_back.visible and not h.timer_row.visible, "no hold bar or timer yet")
 	_check(is_equal_approx(r.presenter.dawn_target(), 0.0), "the sky is at its darkest for mission 1")
@@ -335,9 +335,9 @@ func _test_mission_start_on_screen() -> void:
 func _test_hold_and_timer() -> void:
 	var r := _rig()
 	var h := r.presenter.hud
-	_at(r, "shop")
+	_at(r, "motel")
 	_run(r, 2.0)
-	_check(h.objective_label.text.begins_with("Hold still") and h.hold_back.visible, "at the shop the hold bar appears")
+	_check(h.objective_label.text.begins_with("Hold still") and h.hold_back.visible, "at the motel office the hold bar appears")
 	var share := h.hold_fill.size.x / h.hold_back.custom_minimum_size.x
 	_check(absf(share - 0.5) < 0.08, "and fills with the hold", "share=%.2f" % share)
 	r.game.place_car(Vector2(46.0, -20.0), 0.0, 100.0)
@@ -345,7 +345,7 @@ func _test_hold_and_timer() -> void:
 	_check(absf(h.hold_fill.size.x / h.hold_back.custom_minimum_size.x - share) < 0.01, "leaving the marker pauses it, it does not reset")
 	_drop(r)
 	var r2 := _rig("pharmacist")
-	_at(r2, "hut")
+	_at(r2, "shop")
 	_run(r2, 3.0)
 	var t: Control = r2.presenter.hud.timer_row
 	_check(t.visible and r2.presenter.hud.timer_name.text == "SHUTTER" and r2.presenter.hud.timer_value.text == "2:57", "mission 2 shows the shutter timer", r2.presenter.hud.timer_value.text)
@@ -384,7 +384,7 @@ func _test_fail_menu_retry_from_checkpoint() -> void:
 	resets = 0
 	quits = 0
 	var r := _rig()
-	_at(r, "shop")
+	_at(r, "motel")
 	_run(r, 4.4)  # the box is loaded: a checkpoint
 	_check(r.presenter.has_checkpoint and r.presenter.hud.notice_label.text == "CHECKPOINT", "the checkpoint is announced")
 	r.game.damage(60.0, "test")
@@ -405,7 +405,7 @@ func _test_fail_menu_retry_from_checkpoint() -> void:
 	fm.rows[0].activated.emit()
 	_check(not fm.is_open and not get_tree().paused and resets == 1, "retry closes the menu, starts the world again and resets the views")
 	_check(r.presenter.radio.process_mode == Node.PROCESS_MODE_PAUSABLE, "and the radio pauses with the world again")
-	_check(r.game.phase == GameSim.Phase.PLAYING and r.game.hull >= 60.0 and r.game.car.body.position.distance_to(StoryData.place_pos("shop")) < 1.0, "the car is back at the checkpoint with at least 60 hull", "hull=%.0f" % r.game.hull)
+	_check(r.game.phase == GameSim.Phase.PLAYING and r.game.hull >= 60.0 and r.game.car.body.position.distance_to(StoryData.place_pos("motel")) < 1.0, "the car is back at the checkpoint with at least 60 hull", "hull=%.0f" % r.game.hull)
 	_feed(r)
 	_check(r.presenter.hud.objective_label.text.begins_with("Take the box to the hotel"), "on the step after it", r.presenter.hud.objective_label.text)
 	_check(r.presenter.radio.current_subtitle().is_empty() and r.presenter.radio.queued_ids().is_empty(), "and the radio is cleared: no old call plays after the retry")
@@ -422,13 +422,13 @@ func _test_fail_menu_without_checkpoint_restart_and_quit() -> void:
 	_check(fm.is_open and fm.rows[0].text == "Retry mission", "before a checkpoint the first choice is just Retry mission")
 	fm.rows[0].activated.emit()
 	_feed(r)
-	_check(r.presenter.hud.objective_label.text.begins_with("Drive to the 24-hour shop") and r.game.hull == GameSim.MAX_HULL and resets == 1, "and it starts the mission over")
+	_check(r.presenter.hud.objective_label.text.begins_with("Drive to the motel office") and r.game.hull == GameSim.MAX_HULL and resets == 1, "and it starts the mission over")
 	r.game.damage(1000.0, "test")
 	_run(r, 0.1)
 	_feed(r, 1.6)
 	fm.rows[1].activated.emit()
 	_feed(r)
-	_check(not fm.is_open and not get_tree().paused and resets == 2 and r.presenter.hud.objective_label.text.begins_with("Drive to the 24-hour shop"), "Restart mission does the same", "resets=%d" % resets)
+	_check(not fm.is_open and not get_tree().paused and resets == 2 and r.presenter.hud.objective_label.text.begins_with("Drive to the motel office"), "Restart mission does the same", "resets=%d" % resets)
 	r.game.damage(1000.0, "test")
 	_run(r, 0.1)
 	_feed(r, 1.6)
@@ -437,7 +437,7 @@ func _test_fail_menu_without_checkpoint_restart_and_quit() -> void:
 	_drop(r)
 	# A timed-out mission fails sooner, with its own reason.
 	var r2 := _rig("pharmacist")
-	_at(r2, "hut")
+	_at(r2, "shop")
 	_run(r2, StoryData.SHUTTER_SECONDS + 1.0)
 	_feed(r2, 1.0)
 	_check(r2.presenter.fail_menu.is_open and r2.presenter.fail_menu.reason_label.text.begins_with("The shutter gave way"), "the shutter running out says why")
@@ -449,7 +449,7 @@ func _test_fail_menu_without_checkpoint_restart_and_quit() -> void:
 
 func _test_complete_saves_and_roams() -> void:
 	var r := _rig()
-	_at(r, "shop")
+	_at(r, "motel")
 	_run(r, 4.4)
 	_at(r, "hotel")
 	_run(r, 3.4)
@@ -457,7 +457,7 @@ func _test_complete_saves_and_roams() -> void:
 	_check(h.card_kicker.text == "MISSION COMPLETE" and h.card_title.text == "BATTERIES", "completing a mission shows its card")
 	var saved := SaveStore.load_save(SAVE)
 	_check(not saved.is_empty() and saved["next"] == "pharmacist" and saved["done"] == ["batteries"], "and writes the save", str(saved))
-	_check(h.objective_label.text == "Drive to the park hut for the next call", "free roam says where the next call is", h.objective_label.text)
+	_check(h.objective_label.text == "Drive to the gas station for the next call", "free roam says where the next call is", h.objective_label.text)
 	_check(h.radar.blips.size() == 1 and h.radar.blips[0]["kind"] == "start" and r.presenter.markers.shown() == 1, "the next start is a teal blip and a marker")
 	_check(r.presenter.dawn_target() > 0.0, "the sky has lightened a touch")
 	_drop(r)
@@ -509,7 +509,7 @@ func _test_full_map() -> void:
 	var p := r.presenter
 	p.open_map()
 	_check(p.map_screen.is_open and get_tree().paused and p.blocks_pause() and p.map_screen.view.mode == MapView.Mode.FULL, "the full map opens and stops the world")
-	_check(p.map_screen.view.blips.size() == 1 and p.map_screen.view.blips[0]["place"] == "shop", "with the objective on it")
+	_check(p.map_screen.view.blips.size() == 1 and p.map_screen.view.blips[0]["place"] == "motel", "with the objective on it")
 	p.map_screen.close()
 	_check(not p.map_screen.is_open and not get_tree().paused and not p.blocks_pause(), "and closing it gives the world back")
 	_drop(r)

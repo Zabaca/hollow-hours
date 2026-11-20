@@ -37,17 +37,26 @@ const SPEAKERS := {
 }
 
 ## `label` is the name on the full map; `angle` is the heading a car placed there faces. A place
-## with `marker: false` is only a name on the map (the diner, motel, bar and pawn shop sit at their
+## with `marker: false` is only a name on the map (the diner, bar and pawn shop sit at their
 ## buildings' centres in tools/blender/city.py).
+##
+## Every leg of the story is a cross-town drive, 90 m or more in a straight line, the start of each
+## mission to its first step included (the hotel in the east and the pharmacy and gate in the west
+## fix the geometry, so each mission alternates sides; tests/mission_test.gd pins it):
+##   1 BATTERIES      safe start (64, 0) -> motel office 94 m -> hotel 99 m
+##   2 THE PHARMACIST gas station 90 m -> pharmacy 106 m -> hotel
+##   3 WEST GATE      park hut 92 m -> hotel 92 m -> west gate 131 m
+## Between missions the lit start is 27 m from the hotel after mission 1 (the gas station) and 92 m after
+## mission 2 (the park hut): the pharmacy and the hotel are buildings, so the gap cannot be wider.
 const PLACES := {
-	"safe_start": {"name": "the safe start", "pos": Vector2(-30.0, -2.5), "radius": 5.0, "angle": 0.0, "label": "", "marker": false},
-	"shop": {"name": "the 24-hour shop", "pos": Vector2(46.0, 7.0), "radius": 5.0, "angle": -PI / 2.0, "label": "24H", "marker": true},
+	"safe_start": {"name": "the safe start", "pos": Vector2(64.0, 0.0), "radius": 5.0, "angle": PI, "label": "", "marker": false},
+	"shop": {"name": "the gas station", "pos": Vector2(46.0, 7.0), "radius": 5.0, "angle": -PI / 2.0, "label": "24H", "marker": true},
 	"hotel": {"name": "the hotel's east door", "pos": Vector2(60.0, -16.0), "radius": 5.0, "angle": PI / 2.0, "label": "Hotel", "marker": true},
 	"hut": {"name": "the park hut", "pos": Vector2(-32.0, -9.0), "radius": 5.0, "angle": PI / 2.0, "label": "Park", "marker": true},
 	"pharmacy": {"name": "the pharmacy", "pos": Vector2(-44.0, 4.0), "radius": 5.0, "angle": 0.0, "label": "Pharmacy", "marker": true},
 	"west_gate": {"name": "the west gate", "pos": Vector2(-70.0, 0.0), "radius": 6.0, "angle": PI, "label": "West Gate", "marker": true},
 	"diner": {"name": "the diner", "pos": Vector2(-20.5, 16.0), "radius": 0.0, "angle": 0.0, "label": "Diner", "marker": false},
-	"motel": {"name": "the motel", "pos": Vector2(-20.5, 31.5), "radius": 0.0, "angle": 0.0, "label": "Motel", "marker": false},
+	"motel": {"name": "the motel office", "pos": Vector2(-20.5, 41.5), "radius": 5.0, "angle": PI, "label": "Motel", "marker": true},
 	"bar": {"name": "the bar", "pos": Vector2(19.0, -24.0), "radius": 0.0, "angle": 0.0, "label": "Bar", "marker": false},
 	"pawn": {"name": "the pawn shop", "pos": Vector2(42.5, -32.0), "radius": 0.0, "angle": 0.0, "label": "Pawn", "marker": false},
 }
@@ -56,17 +65,17 @@ const PLACES := {
 ## voice and are neither spoken nor shown); subtitle() strips them.
 const LINES := {
 	"bat_call_1": {"speaker": "vera", "text": "[low, steady voice] Red car on the avenue. Yes, you. Keep moving. They come for anything that sits still."},
-	"bat_call_2": {"speaker": "vera", "text": "I'm on the hotel roof and my radio's dying. The all-night shop at the gas station has a box of batteries. Bring it to me."},
-	"bat_shop": {"speaker": "vera", "text": "Pull up to the south door and hold still. Count to four."},
+	"bat_call_2": {"speaker": "vera", "text": "I'm on the hotel roof and my radio's dying. The motel office has a box of batteries. Bring it to me."},
+	"bat_shop": {"speaker": "vera", "text": "Pull up to the office door and hold still. Count to four."},
 	"bat_alarm": {"speaker": "vera", "text": "[urgent] That's the door alarm. Sorry. Hold on, hold on!"},
 	"bat_loaded": {"speaker": "vera", "text": "Got it. Hotel, east door. I'll lower a rope."},
-	"bat_done": {"speaker": "vera", "text": "[relieved] Lights are back. And Red, someone else is on this band, near the park hut. Get close and I'll patch them through."},
+	"bat_done": {"speaker": "vera", "text": "[relieved] Lights are back. And Red, someone else is on this band, near the gas station. Get close and I'll patch them through."},
 	"ph_call_1": {"speaker": "teo", "text": "[whispering, scared] Hello? This is Teo, at the pharmacy. They're scratching at the shutter. It won't hold long."},
 	"ph_call_2": {"speaker": "vera", "text": "Hang on, Teo. Red, the pharmacy tower, north side of the avenue. Hurry."},
 	"ph_door": {"speaker": "teo", "text": "[shouting] Two of them at the shutter! Run them down!"},
 	"ph_cleared": {"speaker": "teo", "text": "Okay, okay. Stop by the door, I'm coming out."},
 	"ph_aboard": {"speaker": "teo", "text": "[breathless] I'm in. Drive!"},
-	"ph_done": {"speaker": "vera", "text": "Teo's safe up here. If anyone outside can hear us, it's through the gas station's aerial."},
+	"ph_done": {"speaker": "vera", "text": "Teo's safe up here. If anyone outside can hear us, it's through the park hut's aerial."},
 	"ph_failed": {"speaker": "teo", "text": "[screaming] They're through the shutter!"},
 	"gate_call_1": {"speaker": "ruck", "text": "[flat, tired voice] Unknown vehicle, this is the cordon. We open the west gate once, at the end of the avenue. At first light we burn the quarter."},
 	"gate_call_2": {"speaker": "vera", "text": "We're coming with you. Hotel, east door. Both of us."},
@@ -91,19 +100,19 @@ const MISSIONS := [
 		"begin": {"lines": ["bat_call_1", "bat_call_2"], "pack": 3},
 		"end": {"lines": ["bat_done"]},
 		"steps": [
-			{"id": "reach_shop", "kind": "reach", "place": "shop", "text": "Drive to the 24-hour shop at the gas station"},
+			{"id": "reach_motel", "kind": "reach", "place": "motel", "text": "Drive to the motel office on the north road"},
 			{
-				"id": "load", "kind": "hold", "place": "shop", "seconds": 4.0,
-				"text": "Hold still at the shop's south door while the box is loaded",
+				"id": "load", "kind": "hold", "place": "motel", "seconds": 4.0,
+				"text": "Hold still at the motel office door while the box is loaded",
 				"begin": {"lines": ["bat_shop"]},
-				"during": [{"t": 1.0, "lines": ["bat_alarm"], "alert": {"place": "shop", "radius": 90.0}, "pack": 4}],
+				"during": [{"t": 1.0, "lines": ["bat_alarm"], "alert": {"place": "motel", "radius": 90.0}, "pack": 4}],
 				"end": {"lines": ["bat_loaded"], "checkpoint": true},
 			},
 			{"id": "deliver", "kind": "hold", "place": "hotel", "seconds": 3.0, "text": "Take the box to the hotel's east door and hold still"},
 		],
 	},
 	{
-		"id": "pharmacist", "title": "THE PHARMACIST", "start": "hut", "dawn": 0.1,
+		"id": "pharmacist", "title": "THE PHARMACIST", "start": "shop", "dawn": 0.1,
 		"begin": {
 			"lines": ["ph_call_1", "ph_call_2"], "pack": 4,
 			"timer": {"id": "shutter", "seconds": SHUTTER_SECONDS, "reason": "shutter", "label": "SHUTTER"},
@@ -125,7 +134,7 @@ const MISSIONS := [
 		],
 	},
 	{
-		"id": "west_gate", "title": "WEST GATE", "start": "shop", "dawn": 0.2,
+		"id": "west_gate", "title": "WEST GATE", "start": "hut", "dawn": 0.2,
 		"begin": {"lines": ["gate_call_1", "gate_call_2"], "pack": 4},
 		"end": {},
 		"steps": [

@@ -65,7 +65,7 @@ Nits:
 
 ## From the encounters round
 
-- The autopilot is a weak driver against a pack that fights (the guard in mission_test runs it with the creatures live and the hull held, and it finishes on every seed tried only with the 3:00 shutter and its kill-step tactics: charge on the avenue, no dodging there). It is a proxy, not a measure of how a person fares: hand play is still the test of the pharmacy run-down and of the shop's 4-second hold.
+- The autopilot is a weak driver against a pack that fights (the guard in mission_test runs it with the creatures live and the hull held, and it finishes on every seed tried only with the 3:00 shutter and its kill-step tactics: charge on the avenue, no dodging there). It is a proxy, not a measure of how a person fares: hand play is still the test of the pharmacy run-down and of the motel's 4-second hold.
 - A hunter that is hugging the car (cooldown running, 1 to 2 m off the flank) runs alongside and cannot be hit: kills come from the front. A bump or knock does not kill it.
 - Hunters lead a fast car: above about 80 km/h a pursuer runs ahead of the car on the intercept it computed, so the pack is harmless from behind at that speed. Only a dent on a very fast run-down was added.
 - The spec's 2:00 shutter is now 3:00 (StoryData.SHUTTER_SECONDS); the option file still says 2:00.

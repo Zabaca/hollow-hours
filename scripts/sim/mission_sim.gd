@@ -188,9 +188,13 @@ func _reset_progress() -> void:
 	_roam_wreck_reported = false
 
 
-## New Game: mission 1 starts at once (it has no start marker).
+## New Game: mission 1 starts at once (it has no start marker), the car at the safe start with a pack
+## that is out of sight of it (the layout's own player start is where Survive the Night begins).
 func new_game(game: GameSim) -> void:
 	_reset_progress()
+	var safe: Dictionary = StoryData.PLACES["safe_start"]
+	game.place_car(safe["pos"], float(safe["angle"]), GameSim.MAX_HULL)
+	game.pack.reset_pack(game.car, StoryData.ROAM_PACK, false)
 	_last_kills = game.pack.kills
 	start_mission(game, 0)
 

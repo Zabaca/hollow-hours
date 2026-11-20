@@ -70,3 +70,15 @@ Nits:
 - The stunned creature plays the "dead" clip with dim eyes; a stagger or get-up clip would read better (creature animations are being redesigned elsewhere).
 - Hunters lead a fast car: above about 80 km/h a pursuer runs ahead of the car on the intercept it computed, so the pack is harmless from behind at that speed. Only a dent on a very fast run-down was added.
 - The spec's 2:00 shutter is now 3:00 (StoryData.SHUTTER_SECONDS); the option file still says 2:00.
+
+## From the encounters review (the fight rework, merged)
+
+Should-fix:
+- **The live-hunter guard rests on five seeds and a pinned hull.** On 10 seeds with the hull held, 8 finish (seed 6 fails the shutter); with the hull not held, 7 of 10 finish (seeds 6 and 8 are wrecked at the pharmacist). Base wrecked none at the pharmacist. Run 10 or more seeds and assert a pass rate, with the hull held and not held.
+- **The shutter is 3:00, the option file says 2:00.** The owner decides after playing whether it should be a real clock (2:00 or 2:30).
+- **Straight and fast is strong.** At 60 km/h on a straight the pack is near-harmless (creatures ahead are run down 83% of the time, about 14% latch). The danger sits at corners, stops and crashes. If the owner wants more threat: flank and rear pressure from side streets, or a smaller mid-leap kill window (LEAP_KILL_SPEED).
+
+Nits:
+- autopilot.gd's kill step hard-codes the avenue's coordinates.
+- The "lands clear" check passes at exactly its 2.5 m threshold.
+- Throw-off at a crawl is still long (5 km/h: swerves 4.1 s, slide 2.4 s).

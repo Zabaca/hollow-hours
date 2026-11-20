@@ -321,9 +321,13 @@ func _test_run_down_count() -> void:
 	for g in sim.pack.gaunts:
 		if g.attacking() and g.alert:
 			hunters += 1
-		if g.pos.distance_to(StoryData.place_pos("pharmacy")) > 12.0:
+		if g.pos.distance_to(StoryData.place_pos("pharmacy")) > 14.0:
 			near = false
-	_check(hunters == 2 and sim.pack.gaunts.size() == 2 and near, "two Gaunts are placed at the pharmacy, already hunting", "hunters=%d total=%d" % [hunters, sim.pack.gaunts.size()])
+	_check(hunters == 1 and sim.pack.gaunts.size() == 1 and near, "the first Gaunt is placed at the pharmacy, already hunting, down the avenue to the west", "hunters=%d total=%d" % [hunters, sim.pack.gaunts.size()])
+	var first_x: float = (sim.pack.gaunts[0] as GauntSim).pos.x
+	_check(first_x < StoryData.place_pos("pharmacy").x - 8.0, "on the side a car arriving from the east is driving towards", "x=%.1f" % first_x)
+	_run(sim, 9.2)
+	_check(sim.pack.gaunts.size() == 2, "and the second joins it nine seconds later", "n=%d" % sim.pack.gaunts.size())
 	sim.pack.gaunts.clear()
 	_kill_one(sim)
 	_check(sim.mission.objective()["remaining"] == 1, "one run down leaves one to go")
@@ -356,14 +360,15 @@ func _test_shutter() -> void:
 	_at(sim, "hut", PI / 2.0)
 	_run(sim, 0.1)
 	var t: Array = sim.mission.timers_left()
-	_check(t.size() == 1 and t[0]["id"] == "shutter" and absf(t[0]["left"] - 120.0) < 0.5, "the shutter timer starts at the call, at two minutes", str(t))
+	_check(t.size() == 1 and t[0]["id"] == "shutter" and absf(t[0]["left"] - StoryData.SHUTTER_SECONDS) < 0.5, "the shutter timer starts at the call, at three minutes", str(t))
 	var e := _run(sim, 59.0)
-	_check(absf(sim.mission.timers_left()[0]["left"] - 60.9) < 1.0, "it counts down in simulated time", str(sim.mission.timers_left()))
+	_check(absf(sim.mission.timers_left()[0]["left"] - (StoryData.SHUTTER_SECONDS - 59.1)) < 1.0, "it counts down in simulated time", str(sim.mission.timers_left()))
 	e.append_array(_run(sim, 59.0))
-	_check(not _has(e, "mission_failed"), "the mission holds at 1:58")
+	e.append_array(_run(sim, StoryData.SHUTTER_SECONDS - 120.0))
+	_check(not _has(e, "mission_failed"), "the mission holds until the last second", str(sim.mission.timers_left()))
 	e = _run(sim, 3.0)
 	var failed := _of(e, "mission_failed")
-	_check(failed.size() == 1 and failed[0]["reason"] == "shutter" and "ph_failed" in _lines(e), "the shutter gives way at 2:00 and Teo screams", str(failed))
+	_check(failed.size() == 1 and failed[0]["reason"] == "shutter" and "ph_failed" in _lines(e), "the shutter gives way at 3:00 and Teo screams", str(failed))
 	_check(sim.phase == GameSim.Phase.PLAYING, "a timed-out mission does not wreck the car")
 
 
@@ -452,7 +457,7 @@ func _test_restart_mission() -> void:
 	var hut: Vector2 = StoryData.place_pos("hut")
 	_check(_has(e, "mission_started") and sim.mission.objective()["kind"] == "reach" and sim.mission.objective()["place"] == "pharmacy", "restart starts the mission over", str(_lines(e)))
 	_check(sim.car.body.position.distance_to(hut) < 0.5 and sim.hull == GameSim.MAX_HULL, "the car at the mission's start with a full hull")
-	_check(absf(sim.mission.timers_left()[0]["left"] - 120.0) < 0.5, "and the shutter timer back at two minutes")
+	_check(absf(sim.mission.timers_left()[0]["left"] - StoryData.SHUTTER_SECONDS) < 0.5, "and the shutter timer back at its full time")
 
 
 # ----------------------------------------------------------------------------- completing, saving, order
@@ -723,7 +728,11 @@ func _test_hunters_not_in_the_car() -> void:
 		_run(sim, 0.01)
 		for g in sim.pack.gaunts:
 			worst = minf(worst, g.pos.distance_to(sim.car.body.position))
-		_check(sim.pack.gaunts.size() == 2, "seed %d: two hunters" % seed_in, "n=%d" % sim.pack.gaunts.size())
+		_check(sim.pack.gaunts.size() == 1, "seed %d: one hunter to begin with" % seed_in, "n=%d" % sim.pack.gaunts.size())
+		_run(sim, 9.01)
+		var newest: GauntSim = sim.pack.gaunts.back()
+		worst = minf(worst, newest.pos.distance_to(sim.car.body.position))
+		_check(sim.pack.gaunts.size() == 2, "seed %d: the second arrives" % seed_in, "n=%d" % sim.pack.gaunts.size())
 	_check(worst >= 4.5, "the pharmacy hunters never appear inside or on top of the car", "nearest=%.1f m" % worst)
 	# Placed where the car can reach them: out in the street, not pinned against the tower's wall.
 	var tight := 0
@@ -803,25 +812,39 @@ func _test_pack_hooks() -> void:
 
 func _test_whole_story_driven() -> void:
 	for seed_in in [7, 3]:
-		_drive_story(seed_in)
+		_drive_story(seed_in, false)
+	# The guard against a story that cannot be finished: the creatures the story places are LIVE (they pounce,
+	# take hold and have to be run down), the director is off and the hull is held at full, so only the timers
+	# and the missions' own steps can stop the autopilot. It must finish every mission inside its timers with
+	# room to spare. (This is what the stunned route check above cannot see.)
+	for seed_in in [7, 3, 11, 1, 4]:
+		_drive_story(seed_in, true)
 
 
-func _drive_story(seed_in: int) -> void:
+func _drive_story(seed_in: int, live: bool) -> void:
 	var sim := _story(seed_in)
 	var pilot := Autopilot.new()
 	var log: Array = []
 	var failed := false
 	var complete := false
 	var marks := {}
+	var left := 0.0
+	var shutter_margin := -1.0
+	var latches := 0
 	var steps := int(600.0 / DT)
 	for i in steps:
-		# "The pack switched off": the director is off and the creatures the story places lie where they are
-		# (stunned: they cannot pounce or take hold, and can be run down at speed), so this proves each mission can be
-		# finished by driving. How the autopilot fares against a pack that fights is in the report, not a test.
-		for g in sim.pack.gaunts:
-			if g.alive() and g.state != GauntSim.State.DOWN:
-				g.set_state(GauntSim.State.DOWN)
-			g.stun = 999.0
+		if live:
+			sim.hull = GameSim.MAX_HULL
+			var tl := sim.mission.timers_left()
+			if not tl.is_empty() and tl[0]["id"] == "shutter":
+				left = float(tl[0]["left"])
+		else:
+			# The route check: the creatures the story places lie where they are (stunned: they cannot pounce or
+			# take hold, and can be run down at speed), so it proves each mission can be finished by driving.
+			for g in sim.pack.gaunts:
+				if g.alive() and g.state != GauntSim.State.DOWN:
+					g.set_state(GauntSim.State.DOWN)
+				g.stun = 999.0
 		sim.step(DT, pilot.controls(sim, DT))
 		for e in sim.take_events():
 			match e["type"]:
@@ -831,9 +854,17 @@ func _drive_story(seed_in: int) -> void:
 				"mission_failed":
 					failed = true
 					print("  failed: ", e["id"], " ", e["reason"], " at ", int(sim.time))
+				"timer":
+					if e["state"] == "stop" and e["id"] == "shutter":
+						shutter_margin = left
+				"latch":
+					latches += 1
 				"story_complete":
 					complete = true
 		if complete or failed:
 			break
-	_check(log == ["batteries", "pharmacist", "west_gate"] and complete and not failed, "seed %d: the autopilot drives all three missions to the end with the pack off" % seed_in, "log=%s t=%.0f" % [str(marks), sim.time])
+	var what := "with the creatures lying stunned" if not live else "with the story's creatures live and the hull held"
+	_check(log == ["batteries", "pharmacist", "west_gate"] and complete and not failed, "seed %d: the autopilot drives all three missions to the end %s" % [seed_in, what], "log=%s t=%.0f latches=%d" % [str(marks), sim.time, latches])
 	_check(sim.time < 600.0, "within ten simulated minutes", "t=%.0f hull=%.0f kills=%d" % [sim.time, sim.hull, sim.kills])
+	if live:
+		_check(shutter_margin >= 15.0, "seed %d: and with the shutter still holding for at least 15 s to spare" % seed_in, "margin %.0f s of %.0f" % [shutter_margin, StoryData.SHUTTER_SECONDS])

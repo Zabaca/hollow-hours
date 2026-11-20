@@ -16,8 +16,11 @@ extends RefCounted
 ##   lines [id]                      radio lines to play
 ##   pack n                          the pack's size from now on
 ##   alert {place, radius} | {all}   alert every Gaunt within radius of a place, or all of them
-##   spawn [{place, count, ring, clear?}]   Gaunts placed `ring` metres from a place, already hunting,
-##                                   at least `clear` (default 6) metres from the car
+##   spawn [{place, count, ring, clear?, bearings?}]   Gaunts placed `ring` metres from a place, already
+##                                   hunting, at least `clear` (default 6) metres from the car. `bearings`
+##                                   (radians, map angle) says where round the place each one stands; the
+##                                   pharmacy's two are down the avenue to its west, so a car arriving from
+##                                   the east has a straight run at them
 ##   timer {id, seconds, reason, label}   start a timer; it fails the mission with `reason` at zero
 ##   stop_timer id
 ##   gate "open"
@@ -103,14 +106,15 @@ const MISSIONS := [
 		"id": "pharmacist", "title": "THE PHARMACIST", "start": "hut", "dawn": 0.1,
 		"begin": {
 			"lines": ["ph_call_1", "ph_call_2"], "pack": 4,
-			"timer": {"id": "shutter", "seconds": 120.0, "reason": "shutter", "label": "SHUTTER"},
+			"timer": {"id": "shutter", "seconds": SHUTTER_SECONDS, "reason": "shutter", "label": "SHUTTER"},
 		},
 		"end": {"lines": ["ph_done"]},
 		"steps": [
 			{"id": "reach_pharmacy", "kind": "reach", "place": "pharmacy", "text": "Drive to the pharmacy tower on the avenue"},
 			{
 				"id": "clear", "kind": "kill", "count": 2, "place": "pharmacy", "text": "Run down the Gaunts at the shutter",
-				"begin": {"lines": ["ph_door"], "spawn": [{"place": "pharmacy", "count": 2, "ring": 8.0}]},
+				"begin": {"lines": ["ph_door"], "spawn": [{"place": "pharmacy", "count": 1, "ring": 13.0, "bearings": [3.4]}]},
+				"during": [{"t": 9.0, "spawn": [{"place": "pharmacy", "count": 1, "ring": 13.0, "bearings": [2.9]}]}],
 			},
 			{
 				"id": "load_teo", "kind": "hold", "place": "pharmacy", "seconds": 3.0, "text": "Stop at the door while Teo gets in",
@@ -143,6 +147,9 @@ const MISSIONS := [
 ]
 
 ## Tuning numbers MissionSim reads.
+## How long Teo can hold the shutter, from the call until he is in the car: long enough for a driver to run down
+## two creatures that fight back and still have time to spare (tests/mission_test.gd drives it with creatures live).
+const SHUTTER_SECONDS := 180.0
 const RETRY_MIN_HULL := 60.0  # a retry from a checkpoint brings the car back with at least this hull
 const HOLD_SPEED := 2.0  # m/s: a hold fills only below this
 const ROAM_PACK := 3  # the pack's size in free roam

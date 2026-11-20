@@ -468,9 +468,12 @@ func _spawn_hunting(game: GameSim, sp: Dictionary) -> void:
 	var car_at := game.car.body.position
 	for n in int(sp["count"]):
 		var start := game.pack.rng.randf() * TAU
+		if sp.has("bearings"):
+			start = float((sp["bearings"] as Array)[n % (sp["bearings"] as Array).size()])
 		var best := center
 		var best_score := -INF
 		for attempt in 8:
+			# With a given bearing the first try is that exact spot; the rest fan out from it.
 			var p := center + Vector2.from_angle(start + attempt * TAU / 8.0) * ring
 			var d := p.distance_to(car_at)
 			# Out in the street, where the car can get at it: a few metres from every wall, with a clear line.

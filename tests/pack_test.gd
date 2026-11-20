@@ -253,8 +253,8 @@ func _test_pounce_can_be_beaten() -> void:
 	var brake := _latch_rate(60.0, "brake")
 	_check(still > 0.85, "a stopped car is latched nearly every time", "%.0f%%" % (still * 100.0))
 	_check(slow > 0.7, "a slow one on most pounces", "%.0f%%" % (slow * 100.0))
-	_check(swerve < 0.3 and swerve_mid < 0.4, "an alert driver who swerves in the window is latched under a third of the time at speed", "60 km/h %.0f%%, 40 km/h %.0f%%" % [swerve * 100.0, swerve_mid * 100.0])
-	_check(brake < 0.4, "braking hard in the window beats it too", "%.0f%%" % (brake * 100.0))
+	_check(swerve < 0.33 and swerve_mid < 0.33, "an alert driver who swerves in the window is latched under a third of the time at speed", "60 km/h %.0f%%, 40 km/h %.0f%%" % [swerve * 100.0, swerve_mid * 100.0])
+	_check(brake < 0.33, "braking hard in the window beats it too", "%.0f%%" % (brake * 100.0))
 	_check(swerve < straight_fast * 0.5, "and the dodge is worth far more than driving straight on", "straight %.0f%% vs swerve %.0f%%" % [straight_fast * 100.0, swerve * 100.0])
 	# A miss: lands, is stunned, and gets up.
 	var seen_miss := false
@@ -326,7 +326,7 @@ func _test_throw_off_takes_a_few_seconds() -> void:
 	var swerve_mid := _shake_time(40.0, "swerve")
 	var swerve_slow := _shake_time(20.0, "swerve")
 	var straight := _shake_time(40.0, "straight")
-	_check(slide_slow < 2.0 and slide_fast < 1.5, "a handbrake slide throws it off in 1 to 2 seconds, even at a crawl", "20 km/h %.1f s, 50 km/h %.1f s" % [slide_slow, slide_fast])
+	_check(slide_slow < 2.0 and slide_fast < 1.5 and slide_fast >= 0.8 and slide_slow >= 0.8, "a handbrake slide throws it off in 1 to 2 seconds (not at once: the bar is seen to fill), even at a crawl", "20 km/h %.1f s, 50 km/h %.1f s" % [slide_slow, slide_fast])
 	_check(swerve_mid < 3.0 and swerve_slow < 3.5, "hard swerves do it in about 1 to 3 seconds", "40 km/h %.1f s, 20 km/h %.1f s" % [swerve_mid, swerve_slow])
 	_check(straight >= 99.0, "driving straight on never does")
 	# The grip shows as progress.
@@ -347,32 +347,87 @@ func _test_throw_off_takes_a_few_seconds() -> void:
 	_check(is_equal_approx(p0, 0.0) and p1 > 0.15, "shaking shows as progress on the bar", "%.2f then %.2f" % [p0, p1])
 
 
+## A real scrape: the car driven along the face of a building with a creature clinging on the wall side and
+## another on the far side. The wall meets the car at a corner or along an edge, not at the slot, so this goes
+## through GameSim.step and the collision code, not a hand-made contact point.
 func _test_scraping_rakes_one_off() -> void:
-	var setup := _enc_setup(810, 30.0, 1.0)
-	var sim: GameSim = setup[0]
-	sim.pack.gaunts.clear()
-	var g := GauntSim.new()
-	g.id = 79
-	g.slot = 3  # the left side
-	g.state = GauntSim.State.LATCHED
-	g.stamina = PackSim.GRIP
-	g.pos = sim.car.body.to_world(PackSim.SLOTS[3]["local"])
-	sim.pack.gaunts.append(g)
-	var far := GauntSim.new()
-	far.id = 80
-	far.slot = 4  # the right side
-	far.state = GauntSim.State.LATCHED
-	far.stamina = PackSim.GRIP
-	far.pos = sim.car.body.to_world(PackSim.SLOTS[4]["local"])
-	sim.pack.gaunts.append(far)
-	var hit_at: Vector2 = g.pos + Vector2(0.0, 0.3)
-	sim.pack.scrape(sim.car, hit_at, 4.0)
-	_check(g.state == GauntSim.State.THROWN and far.state == GauntSim.State.LATCHED, "scraping the car's side against something rakes off the one clinging there and leaves the other")
+	var sim := _enc_setup(810, 30.0, 1.0)[0] as GameSim
+	var wall_y := INF
+	for b in sim.world.boxes:
+		if float(b["x0"]) < -40.0 and float(b["x1"]) > -40.0 and float(b["y0"]) > 0.0 and b["kind"] == "building":
+			wall_y = minf(wall_y, float(b["y0"]))
+	var results := {}
+	for kmh in [20.0, 35.0, 50.0]:
+		for side in ["wall", "far"]:
+			sim = _enc_setup(811, 0.0, 1.0)[0] as GameSim
+			sim.pack.gaunts.clear()
+			var v: float = kmh / 3.6
+			# Driving east with the building on the left: the left slot is the wall side.
+			sim.place_car(Vector2(-60.0, wall_y - sim.car.half_width - 0.5), 0.0, GameSim.MAX_HULL)
+			sim.car.body.velocity = Vector2(v, 0.0)
+			var g := GauntSim.new()
+			g.id = 5
+			g.slot = 3 if side == "wall" else 4
+			g.state = GauntSim.State.LATCHED
+			g.stamina = PackSim.GRIP
+			g.pos = sim.car.body.to_world(PackSim.SLOTS[g.slot]["local"])
+			sim.pack.gaunts.append(g)
+			var other := GauntSim.new()
+			other.id = 6
+			other.slot = 4 if side == "wall" else 3
+			other.state = GauntSim.State.LATCHED
+			other.stamina = PackSim.GRIP
+			other.pos = sim.car.body.to_world(PackSim.SLOTS[other.slot]["local"])
+			sim.pack.gaunts.append(other)
+			var scraped := false
+			var touched := false
+			var t := 0.0
+			while t < 3.0 and not touched:
+				# Steer gently into the wall and back out: a graze, not a crash.
+				var turn := 0.25 if t < 1.5 else -0.1
+				sim.step(DT, {"throttle": clampf((v - sim.car.body.velocity.length()) * 0.4, 0.0, 1.0), "turn": turn, "handbrake": false, "boost": false})
+				t += DT
+				for e in sim.take_events():
+					if e["type"] in ["bump", "crash"]:
+						touched = true  # (the first knock only: later ones are lamp posts and rebounds)
+					if e["type"] == "thrown" and e.get("scraped", false) and int(e["id"]) == 5:
+						scraped = true
+			results["%d %s" % [int(kmh), side]] = scraped and (other.state == GauntSim.State.LATCHED or side == "far")
+			if side == "far":
+				results["%d far" % int(kmh)] = scraped
+	var wall_ok := true
+	var far_ok := true
+	for k in results:
+		if k.ends_with("wall") and not results[k]:
+			wall_ok = false
+		if k.ends_with("far") and results[k]:
+			far_ok = false
+	_check(wall_ok, "driving along a wall rakes off the creature clinging on that side, at 20, 35 and 50 km/h", str(results))
+	_check(far_ok, "and not the one on the far side", str(results))
+	# Hood and trunk slots: contact at the front or the back; the roof is never raked.
+	var hit_sim := _enc_setup(812, 0.0, 1.0)[0] as GameSim
+	hit_sim.pack.gaunts.clear()
+	var roof := GauntSim.new()
+	roof.id = 7
+	roof.slot = 0
+	roof.state = GauntSim.State.LATCHED
+	roof.stamina = PackSim.GRIP
+	hit_sim.pack.gaunts.append(roof)
+	var hood := GauntSim.new()
+	hood.id = 8
+	hood.slot = 1
+	hood.state = GauntSim.State.LATCHED
+	hood.stamina = PackSim.GRIP
+	hit_sim.pack.gaunts.append(hood)
+	hit_sim.pack.scrape(hit_sim.car, hit_sim.car.body.to_world(Vector2(2.2, 0.3)), 4.0)
+	_check(hood.state == GauntSim.State.THROWN and roof.state == GauntSim.State.LATCHED, "a knock at the front rakes the one on the hood and leaves the one on the roof")
 
 
 func _test_thrown_is_clear_and_safe() -> void:
 	var cleared := 0
 	var worst_lateral := INF
+	var lock_broken := 0
+	var could_relatch := 0
 	for i in 20:
 		var setup := _enc_setup(900 + i, 40.0, 1.0)
 		var sim: GameSim = setup[0]
@@ -381,27 +436,51 @@ func _test_thrown_is_clear_and_safe() -> void:
 		g.id = 90
 		g.slot = 0
 		g.state = GauntSim.State.LATCHED
-		g.stamina = 0.01
+		g.stamina = PackSim.GRIP
 		g.pos = sim.car.body.to_world(PackSim.SLOTS[0]["local"])
 		sim.pack.gaunts.append(g)
+		# The real way: the driver shakes it off (a hard swerve and slide) and then stops dead, so that the
+		# only thing keeping it off is the lock.
+		var t := 0.0
+		var t_thrown := -1.0
 		var landed_at := Vector2.ZERO
-		var car_at := Vector2.ZERO
+		var path_from := Vector2.ZERO
+		var path_dir := Vector2.RIGHT
 		var died := false
-		for k in int(3.0 / DT):
-			sim.step(DT, {"throttle": 0.6, "turn": 1.0 if k < 20 else 0.0, "handbrake": k < 20, "boost": false})
+		var latched_at := -1.0
+		while t < 12.0:
+			var shaking := t_thrown < 0.0
+			var c := {"throttle": 0.6, "turn": 1.0 if int(t / 0.4) % 2 == 0 else -1.0, "handbrake": true, "boost": false} if shaking else {"throttle": 0.0, "turn": 0.0, "handbrake": true, "boost": false}
+			if not shaking and sim.car.speed() < 0.3:
+				c["handbrake"] = false
+			sim.step(DT, c)
+			t += DT
 			for e in sim.take_events():
-				if e["type"] == "stunned":
-					landed_at = e["pos"]
-					car_at = sim.car.body.position
-				if e["type"] in ["roadkill", "died"]:
-					died = true
+				match e["type"]:
+					"thrown":
+						if t_thrown < 0.0:
+							t_thrown = t
+							path_from = sim.car.body.position
+							path_dir = sim.car.body.velocity.normalized() if sim.car.speed() > 1.0 else Vector2.from_angle(sim.car.body.angle)
+					"stunned":
+						landed_at = e["pos"]
+					"roadkill", "died":
+						died = true
+					"latch":
+						if latched_at < 0.0 and t_thrown >= 0.0:
+							latched_at = t - t_thrown
 		if landed_at != Vector2.ZERO:
-			# Distance from the car's line (its heading through where it was at the throw) when it landed.
-			var lateral := absf((landed_at - car_at).cross(Vector2.from_angle(sim.car.body.angle)))
-			worst_lateral = minf(worst_lateral, lateral)
-		if not died and g.state in [GauntSim.State.DOWN, GauntSim.State.HUNT, GauntSim.State.THROWN, GauntSim.State.STALK]:
+			worst_lateral = minf(worst_lateral, absf((landed_at - path_from).cross(path_dir)))
+		if not died and t_thrown >= 0.0:
 			cleared += 1
+		if latched_at >= 0.0 and latched_at < PackSim.RELATCH_LOCK:
+			lock_broken += 1
+		if latched_at >= 0.0:
+			could_relatch += 1
 	_check(cleared == 20, "a creature shaken off is never killed by the car afterwards (20 of 20 survive)", "survived=%d" % cleared)
+	_check(worst_lateral >= 2.5, "it lands clear of the car's line (at least 2.5 m to the side, every time)", "nearest %.1f m" % worst_lateral)
+	_check(lock_broken == 0, "it does not take hold again before the lock is up, even with the car stopped dead beside it", "early latches=%d" % lock_broken)
+	_check(could_relatch >= 15, "and once the lock is up it can (a stopped car is taken again)", "%d of 20 latched again within 12 s" % could_relatch)
 	# Stunned and not to be crushed by a slow roll; but a fast one still runs it down.
 	for case in [[6.0, false], [8.0, false], [11.0, true]]:
 		var sim := _enc_setup(950, 0.0, 1.0)[0] as GameSim
@@ -418,17 +497,6 @@ func _test_thrown_is_clear_and_safe() -> void:
 			sim.step(DT, {"throttle": clampf((float(case[0]) - sim.car.body.velocity.x) * 0.5, 0.0, 1.0), "turn": 0.0, "handbrake": false, "boost": false})
 			sim.take_events()
 		_check((g.state == GauntSim.State.DEAD) == bool(case[1]), "a stunned creature run over at %d km/h %s" % [int(float(case[0]) * 3.6), "dies" if case[1] else "is only shoved aside"], "state=%d" % g.state)
-	# It cannot take hold again for a few seconds, even if it is touching a slow car.
-	var s2 := _enc_setup(960, 0.0, 1.0)[0] as GameSim
-	s2.pack.gaunts.clear()
-	var h := s2.pack.place_hunting(s2.car.body.position + Vector2(2.6, 0.0), s2.car)
-	h.cooldown = PackSim.RELATCH_LOCK
-	h.vel = Vector2(-4.0, 0.0)
-	for k in int(1.0 / DT):
-		s2.step(DT, {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false})
-		s2.take_events()
-		h.cooldown = maxf(h.cooldown, 2.0)
-	_check(h.state != GauntSim.State.LATCHED, "a creature that was just thrown cannot take hold again straight away")
 
 
 func _test_rundown_needs_the_cars_speed() -> void:
@@ -452,3 +520,18 @@ func _test_rundown_needs_the_cars_speed() -> void:
 					killed_fast += 1
 	_check(killed_slow == 0, "a creature that runs into a stopped or crawling car is not killed by it", "killed slow=%d" % killed_slow)
 	_check(killed_fast >= 8, "but a car doing 40 km/h kills one it meets", "killed fast=%d of 10" % killed_fast)
+	# Very high speed is risky in its own way: running one down at 80 km/h dents the car, at 40 km/h it does not.
+	var dents := {}
+	for kmh in [40.0, 80.0]:
+		var sim := _enc_setup(1100, float(kmh), 1.0)[0] as GameSim
+		sim.pack.gaunts.clear()
+		var g := sim.pack.place_hunting(sim.car.body.position + Vector2(30.0, 0.0), sim.car)
+		g.set_state(GauntSim.State.DOWN)  # lying in the road, so it is there to be hit at any speed
+		g.stun = 99.0
+		var v: float = float(kmh) / 3.6
+		for k in int(2.5 / DT):
+			sim.car.body.velocity = Vector2(v, 0.0)  # (held, so the impact is the speed we mean)
+			sim.step(DT, {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false})
+			sim.take_events()
+		dents[int(kmh)] = GameSim.MAX_HULL - sim.hull
+	_check(dents[40] < 0.5 and dents[80] >= 3.0, "but at 80 km/h it dents the car (40 km/h does not)", str(dents))

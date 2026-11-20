@@ -33,9 +33,6 @@ var repath_t := 0.0
 var tumble := 0.0  # rad, for the thrown spin
 var tumble_rate := 0.0
 var stun := 0.0
-## Why it is on the ground: "" (not), "thrown" (shaken off the car), "missed" (a pounce that found nothing).
-var fell := ""
-var windup_total := 0.0  # seconds its wind-up lasts, for the view
 var lit := false  # in a light right now (headlight or lamp)
 
 

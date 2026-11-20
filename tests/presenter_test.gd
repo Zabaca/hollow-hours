@@ -348,10 +348,10 @@ func _test_hold_and_timer() -> void:
 	_at(r2, "hut")
 	_run(r2, 3.0)
 	var t: Control = r2.presenter.hud.timer_row
-	_check(t.visible and r2.presenter.hud.timer_name.text == "SHUTTER" and r2.presenter.hud.timer_value.text == "1:57", "mission 2 shows the shutter timer", r2.presenter.hud.timer_value.text)
+	_check(t.visible and r2.presenter.hud.timer_name.text == "SHUTTER" and r2.presenter.hud.timer_value.text == "2:57", "mission 2 shows the shutter timer", r2.presenter.hud.timer_value.text)
 	_check(r2.presenter.hud.card_title.text == "THE PHARMACIST", "and its card")
 	_run(r2, 100.0)
-	_check(r2.presenter.hud.timer_value.text == "0:17", "which counts down in play", r2.presenter.hud.timer_value.text)
+	_check(r2.presenter.hud.timer_value.text == "1:17", "which counts down in play", r2.presenter.hud.timer_value.text)
 	_at(r2, "pharmacy")
 	_run(r2, 0.2)
 	_check(r2.presenter.hud.objective_label.text.contains("(2 to go)"), "the run-down step counts what is left", r2.presenter.hud.objective_label.text)
@@ -438,7 +438,7 @@ func _test_fail_menu_without_checkpoint_restart_and_quit() -> void:
 	# A timed-out mission fails sooner, with its own reason.
 	var r2 := _rig("pharmacist")
 	_at(r2, "hut")
-	_run(r2, 121.0)
+	_run(r2, StoryData.SHUTTER_SECONDS + 1.0)
 	_feed(r2, 1.0)
 	_check(r2.presenter.fail_menu.is_open and r2.presenter.fail_menu.reason_label.text.begins_with("The shutter gave way"), "the shutter running out says why")
 	r2.presenter.fail_menu.close()

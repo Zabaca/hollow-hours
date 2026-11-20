@@ -20,6 +20,7 @@ const MAX_HULL := 100.0
 const CRASH := 6.0  # m/s into a wall that counts as a crash (Roadkill's threshold)
 const BUMP := 1.5  # m/s into a wall that is still a knock you can hear
 const CLAW_DPS := 3.0  # hull per second per creature clinging to the car
+const ROADKILL_DENT_SPEED := 17.0  # m/s (61 km/h): above this, running one down costs hull
 const BOOST := CarSim.BOOST
 const GRAB := PackSim.GRAB_DRAG * PackSim.GAUNT_MASS / 80.0  # N per (m/s) per clinging creature
 
@@ -290,6 +291,8 @@ func step(dt: float, controls: Dictionary) -> void:
 		for e in pack.take_events():
 			if e["type"] == "roadkill":
 				gauge = minf(1.0, gauge + BOOST["roadkill"])
+				# A creature in the road at very high speed is a crash-grade impact: it dents the car too.
+				damage(clampf((float(e["speed"]) - ROADKILL_DENT_SPEED) * 1.2, 0.0, 12.0), "roadkill")
 			elif e["type"] == "latch":
 				damage(4.0, "pounce")
 			elif e["type"] == "claw":

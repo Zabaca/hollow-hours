@@ -11,6 +11,7 @@ extends Node
 const DT := 1.0 / 120.0
 const IDLE := {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false}
 const DIR := "user://mission_test"
+const MIN_LEG := 89.0  # m: "about 90"; the gas station to the pharmacy is 90.0
 
 var failures := 0
 
@@ -20,6 +21,7 @@ func _ready() -> void:
 	_clean()
 	_test_script()
 	_test_places()
+	_test_legs()
 	_test_new_game()
 	_test_start_story_at()
 	_test_hold()
@@ -126,7 +128,7 @@ func _lines(events: Array) -> Array:
 ## Mission 1 up to just after the box is loaded (the checkpoint), by placing the car and waiting.
 func _load_box(sim: GameSim) -> Array:
 	var out: Array = []
-	_at(sim, "shop")
+	_at(sim, "motel")
 	out.append_array(_run(sim, 0.1))
 	out.append_array(_run(sim, 4.2))
 	return out
@@ -135,7 +137,7 @@ func _load_box(sim: GameSim) -> Array:
 ## Mission 3 (continued) up to the checkpoint at the hotel; returns the events.
 func _pick_up_both(sim: GameSim) -> Array:
 	var out: Array = []
-	_at(sim, "shop")
+	_at(sim, "hut")
 	out.append_array(_run(sim, 0.1))
 	_at(sim, "hotel")
 	out.append_array(_run(sim, 4.2))
@@ -215,6 +217,25 @@ func _test_places() -> void:
 	_check(is_equal_approx(float(gate_rec["x"]), float(w.arena["left"])) and float(gate_rec["width"]) >= 2.0 * 1.06 + 4.0, "and it sits in the west wall with room for the car to line up", str(gate_rec))
 
 
+## Every leg of the story is a real cross-town drive: from a mission's start to its first step and from each
+## step's place to the next, about 90 m or more in a straight line (the hotel, pharmacy and gate are buildings
+## that cannot move, which is why the missions alternate sides of town; see StoryData.PLACES).
+func _test_legs() -> void:
+	var short: Array = []
+	var shortest := INF
+	for m in StoryData.MISSIONS:
+		var at_id: String = m["start"] if m["start"] != "" else "safe_start"
+		for s in m["steps"]:
+			if not s.has("place") or s["place"] == at_id:
+				continue  # a hold at the place just reached is not a leg
+			var d := StoryData.place_pos(at_id).distance_to(StoryData.place_pos(s["place"]))
+			shortest = minf(shortest, d)
+			if d < MIN_LEG:
+				short.append("%s: %s to %s %.0f m" % [m["id"], at_id, s["place"], d])
+			at_id = s["place"]
+	_check(short.is_empty(), "every leg of every mission is at least %d m in a straight line" % int(MIN_LEG), "shortest=%.1f short=%s" % [shortest, str(short)])
+
+
 # ----------------------------------------------------------------------------- starting, holding, counting
 
 
@@ -224,11 +245,16 @@ func _test_new_game() -> void:
 	var started := _of(e, "mission_started")
 	var obj := _of(e, "objective")
 	_check(started.size() == 1 and started[0]["number"] == 1 and started[0]["title"] == "BATTERIES", "a new story starts mission 1")
-	_check(obj.size() == 1 and obj[0]["kind"] == "reach" and obj[0]["place"] == "shop" and String(obj[0]["text"]) != "", "its first objective is to reach the shop", str(obj))
+	_check(obj.size() == 1 and obj[0]["kind"] == "reach" and obj[0]["place"] == "motel" and String(obj[0]["text"]) != "", "its first objective is to reach the motel office", str(obj))
 	_check(_lines(e) == ["bat_call_1", "bat_call_2"], "its first two lines are Vera's call", str(_lines(e)))
 	_check(sim.mission.objective_text() == obj[0]["text"] and sim.hull == GameSim.MAX_HULL, "the objective reads back and the hull is full")
 	var blip: Array = sim.mission.blips()
-	_check(blip.size() == 1 and blip[0]["kind"] == "objective" and blip[0]["place"] == "shop", "the shop is the objective's blip")
+	_check(blip.size() == 1 and blip[0]["kind"] == "objective" and blip[0]["place"] == "motel", "the motel office is the objective's blip")
+	var safe: Dictionary = StoryData.PLACES["safe_start"]
+	var nearest := INF
+	for g in sim.pack.gaunts:
+		nearest = minf(nearest, g.pos.distance_to(safe["pos"]))
+	_check(sim.car.body.position.distance_to(safe["pos"]) < 0.5 and sim.pack.gaunts.size() == 3 and nearest >= 40.0, "the car starts at the safe start with three Gaunts well away from it", "nearest=%.1f" % nearest)
 
 
 func _test_start_story_at() -> void:
@@ -246,9 +272,9 @@ func _test_start_story_at() -> void:
 func _test_hold() -> void:
 	var sim := _story()
 	sim.take_events()
-	_at(sim, "shop")
+	_at(sim, "motel")
 	var e := _run(sim, 0.1)
-	_check(_lines(e) == ["bat_shop"] and sim.mission.hold_progress() >= 0.0, "reaching the shop starts the hold and plays its line", str(_lines(e)))
+	_check(_lines(e) == ["bat_shop"] and sim.mission.hold_progress() >= 0.0, "reaching the motel office starts the hold and plays its line", str(_lines(e)))
 	var filling := _of(e, "hold")
 	e = _run(sim, 2.0)
 	var p1: float = sim.mission.hold_progress()
@@ -260,12 +286,12 @@ func _test_hold() -> void:
 	_check(absf(sim.mission.hold_progress() - p1) < 0.002, "the hold pauses outside the marker", "progress=%.3f" % sim.mission.hold_progress())
 	_check(_of(e, "hold").size() >= 1 and _of(e, "hold")[0]["state"] == "paused", "and reports it paused")
 	# Inside but moving: still paused.
-	_at(sim, "shop")
+	_at(sim, "motel")
 	sim.car.body.velocity = Vector2(8.0, 0.0)
 	_run(sim, 0.05)
 	_check(absf(sim.mission.hold_progress() - p1) < 0.002, "the hold does not fill while the car is moving", "progress=%.3f" % sim.mission.hold_progress())
 	# Still and inside: it picks up where it left off and finishes in the rest of the four seconds.
-	_at(sim, "shop")
+	_at(sim, "motel")
 	e = _run(sim, 1.6)
 	_check(not _has(e, "checkpoint"), "it has not finished before four seconds are held")
 	e = _run(sim, 0.7)
@@ -278,11 +304,11 @@ func _test_alarm() -> void:
 	var sim := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
 	sim.take_events()
 	var before := sim.pack.alive_count()
-	_at(sim, "shop")
+	_at(sim, "motel")
 	var e := _run(sim, 0.1)
 	var alarm_early := "bat_alarm" in _lines(e)
 	e = _run(sim, 1.5)
-	_check(not alarm_early and "bat_alarm" in _lines(e), "the shop's alarm sounds once the loading has begun")
+	_check(not alarm_early and "bat_alarm" in _lines(e), "the motel's alarm sounds once the loading has begun")
 	e.append_array(_run(sim, 2.0))
 	_check(before == 3 and sim.pack.alive_count() == 4, "and a fourth Gaunt joins the three", "before=%d after=%d" % [before, sim.pack.alive_count()])
 
@@ -305,9 +331,9 @@ func _test_run_down_count() -> void:
 	var sim := _continued("pharmacist")
 	sim.take_events()
 	# A creature run down before the step begins does not count towards it.
-	_at(sim, "hut", PI / 2.0)
+	_at(sim, "shop", -PI / 2.0)
 	var e := _run(sim, 0.1)
-	_check(_lines(e) == ["ph_call_1", "ph_call_2"], "mission 2 starts at the park hut with Teo's call and Vera's", str(_lines(e)))
+	_check(_lines(e) == ["ph_call_1", "ph_call_2"], "mission 2 starts at the gas station with Teo's call and Vera's", str(_lines(e)))
 	_kill_one(sim)
 	var kills_before := sim.kills
 	sim.pack.gaunts.clear()
@@ -357,7 +383,7 @@ func _test_wreck_fails_each_mission() -> void:
 func _test_shutter() -> void:
 	var sim := _continued("pharmacist")
 	sim.take_events()
-	_at(sim, "hut", PI / 2.0)
+	_at(sim, "shop", -PI / 2.0)
 	_run(sim, 0.1)
 	var t: Array = sim.mission.timers_left()
 	_check(t.size() == 1 and t[0]["id"] == "shutter" and absf(t[0]["left"] - StoryData.SHUTTER_SECONDS) < 0.5, "the shutter timer starts at the call, at three minutes", str(t))
@@ -375,9 +401,9 @@ func _test_shutter() -> void:
 func _test_gate_timer() -> void:
 	var sim := _continued("west_gate")
 	sim.take_events()
-	_at(sim, "shop", -PI / 2.0)
+	_at(sim, "hut", PI / 2.0)
 	var e := _run(sim, 0.1)
-	_check(_lines(e) == ["gate_call_1", "gate_call_2"], "mission 3 starts at the gas station with Ruck's call and Vera's", str(_lines(e)))
+	_check(_lines(e) == ["gate_call_1", "gate_call_2"], "mission 3 starts at the park hut with Ruck's call and Vera's", str(_lines(e)))
 	e = _pick_up_both(sim)
 	_check(_has(e, "checkpoint") and "gate_aboard" in _lines(e), "Vera and Teo aboard is a checkpoint and Ruck's warning", str(_lines(e)))
 	_check(sim.mission.objective()["kind"] == "survive", "then sixty seconds of staying alive")
@@ -397,7 +423,7 @@ func _test_gate_timer() -> void:
 func _test_retry_from_checkpoint() -> void:
 	var sim := _continued("west_gate")
 	sim.take_events()
-	_at(sim, "shop", -PI / 2.0)
+	_at(sim, "hut", PI / 2.0)
 	_run(sim, 0.1)
 	_at(sim, "hotel", PI / 2.0)
 	sim.damage(70.0, "test")  # hull 30 when the checkpoint is taken
@@ -432,21 +458,21 @@ func _test_retry_from_checkpoint() -> void:
 func _test_retry_before_checkpoint() -> void:
 	var sim := _story()
 	sim.take_events()
-	_at(sim, "shop")
+	_at(sim, "motel")
 	_run(sim, 0.5)
 	sim.damage(1000.0, "test")
 	_run(sim, 0.1)
 	sim.retry_mission()
 	var e := sim.take_events()
-	var ps: Dictionary = sim.world.player_start
-	_check(_has(e, "mission_started") and sim.mission.objective()["place"] == "shop" and sim.mission.objective()["kind"] == "reach", "before the first checkpoint a retry restarts the mission", str(_of(e, "retry")))
-	_check(sim.car.body.position.distance_to(Vector2(ps["x"], ps["y"])) < 0.5 and sim.hull == GameSim.MAX_HULL, "at the safe start with a full hull")
+	var safe: Dictionary = StoryData.PLACES["safe_start"]
+	_check(_has(e, "mission_started") and sim.mission.objective()["place"] == "motel" and sim.mission.objective()["kind"] == "reach", "before the first checkpoint a retry restarts the mission", str(_of(e, "retry")))
+	_check(sim.car.body.position.distance_to(safe["pos"]) < 0.5 and sim.hull == GameSim.MAX_HULL, "at the safe start with a full hull")
 
 
 func _test_restart_mission() -> void:
 	var sim := _continued("pharmacist")
 	sim.take_events()
-	_at(sim, "hut", PI / 2.0)
+	_at(sim, "shop", -PI / 2.0)
 	_run(sim, 30.0)
 	_at(sim, "pharmacy")
 	_run(sim, 0.1)
@@ -454,9 +480,9 @@ func _test_restart_mission() -> void:
 	sim.damage(40.0, "test")
 	sim.restart_mission()
 	var e := sim.take_events()
-	var hut: Vector2 = StoryData.place_pos("hut")
+	var start: Vector2 = StoryData.place_pos("shop")
 	_check(_has(e, "mission_started") and sim.mission.objective()["kind"] == "reach" and sim.mission.objective()["place"] == "pharmacy", "restart starts the mission over", str(_lines(e)))
-	_check(sim.car.body.position.distance_to(hut) < 0.5 and sim.hull == GameSim.MAX_HULL, "the car at the mission's start with a full hull")
+	_check(sim.car.body.position.distance_to(start) < 0.5 and sim.hull == GameSim.MAX_HULL, "the car at the mission's start with a full hull")
 	_check(absf(sim.mission.timers_left()[0]["left"] - StoryData.SHUTTER_SECONDS) < 0.5, "and the shutter timer back at its full time")
 
 
@@ -477,7 +503,7 @@ func _test_complete_and_save() -> void:
 	_check(prio.get("bat_done") == true and prio.get("bat_loaded") == false, "the closing call jumps the radio queue, a mid-mission line does not", str(prio))
 	var saves := _of(e, "save")
 	_check(saves.size() == 1 and saves[0]["data"]["next"] == "pharmacist" and saves[0]["data"]["done"] == ["batteries"], "and asks for a save naming the next mission", str(saves))
-	_check(sim.mission.blips().size() == 1 and sim.mission.blips()[0]["kind"] == "start" and sim.mission.blips()[0]["place"] == "hut", "back in free roam with the park hut lit as a start")
+	_check(sim.mission.blips().size() == 1 and sim.mission.blips()[0]["kind"] == "start" and sim.mission.blips()[0]["place"] == "shop", "back in free roam with the gas station lit as a start")
 	var path := DIR + "/round_trip.json"
 	var wrote := SaveStore.write_save(saves[0]["data"], path)
 	var back := SaveStore.load_save(path)
@@ -487,21 +513,21 @@ func _test_complete_and_save() -> void:
 	sim2.continue_story(back)
 	var e2 := sim2.take_events()
 	var roam := _of(e2, "roam")
-	_check(roam.size() == 1 and roam[0]["next"] == "pharmacist" and sim2.mission.blips()[0]["place"] == "hut", "Continue from it lights mission 2's start")
+	_check(roam.size() == 1 and roam[0]["next"] == "pharmacist" and sim2.mission.blips()[0]["place"] == "shop", "Continue from it lights mission 2's start")
 
 
 func _test_missions_in_order() -> void:
 	var sim := _story()
 	sim.take_events()
-	_at(sim, "hut", PI / 2.0)
+	_at(sim, "shop", -PI / 2.0)
 	var e := _run(sim, 1.0)
-	_check(not _has(e, "mission_started") and sim.mission.objective()["place"] == "shop", "mission 2 cannot start before mission 1 is done")
+	_check(not _has(e, "mission_started") and sim.mission.objective()["place"] == "motel", "mission 2 cannot start before mission 1 is done")
 	var sim2 := _continued("west_gate")
 	sim2.take_events()
-	_at(sim2, "hut", PI / 2.0)
+	_at(sim2, "shop", -PI / 2.0)
 	e = _run(sim2, 1.0)
 	_check(not _has(e, "mission_started"), "nor can mission 3 start at mission 2's marker")
-	_at(sim2, "shop", -PI / 2.0)
+	_at(sim2, "hut", PI / 2.0)
 	e = _run(sim2, 0.2)
 	_check(_of(e, "mission_started").size() == 1 and _of(e, "mission_started")[0]["number"] == 3, "but its own does")
 
@@ -522,14 +548,14 @@ func _test_continue_and_revert() -> void:
 	_check(totals_before["wrecks"] == 1 and totals_after == totals_before, "the wreck, the time and the kills still count after going back", "%s -> %s" % [str(totals_before), str(totals_after)])
 	var safe: Dictionary = StoryData.PLACES["safe_start"]
 	_check(sim.phase == GameSim.Phase.PLAYING and sim.hull == GameSim.MAX_HULL and sim.car.body.position.distance_to(safe["pos"]) < 0.5, "back to the last save: the safe start, a full hull")
-	_check(sim.mission.blips()[0]["kind"] == "start" and sim.mission.blips()[0]["place"] == "hut", "with mission 2's start lit", str(_of(e, "roam")))
+	_check(sim.mission.blips()[0]["kind"] == "start" and sim.mission.blips()[0]["place"] == "shop", "with mission 2's start lit", str(_of(e, "roam")))
 	# Before any save there is nothing to go back to but a new game.
 	var fresh := _story()
 	fresh.take_events()
 	fresh.damage(1000.0, "test")
 	_run(fresh, 0.1)
 	fresh.revert_to_save()
-	_check(fresh.mission.objective()["kind"] == "reach" and fresh.mission.objective()["place"] == "shop", "before the first save a wreck means a new game")
+	_check(fresh.mission.objective()["kind"] == "reach" and fresh.mission.objective()["place"] == "motel", "before the first save a wreck means a new game")
 	_check(sim.mission.dawn_amount() > fresh.mission.dawn_amount(), "the sky has lightened a touch since the first mission", "%.2f vs %.2f" % [sim.mission.dawn_amount(), fresh.mission.dawn_amount()])
 
 
@@ -616,7 +642,7 @@ func _test_gate_trigger() -> void:
 	_check(ending_prio, "and the closing lines jump the radio queue")
 	var midway := GameSim.new(CityLayout.DATA, "bruiser", 7, true)
 	midway.continue_story(sim.mission.last_save)
-	_check(midway.mission.objective()["kind"] == "start" and midway.mission.objective()["place"] == "shop", "quitting during the roll-out resumes at mission 3's start, not in an empty roam")
+	_check(midway.mission.objective()["kind"] == "start" and midway.mission.objective()["place"] == "hut", "quitting during the roll-out resumes at mission 3's start, not in an empty roam")
 	e = _run(sim, GameSim.ESCAPE_MAX_TIME + 0.5)
 	var saves := _of(e, "save")
 	_check(_has(e, "story_complete") and saves.size() == 1 and saves[0]["data"]["ending_seen"] == true and saves[0]["data"]["next"] == "", "the story completes and asks for a final save", str(_of(e, "story_complete")))
@@ -721,7 +747,7 @@ func _test_hunters_not_in_the_car() -> void:
 	for seed_in in [1, 2, 3, 4, 5, 6, 7, 8]:
 		var sim := _continued("pharmacist", seed_in)
 		sim.take_events()
-		_at(sim, "hut", PI / 2.0)
+		_at(sim, "shop", -PI / 2.0)
 		_run(sim, 0.1)
 		# The car pulls up on the ring side nearest a bearing the old code could have picked.
 		sim.place_car(StoryData.place_pos("pharmacy") + Vector2(4.0, 0.5), PI, GameSim.MAX_HULL)
@@ -739,7 +765,7 @@ func _test_hunters_not_in_the_car() -> void:
 	for seed_in in [1, 2, 3, 4, 5, 6, 7, 8]:
 		var sim := _continued("pharmacist", seed_in)
 		sim.take_events()
-		_at(sim, "hut", PI / 2.0)
+		_at(sim, "shop", -PI / 2.0)
 		_run(sim, 0.1)
 		_at(sim, "pharmacy")
 		_run(sim, 0.1)

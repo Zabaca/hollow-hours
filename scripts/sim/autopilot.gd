@@ -13,6 +13,10 @@ const DEMO_ROUTE := [
 	Vector2(-14, -0.4), Vector2(3, -0.4), Vector2(8, 0.4), Vector2(50, 0.4), Vector2(62, 8), Vector2(62, 42),
 	Vector2(40, 44), Vector2(10, 44), Vector2(5.8, 36), Vector2(5.8, 10), Vector2(2, -0.4), Vector2(-30, -0.4),
 ]
+## The burned bus and two wrecks leave the avenue a chicane at the central junction, about 4 m wide. The car's own
+## grid (CAR_CLEARANCE) calls that shut and would send a car crossing town round the ring road, to arrive at the
+## pharmacy from the wrong side; a driver takes the chicane, so westbound the car is steered through these.
+const CHICANE_WEST := [Vector2(8.0, 0.4), Vector2(3.0, -0.4), Vector2(-14.0, -0.4)]
 const CAR_CLEARANCE := 2.4  # metres from a wall to a cell the car may be routed through
 const REACTION := 0.3  # seconds from the tell to the hand moving
 const BRAKE_DECEL := 5.0  # m/s^2 the stopping plan assumes (the car manages about 11)
@@ -187,10 +191,25 @@ func _target(game: GameSim, obj: Dictionary) -> Vector2:
 				var pts := [base, base + Vector2(25.0, 0.0)]
 				if car.body.position.distance_to(pts[patrol_i % 2]) < 9.0:
 					patrol_i += 1
-				return pts[patrol_i % 2]
+				return _by_the_chicane(car, pts[patrol_i % 2])
 			return _demo_target(car)
 		_:
-			return obj["pos"]
+			# A reach that is not a stop (the pharmacy, where the hunters wait) is entered at a speed the car can
+			# still turn about from: the kill step begins the moment it is inside, 13 m from the west wall.
+			if obj["kind"] == "reach" and not obj.get("stop", false) and car.body.position.distance_to(obj["pos"]) < 40.0:
+				cap_speed = 14.0
+			return _by_the_chicane(car, obj["pos"])
+
+
+## `goal`, or the next chicane waypoint when the car is east of the central junction and the goal is far west of it.
+func _by_the_chicane(car: CarSim, goal: Vector2) -> Vector2:
+	var here: Vector2 = car.body.position
+	if goal.x > -20.0 or here.x < -12.0:
+		return goal
+	for w in CHICANE_WEST:
+		if (w as Vector2).x < here.x - 4.0:
+			return w
+	return goal
 
 
 func _demo_target(car: CarSim) -> Vector2:

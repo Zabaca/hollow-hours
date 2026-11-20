@@ -103,15 +103,16 @@ func sync(world: SimWorld, delta: float) -> void:
 			play("sprint", clampf(spd / 14.0, 0.5, 1.7), 0.1)
 			eye_energy = 4.0
 		GauntSim.State.WIND:
+			# The tell: the crouch of the pounce clip stretched over the whole wind-up, the eyes flaring.
 			if current != "pounce":
 				current = ""
-				play("pounce", 1.0, 0.1)
-			eye_energy = 5.0
+				play("pounce", PackSim.WIND_ANIM / PackSim.WIND_TIME, 0.1)
+			eye_energy = 9.0
 		GauntSim.State.LEAP:
 			if current != "pounce":
 				current = ""
 				play("pounce", 1.0, 0.05)
-				anim.seek(PackSim.WIND_TIME, true)
+				anim.seek(PackSim.WIND_ANIM, true)
 			eye_energy = 5.0
 		GauntSim.State.LATCHED:
 			play("latch", 1.0, 0.05)
@@ -120,8 +121,9 @@ func sync(world: SimWorld, delta: float) -> void:
 			play("thrown", 1.0, 0.05)
 			eye_energy = 3.0
 		GauntSim.State.DOWN:
+			# Stunned, not dead: lying where it landed with its eyes dimmed, until it gets up.
 			play("dead", 1.0, 0.1)
-			eye_energy = 2.0
+			eye_energy = 0.6
 		GauntSim.State.DEAD:
 			play("dead", 1.0, 0.05)
 			eye_energy = 0.0

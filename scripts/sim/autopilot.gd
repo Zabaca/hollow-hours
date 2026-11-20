@@ -14,6 +14,7 @@ const DEMO_ROUTE := [
 	Vector2(40, 44), Vector2(10, 44), Vector2(5.8, 36), Vector2(5.8, 10), Vector2(2, -0.4), Vector2(-30, -0.4),
 ]
 const CAR_CLEARANCE := 2.4  # metres from a wall to a cell the car may be routed through
+const REACTION := 0.3  # seconds from the tell to the hand moving
 const BRAKE_DECEL := 5.0  # m/s^2 the stopping plan assumes (the car manages about 11)
 
 var route_i := 0
@@ -24,6 +25,8 @@ var nav_path := PackedVector2Array()
 var reverse_t := 0.0
 var reverse_turn := 1.0
 var patrol_i := 0
+var runup := false  # on a kill step: backing off down the avenue to get up speed before the next run
+var wind_seen := -1.0  # game time a creature near the car began its wind-up (the tell), -1 for none
 var rng := RandomNumberGenerator.new()
 var nav: NavGrid  # the car's own grid: wider berth than the Gaunts', so it does not take an alley it cannot fit
 var nav_world: SimWorld
@@ -57,7 +60,25 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 	# Something on the car: do what a player would, slide and swerve until it lets go.
 	if game.pack.latched().size() > 0:
 		var flip := 1.0 if int(game.time / 0.7) % 2 == 0 else -1.0
-		return {"throttle": 1.0, "turn": flip, "handbrake": true, "boost": false}
+		# A slide throws it off fastest but throws away the speed that keeps the next one off: at a crawl just swerve and boost.
+		var slow := car.speed() < 8.0
+		return {"throttle": 1.0, "turn": flip, "handbrake": not slow, "boost": slow}
+	# A creature is crouching to pounce: read the tell, and a beat later throw the car away from its side.
+	var crouching: GauntSim = null
+	for g in game.pack.gaunts:
+		if g.state == GauntSim.State.WIND and g.pos.distance_to(car.body.position) < 18.0:
+			crouching = g
+			break
+	if crouching == null:
+		wind_seen = -1.0
+	else:
+		if wind_seen < 0.0:
+			wind_seen = game.time
+		var since := game.time - wind_seen
+		if since >= REACTION and since < REACTION + 0.7:
+			var rel := crouching.pos - car.body.position
+			var side := signf(car.forward().cross(rel))
+			return {"throttle": 1.0, "turn": -side if side != 0.0 else 1.0, "handbrake": false, "boost": false}
 
 	var target := _target(game, obj)
 	var stop: bool = obj.get("stop", false)
@@ -82,8 +103,10 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 	var err := angle_difference(car.body.angle, want)
 	var throttle := 0.7 if absf(err) < 0.5 else 0.4
 	var turn := clampf(err * 2.4, -1.0, 1.0)
+	var boosting := false
 	if chase:
 		throttle = 1.0 if absf(err) < 0.5 else 0.5
+		boosting = absf(err) < 0.3 and car.speed() > 6.0 and car.body.position.distance_to(target) > 6.0
 	if stop:
 		var dist := car.body.position.distance_to(target)
 		var along := car.body.velocity.dot(car.forward())
@@ -95,7 +118,7 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 			var limit := sqrt(2.0 * BRAKE_DECEL * maxf(dist - radius * 0.6, 0.0)) + 1.5
 			if along > limit:
 				throttle = -1.0
-	return {"throttle": throttle, "turn": turn, "handbrake": false, "boost": false}
+	return {"throttle": throttle, "turn": turn, "handbrake": false, "boost": boosting}
 
 
 ## Where to drive: the objective, a Gaunt to run down, a patrol while waiting, or the demo loop.
@@ -106,6 +129,19 @@ func _target(game: GameSim, obj: Dictionary) -> Vector2:
 		return _demo_target(car)
 	match obj["kind"]:
 		"kill":
+			# A run-down needs the car's own speed (PackSim.RUNDOWN_SPEED): from a standstill beside a
+			# creature there is nothing to hit it with, so go and get a run-up along the avenue first.
+			var nearest := INF
+			for g in game.pack.gaunts:
+				if g.alive() and g.state != GauntSim.State.LATCHED:
+					nearest = minf(nearest, g.pos.distance_to(car.body.position))
+			if car.speed() < 7.0 and nearest < 22.0:
+				runup = true
+			elif car.speed() > 13.0 or nearest > 45.0:
+				runup = false
+			if runup:
+				var away := 1.0 if car.body.position.x < 20.0 else -1.0
+				return Vector2(clampf(car.body.position.x + away * 34.0, -62.0, 62.0), -0.4)
 			var best := INF
 			var at := Vector2.INF
 			for g in game.pack.gaunts:

@@ -272,6 +272,8 @@ func step(dt: float, controls: Dictionary) -> void:
 	var worst := 0.0
 	for hit in world.collide_car(car, BUMP):
 		var impact: float = hit["impact"]
+		# Whatever the car scraped, a creature clinging near that spot is raked off against it.
+		pack.scrape(car, hit["point"], impact)
 		if impact <= CRASH:
 			# A knock under Roadkill's crash threshold: no damage, but it must be heard.
 			events.append({"type": "bump", "impact": impact, "point": hit["point"], "kind": hit["kind"]})

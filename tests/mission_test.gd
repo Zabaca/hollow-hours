@@ -725,6 +725,19 @@ func _test_hunters_not_in_the_car() -> void:
 			worst = minf(worst, g.pos.distance_to(sim.car.body.position))
 		_check(sim.pack.gaunts.size() == 2, "seed %d: two hunters" % seed_in, "n=%d" % sim.pack.gaunts.size())
 	_check(worst >= 4.5, "the pharmacy hunters never appear inside or on top of the car", "nearest=%.1f m" % worst)
+	# Placed where the car can reach them: out in the street, not pinned against the tower's wall.
+	var tight := 0
+	for seed_in in [1, 2, 3, 4, 5, 6, 7, 8]:
+		var sim := _continued("pharmacist", seed_in)
+		sim.take_events()
+		_at(sim, "hut", PI / 2.0)
+		_run(sim, 0.1)
+		_at(sim, "pharmacy")
+		_run(sim, 0.1)
+		for g in sim.pack.gaunts:
+			if sim.mission._wall_gap(sim.world, g.pos) < MissionSim.WALL_GAP - 1.5:
+				tight += 1
+	_check(tight == 0, "and they stand clear of the walls, where the car can get at them", "against a wall=%d" % tight)
 
 
 func _test_no_dawn_clock() -> void:
@@ -802,6 +815,13 @@ func _drive_story(seed_in: int) -> void:
 	var marks := {}
 	var steps := int(600.0 / DT)
 	for i in steps:
+		# "The pack switched off": the director is off and the creatures the story places lie where they are
+		# (stunned: they cannot pounce or take hold, and can be run down at speed), so this proves each mission can be
+		# finished by driving. How the autopilot fares against a pack that fights is in the report, not a test.
+		for g in sim.pack.gaunts:
+			if g.alive() and g.state != GauntSim.State.DOWN:
+				g.set_state(GauntSim.State.DOWN)
+			g.stun = 999.0
 		sim.step(DT, pilot.controls(sim, DT))
 		for e in sim.take_events():
 			match e["type"]:

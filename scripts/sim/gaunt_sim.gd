@@ -21,17 +21,21 @@ var alert := false
 var frozen := false
 var frozen_t := 0.0
 var chitter_t := 8.0
-var stamina := 3.0
+var stamina := PackSim.GRIP  # how long it can hold on, in seconds of full shaking
 var slot := -1  # index into PackSim.SLOTS while latched
 var claw_t := 0.0
 var leap_from := Vector2.ZERO
 var leap_to := Vector2.ZERO
+var leap_car_vel := Vector2.ZERO  # the car's velocity when it launched: the line it committed to
 var path := PackedVector2Array()
 var path_i := 0
 var repath_t := 0.0
 var tumble := 0.0  # rad, for the thrown spin
 var tumble_rate := 0.0
 var stun := 0.0
+## Why it is on the ground: "" (not), "thrown" (shaken off the car), "missed" (a pounce that found nothing).
+var fell := ""
+var windup_total := 0.0  # seconds its wind-up lasts, for the view
 var lit := false  # in a light right now (headlight or lamp)
 
 

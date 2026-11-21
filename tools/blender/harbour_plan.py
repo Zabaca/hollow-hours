@@ -106,7 +106,7 @@ def road_lines():
 # Road-side points the missions reach. `r` is the reach radius the story would use. These are plan
 # numbers: harbour_check.py measures the legs between them by road and says if one is off its range.
 PLACES = {
-    "highway_start": dict(x=HW_X1 - 25.0, y=8.0, r=10.0),       # the cordon's highway checkpoint, where chapter 2 opens
+    "highway_start": dict(x=HW_X1 - 25.0, y=11.5, r=10.0),       # the cordon's highway checkpoint, where chapter 2 opens
     "convoy_call": dict(x=CITY_RIGHT - 28.0, y=-3.5, r=12.0),   # where the convoy's last call came from, inside the east edge
     "ruck_truck": dict(x=XS[0] + 12.0, y=YS[-1] - 4.0, r=10.0),  # on the north ring road, far north-west
     "field_hospital": dict(x=XS[6] - 2.0, y=YS[1] + 4.5, r=12.0),  # the school, south-east
@@ -144,6 +144,11 @@ LEGS = [
 
 # ---------------------------------------------------------------- roadblocks
 
+# CLOSED_ROADBLOCKS is one setting for the city's maze-like quality: True keeps every 'closed' roadblock shut (the
+# routes wind round them, which is what makes the chapter's legs 300 m and more); False loosens each into a 4 m squeeze
+# at the middle of its road, so the straight streets are open again and the legs shrink (see docs/harbour-city.md).
+CLOSED_ROADBLOCKS = True
+
 # kind 'squeeze': a barricade that leaves a SQUEEZE_GAP gap; 'closed': it shuts the road, so the
 # route turns into a side street. `at` is the road's centre line coordinate and `pos` the point along
 # it; `axis` 'y' means the road runs east-west (y = at). `gap_side` is where the gap sits across the
@@ -179,6 +184,8 @@ ROADBLOCKS = [
 # Ambush spots: a place and a count, beside the squeezes and the highway's set pieces (ambushes.id
 # matches the roadblock or feature it hides beside; harbour.py adds the highway's).
 AMBUSH_COUNT = 3
+HUNTER_SPACING = 70.0   # least distance along the highway between two stalled-car hunters, outside the jam
+HUNTER_RELEASE = 35.0   # a stalled-car hunter is placed, hunting, when the car comes this close
 
 # Lamps: about one in five lives, gathered at these junctions (index pairs into XS, YS).
 LIT_JUNCTIONS = [(3, 3), (5, 1), (2, 5), (4, 0), (1, 3), (5, 5), (0, 2), (3, 1)]

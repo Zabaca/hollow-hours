@@ -6,6 +6,8 @@ extends Node3D
 ## graphics preset; `--no-hud` hides the HUD (for key-art frames); `--story` and `--mission=N` start the
 ## story (see Session). Example (with a window, not --headless):
 ##   godot --path . -- --demo --shot=/tmp/hollow.png --shot-at=8
+## `--shot-city=ID` takes the shot only in that city (the story cuts from the quarter to the harbour city);
+## `--perf=SECONDS` measures frame time (see _perf).
 
 var game: GameSim
 var city: City
@@ -44,6 +46,7 @@ var perf_gpu: Array = []  # the viewport's own measure of the render, in ms: wha
 var perf_cpu: Array = []
 var perf_draws := 0
 var perf_objects := 0
+var shot_city := ""  # --shot-city=ID: take the --shot only in that city (a run that cuts from one city to the next)
 var shot_taken := false
 var started_ms := 0
 var threat := 0.0
@@ -84,6 +87,8 @@ func _ready() -> void:
 			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)  # the cost of a frame, not the screen's rate
 			Engine.max_fps = 0
 			RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+		elif a.begins_with("--shot-city="):
+			shot_city = a.trim_prefix("--shot-city=")
 		elif a.begins_with("--shot-speed="):
 			shot_speed = float(a.trim_prefix("--shot-speed="))
 		elif a.begins_with("--shot-game="):
@@ -209,6 +214,11 @@ func _story_screen() -> void:
 		"complete":
 			presenter.on_event({"type": "mission_complete", "title": "BATTERIES", "id": "batteries", "mission": 0, "final": false})
 		"chapter":
+			# The card, then the cut: with the save the end of chapter 1 would have written, so the next city loads.
+			game.mission.last_save = {
+				"version": SaveStore.VERSION, "saved_at": 0, "next": "long_road", "done": ["batteries", "pharmacist", "west_gate"],
+				"ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0},
+			}
 			presenter.begin_chapter_card()
 		"ending":
 			game.world.gate["open"] = true
@@ -236,6 +246,7 @@ func _open_pause() -> void:
 
 ## The end of a chapter: load the next chapter's city, as Continue from the save the chapter's end wrote.
 func _on_chapter_changed(save: Dictionary) -> void:
+	print("chapter change: loading the %s city for %s" % [SaveStore.city_of(save), str(save.get("next", ""))])
 	Engine.time_scale = 1.0
 	get_tree().paused = false
 	Session.mode = "story"
@@ -394,7 +405,7 @@ func _process(delta: float) -> void:
 		atmos.set_dawn(dawn)
 		fx.dawn = dawn * 0.6
 
-	if shot_path != "" and not shot_taken and ((shot_speed >= 0.0 and car.speed() >= shot_speed and game.time > 5.0) or (shot_game >= 0.0 and game.time >= shot_game) or (shot_game < 0.0 and shot_speed < 0.0 and (Time.get_ticks_msec() - started_ms) / 1000.0 >= shot_at)):
+	if shot_path != "" and not shot_taken and (shot_city == "" or shot_city == city_id) and ((shot_speed >= 0.0 and car.speed() >= shot_speed and game.time > 5.0) or (shot_game >= 0.0 and game.time >= shot_game) or (shot_game < 0.0 and shot_speed < 0.0 and (Time.get_ticks_msec() - started_ms) / 1000.0 >= shot_at)):
 		shot_taken = true
 		_take_shot()
 

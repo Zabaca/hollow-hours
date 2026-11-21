@@ -23,6 +23,8 @@ from rk import mat, reset, join, export
 from mathutils import Matrix, Vector
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+if "open" in ARGS:
+    P.CLOSED_ROADBLOCKS = False  # a trial: every closed roadblock loosened into a squeeze (see harbour_plan.py)
 ROOT = os.path.abspath(os.path.join(HERE_DIR, "..", ".."))
 OUT_DIR = os.path.join(ROOT, "assets", "cities")
 R = C.RNG
@@ -186,6 +188,8 @@ def plan_street_objects():
 def build_roadblock(rb):
     """A roadblock across a road, from kerb to kerb (the road plus both sidewalks, 20 m), leaving a gap or none."""
     axis, at, pos = rb["axis"], rb["at"], rb["pos"]
+    if rb["kind"] == "closed" and not P.CLOSED_ROADBLOCKS:
+        rb = dict(rb, kind="squeeze", gap_side=0.0)
     lo, hi = at - (P.RW / 2 + P.SW), at + (P.RW / 2 + P.SW)
     if axis == "y":
         lo, hi = max(lo, P.ARENA["bottom"]), min(hi, P.ARENA["top"])
@@ -524,7 +528,7 @@ def build_highway():
             xr += step
     rng = random.Random(21)
     jam(H["jam_x0"], H["jam_x1"], rng)
-    jam(t1 + 8.0, t1 + 70.0, rng, fill=0.7, step=10.0)        # the queue for the toll plaza
+    jam(t1 + 8.0, t1 + 45.0, rng, fill=0.7, step=10.0)        # the queue for the toll plaza (it stops short of the checkpoint)
     jam(ovx + 70.0, ovx + 130.0, rng, fill=0.6, step=11.0)    # the queue for the fallen overpass, east side
     C.LAYOUT["highway"]["jam"] = dict(x0=H["jam_x0"], x1=H["jam_x1"])
     # sparse strays elsewhere
@@ -593,10 +597,23 @@ def build_highway():
     C.LAYOUT["ambush_spots"].append(dict(id="hw_jam", x=(H["jam_x0"] + H["jam_x1"]) / 2, y=-5.0, count=P.AMBUSH_COUNT, near="jam"))
     C.LAYOUT["ambush_spots"].append(dict(id="hw_toll", x=t0 - 8.0, y=-12.0, count=P.AMBUSH_COUNT, near="toll_plaza"))
     # hunters waiting in stalled cars: released when the car comes within 35 m
-    stalled = [w for w in C.LAYOUT["wrecks"] if w["kind"] != "bus" and w["x"] > P.HW_X0 + 150 and abs(w["y"]) < P.HW_HALF]
+    # Hunters waiting in stalled cars, released when the car comes within 40 m. One by one, not a crowd: at least
+    # HUNTER_SPACING metres apart along the road (less in the jam, where the traffic is thick), mostly in the
+    # carriageway the car drives (north).
+    cars = sorted((w for w in C.LAYOUT["wrecks"] if w["kind"] != "bus" and w["x"] > P.HW_X0 + 100 and abs(w["y"]) < P.HW_HALF), key=lambda w: -w["x"])
     rng2 = random.Random(5)
-    rng2.shuffle(stalled)
-    C.LAYOUT["stalled_hunters"] = [dict(x=w["x"], y=w["y"], release=35.0) for w in stalled[:18]]
+    picked, last_x = [], 1e9
+    # None in the set pieces themselves (the checkpoint, the toll plaza, the jam, the overpass and truck stop): there the
+    # obstacles are the danger, and a creature on the car in a tight lane has nowhere to be thrown off.
+    quiet = [(H["jam_x0"] - 30.0, H["toll_x1"] + 60.0), (H["truck_stop_x0"] - 40.0, H["overpass_x"] + 140.0)]
+    for w in cars:
+        spacing = P.HUNTER_SPACING
+        if any(a <= w["x"] <= b for a, b in quiet):
+            continue
+        if last_x - w["x"] >= spacing and (w["y"] > 0 or rng2.random() < 0.3) and w["x"] < H["checkpoint_x0"] - 30:
+            picked.append(dict(x=w["x"], y=w["y"], release=P.HUNTER_RELEASE))
+            last_x = w["x"]
+    C.LAYOUT["stalled_hunters"] = picked
     # ------ the checkpoint at the far end, being overrun
     build_checkpoint()
     # creature spawns: in the dark stretches' shoulders
@@ -612,15 +629,18 @@ def build_checkpoint():
     x0 = H["checkpoint_x0"]
     xr = P.ARENA["right"]
     g = hw_group(x0 + 5)
-    # a chicane on each carriageway, 14 m apart, each barrier leaving the gap 4 m wide
+    # a chicane on each carriageway, 20 m apart, each barrier leaving a 7 m gap (the car arrives at highway speed and
+    # has to shift a lane and back: tighter than this is the city's 4 m squeezes, not a checkpoint's)
     def barrier_wall(xa, xb, ya, yb):
         C.box(hw_group(xa), "concrete", xa, ya, 0.0, xb, yb, 1.0)
         C.box(hw_group(xa), "marking_y", xa, ya, 1.0, xb, yb, 1.06)
         C.collider(xa, ya, xb, yb, "prop")
-    barrier_wall(x0 + 8.0, x0 + 11.0, 1.0, 11.0)       # north carriageway: gap on the outer side
-    barrier_wall(x0 + 22.0, x0 + 25.0, 5.0, 15.0)      # then the inner side
-    barrier_wall(x0 + 8.0, x0 + 11.0, -15.0, -5.0)
-    barrier_wall(x0 + 22.0, x0 + 25.0, -11.0, -1.0)
+    barrier_wall(x0 + 22.0, x0 + 25.0, 1.0, 8.0)       # north carriageway: gap on the outer side
+    barrier_wall(x0 + 2.0, x0 + 5.0, 1.0, 5.0)         # then the gap shifts a lane in: open between the two pieces
+    barrier_wall(x0 + 2.0, x0 + 5.0, 12.0, 15.0)
+    barrier_wall(x0 + 22.0, x0 + 25.0, -8.0, -1.0)
+    barrier_wall(x0 + 2.0, x0 + 5.0, -5.0, -1.0)
+    barrier_wall(x0 + 2.0, x0 + 5.0, -15.0, -12.0)
     # sandbags in a low wall on the south carriageway's shoulder, tents behind them, a hut at the median's end
     sg = hw_group(x0 + 30)
     C.box(sg, "sandbag", x0 + 32.0, -14.2, 0.0, x0 + 62.0, -12.6, 1.2)
@@ -632,11 +652,11 @@ def build_checkpoint():
         C.collider(tx - 3.0, -11.0, tx + 3.0, -6.0, "prop")
     K.plain_shed(sg, x0 + 45.0, -4.5, x0 + 53.0, -1.0, 3.4, "wall5", "N")
     K.wreck_lp(sg, x0 + 78.0, -7.65, 0.0, "truck", "paint2", burnt=True)
-    K.wreck_lp(sg, x0 + 40.0, 10.5, math.pi, "van", "paint3", burnt=True, lights_on=True, flicker=0.5)
+    K.wreck_lp(sg, x0 + 40.0, 3.75, math.pi, "van", "paint3", burnt=True, lights_on=True, flicker=0.5)
     for (bx, by) in ((x0 + 30.0, -10.5), (x0 + 5.0, -13.0), (x0 + 60.0, -2.5)):
         C.barrel(sg, bx, by, fire=True)
     # floodlight poles on the shoulders: live, the checkpoint was being held
-    for (fx, fy, tag) in ((x0 + 14.0, 13.8, "checkpoint"), (x0 + 48.0, -13.8, "checkpoint"), (x0 + 70.0, 13.8, "checkpoint")):
+    for (fx, fy, tag) in ((x0 + 14.0, -13.8, "checkpoint"), (x0 + 48.0, -13.8, "checkpoint"), (x0 + 70.0, 13.8, "checkpoint")):
         C.cyl(sg, "metal", fx, fy, 0.0, 9.0, 0.14, 6)
         C.box(sg, "lamp_head", fx - 0.6, fy - 0.3, 8.8, fx + 0.6, fy + 0.3, 9.1)
         C.post(fx, fy, 0.25, "lamp")
@@ -644,7 +664,7 @@ def build_checkpoint():
         C.LAYOUT["lights"][-1]["tag"] = tag
     # the cordon's end wall and a gate frame, shut
     C.box(hw_group(xr - 3), "concrete", xr - 0.5, -P.HW_HALF - 2.0, 0.0, xr + 0.5, P.HW_HALF + 2.0, 4.5)
-    C.LAYOUT["highway"]["checkpoint"] = dict(x0=x0, x1=xr, chicane_gap=4.0)
+    C.LAYOUT["highway"]["checkpoint"] = dict(x0=x0, x1=xr, chicane_gap=7.0)
 
 
 # ---------------------------------------------------------------- perimeter, gate, ground, skyline

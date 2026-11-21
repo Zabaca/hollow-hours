@@ -1,6 +1,6 @@
 # The harbour city: generator, layout and checks
 
-Chapter 2's map, built in the first half of slice 2 of `docs/problems/the-city-is-too-small-for-a-mission-to-feel-like-a-drive/` (options 04 and 05). One map: a walled city of 6 x 6 blocks (about 400 x 300 m) with a river and a lift bridge in the west, and a divided highway 1.2 km long running into it from the east. Plain by design: the detail pass is a later slice and lands in the kit (below).
+Chapter 2's map, built in slices 2 and 2b of `docs/problems/the-city-is-too-small-for-a-mission-to-feel-like-a-drive/` (options 04 and 05). One map: a walled city of 6 x 6 blocks (about 400 x 300 m) with a river and a lift bridge in the west, and a divided highway 1.2 km long running into it from the east. Plain by design: the detail pass is a later slice and lands in the kit (below).
 
 ## Files
 
@@ -28,20 +28,31 @@ python3 -I tools/blender/harbour_check.py
 
 ## Layout data
 
-Every key `city.py` writes is here with the same meaning (`arena`, `boxes`, `posts`, `lamps`, `lights`, `wrecks`, `blocks`, `creature_spawns`, `fires`, `player_start`, `gate`). `arena` is one rectangle: x -199 to 1410, y -151 to 151; the highway's two sides are solid colliders (`building`), so the rectangle's unused part cannot be reached. Added:
+The shape is the one documented at the top of `scripts/sim/sim_world.gd` (arena, boxes, posts, blocks, roads, lights, lamps,
+wrecks, creature_spawns, fires, player_start, gate); `LayoutCheck.problems` is empty for it (`tests/harbour_test.gd`). `arena`
+is ONE rectangle, x -199 to 1410 and y -151 to 151: the city in the west and the highway running out of its east side; the
+unused part beside the highway is solid colliders (`building`). Everything else is extra and read by the game or the checks:
 
-- `blocks[]` gain `i`, `j`, `kit`, `district`.
-- `wrecks[].kind` gains `truck`. Box kinds gain `lift_up` (the two colliders that close the lift bridge's road while it is raised: remove them to let the car over) beside `building`, `wreck`, `prop`, `fence`.
-- `lights[]` may carry `tag`: `hospital_flood` (the four floodlights at the field hospital, for the floodlights failing) and `checkpoint` (the highway checkpoint's three).
-- `gate` is the lift bridge's far end: `{x, y, width, dx, dy, bridge}`, a gap in the west perimeter at the south ring road, direction west.
-- `roads[]`: `{axis, at, a, b, kind, width}`; `axis` `y` is east-west at y = `at`. Kinds: `ring`, `street`, `highway` (carriageway width in `carriageway_width`).
-- `roadblocks[]`: `{id, axis, at, pos, kind: squeeze|closed, gap: {lo, hi, width}|null, corridor}`. A roadblock spans kerb to kerb including both sidewalks (20 m), so it cannot be driven round.
-- `bridges[]`: `{id, kind: fixed|lift, x, y, length, width, up?, closed_by?}`; `river`: `{x0, x1, y0, y1}`.
-- `places{}`: `{x, y, r}` for `highway_start`, `convoy_call`, `ruck_truck`, `field_hospital`, `fuel_depot`, `post_north`, `post_centre_west`, `post_east`, `control_house`. `planned_legs[]` names the legs the missions drive and the least by road each may be.
-- `generators[]`: `{post, x, y}`, the generator standing at each generator post (its light is tagged `generator_<post>`). Ruck's burnt-out truck is the `truck` wreck by `ruck_truck`.
-- `ambush_spots[]`: `{id, x, y, count, near}`, one by every roadblock and the highway's set pieces. `stalled_hunters[]`: `{x, y, release}`, stalled cars on the highway to burst out of at `release` metres.
-- `highway{}`: `toll_plaza`, `jam`, `fallen_overpass`, `truck_stop` (with its `squeeze` and `wide_gap`), `checkpoint`.
-- `size{}`: the setting above, as built.
+- `blocks[]` gain `i`, `j`, `kit`, `district`. `wrecks[].kind` gains `truck`.
+- `lights[]` may carry `tag`: `hospital_flood` (the four floodlights at the field hospital), `checkpoint` (the highway checkpoint's
+  three), `generator_<post>`.
+- `gate` is the lift bridge's far end: `{x -199, y -144, width 8, dx, dy, bridge}`, a gap in the west perimeter at the south ring road.
+- `roads[]`: `{axis, c, width, from, to, kind}`, `axis` the direction the road runs along (`x` is east-west at y = c). Kinds
+  `ring`, `street`, `highway` (two roads, one per 14 m carriageway).
+- `roadblocks[]`: `{id, axis, c, pos, kind: squeeze|closed, gap: {lo, hi, width}|null, corridor}`, same axis convention. A
+  roadblock spans kerb to kerb including both sidewalks (20 m), so it cannot be driven round.
+- `bridges[]`: `{id, kind: fixed|lift, x, y, length, width, up?, closers?}`; the lift bridge's `closers` are the two collider
+  rectangles (kind `fence`, also in `boxes`) that shut its road while it is raised: remove them when it comes down.
+  `river`: `{x0, x1, y0, y1}`.
+- `places{}`: `{x, y, r}` for `highway_start`, `convoy_call`, `ruck_truck`, `field_hospital`, `fuel_depot`, `post_north`,
+  `post_centre_west`, `post_east`, `control_house`; `planned_legs[]` names the legs the missions drive and the least by road each
+  may be. (`StoryData.PLACES` holds the places chapter 2's first mission uses, at the same coordinates where they overlap.)
+- `ambush_spots[]`: `{id, x, y, count, near}`, one by every roadblock and the highway's set pieces (slice 3 uses them).
+  `stalled_hunters[]`: `{x, y, release}`, creatures waiting in stalled cars on the highway, placed hunting when the car comes
+  within `release` metres (the mission's `stalled` effect arms them; `HUNTER_SPACING`, `HUNTER_RELEASE` in the plan).
+- `generators[]`: `{post, x, y}`. `highway{}`: `toll_plaza`, `jam`, `fallen_overpass`, `truck_stop` (with its `squeeze` and
+  `wide_gap`), `checkpoint`. `map_frame`: the part of the map the full map screen shows (the city and 150 m of highway).
+  `size{}`: the setting above, as built.
 
 ## What the checker measures
 
@@ -51,8 +62,24 @@ Roads are at least 14 m wide, the quarter's (the highway is 14 m a carriageway).
 
 Facades are drawn in one place, `blockkit.bldg` (with `window_band` and `bldg_roof`); props in `crate`, `container`, `fence` and `wreck_lp`; every block's ground in `harbour.cell_road` and `city.block_ground`. A texture, bevel or prop pass changes those and regenerates every block once.
 
-## Things the next half should know
+## The closures are one setting
 
-- Every block is a solid building or a cul-de-sac (one gate, no way through), so the only routes are the roads and the closed roadblocks cannot be bypassed. A new kit must keep that, or `harbour_check.py` will show the legs shrink.
-- The nav grid (2 m cells, 0.75 m clearance) can lose a 4 m gap: it blocks a cell within about 1.55 m of a box, so a gap under 5.1 m may show no free cell. Chapter 1's chicane has the same 4 m. If the autopilot cannot route a squeeze, grow `SQUEEZE_GAP` or change the grid's clearance there.
-- The highway's north carriageway (y 1 to 15) carries traffic west, the player's way in; the south one (y -15 to -1) carries it east. The median barrier has crossovers at the toll plaza, the overpass, the jam and 150 m out of the city.
+`CLOSED_ROADBLOCKS` in `harbour_plan.py` (`-- open` on the generator's command line tries it): True keeps the ten `closed`
+roadblocks shut, so the routes wind round them; False loosens each into a 4 m squeeze at the middle of its road. Legs by
+road, closed against loosened: convoy_call to ruck_truck 447 against 428 m; ruck_truck to field_hospital 502 against 486;
+field_hospital to fuel_depot 524 against 360; fuel_depot to post_north 463 against 434; post_north to post_centre_west 370
+against 369; post_centre_west to post_east 412 against 367; field_hospital to control_house 522 against 326 (under the 450 the
+option wants). So loosening them keeps every leg over 300 m except the run to the lift bridge. The kits are cul-de-sacs
+whichever way this is set.
+
+## Things the next slices should know
+
+- Every block is a solid building or a cul-de-sac (one gate, no way through), so the only routes are the roads. A new kit must keep
+  that, or `harbour_check.py` will show the legs shrink.
+- The checkpoint's chicane gaps are 7 m and the city's squeezes 4 m. The pack's own 2 m grid can lose a 4 m gap (it blocks a
+  cell within about 1.55 m of a box); the car's grid for the harbour city is 1 m cells with a halo that keeps routes to the middle
+  of a gap (`Autopilot.HINTS["harbour"]`), which sees every 4 m gap. The autopilot also slows to 11 m/s where a wall is within
+  2.4 m of its way (`tight`), and follows its route when no point of it has a clear line, as a driver would.
+- The highway's north carriageway (y 1 to 15) carries traffic west, the player's way in; the south one (y -15 to -1) carries it east.
+  The median barrier has crossovers at the toll plaza, the overpass, the jam and 150 m out of the city. The creatures in stalled
+  cars are kept out of the set pieces (the jam, the toll plaza, the overpass and truck stop), where the obstacles are the danger.

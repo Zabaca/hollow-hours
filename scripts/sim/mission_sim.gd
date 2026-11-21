@@ -433,6 +433,8 @@ func _apply(game: GameSim, fx: Dictionary, next_step: int = -1, priority: bool =
 		line(id, priority)
 	if fx.has("pack"):
 		game.pack.set_size(int(fx["pack"]))
+	if fx.get("stalled", false):
+		game.pack.arm_stalled(game.world.stalled)
 	if fx.has("alert"):
 		var a: Dictionary = fx["alert"]
 		if a.get("all", false):

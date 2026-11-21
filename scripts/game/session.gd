@@ -20,7 +20,7 @@ extends RefCounted
 
 const GAME_FLAGS := [
 	"--demo", "--shot", "--shot-at", "--shot-game", "--shot-speed", "--low", "--start", "--drive",
-	"--cam-log", "--audio-log", "--no-hud", "--story", "--mission", "--continue", "--city", "--perf",
+	"--cam-log", "--audio-log", "--no-hud", "--story", "--mission", "--continue", "--city", "--perf", "--shot-city",
 ]
 ## Screens that live in the story: the game scene opens them over a mission.
 const STORY_SCREENS := ["map", "fail", "complete", "ending", "chapter"]

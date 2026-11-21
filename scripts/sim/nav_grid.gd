@@ -14,7 +14,9 @@ var origin := Vector2.ZERO
 var size := Vector2i.ZERO
 
 
-func _init(world: SimWorld, clearance: float = 0.75, cell_size: float = CELL) -> void:
+## `halo` (metres, 0 for none) makes the cells that are free but within that much of a box cost three times as
+## much to cross, so a route keeps to the middle of a gap or a lane instead of grazing its edge.
+func _init(world: SimWorld, clearance: float = 0.75, cell_size: float = CELL, halo: float = 0.0) -> void:
 	cell = cell_size
 	var a: Dictionary = world.arena
 	origin = Vector2(a["left"], a["bottom"])
@@ -27,7 +29,7 @@ func _init(world: SimWorld, clearance: float = 0.75, cell_size: float = CELL) ->
 	# Each box and post marks only the cells it can reach (the box grown by the clearance and 0.4 of a
 	# cell, the post's circle by the clearance and 0.3), not every cell of the city: the same solid cells
 	# the test of every cell against every box gave, found in time that follows the obstacles.
-	var reach := clearance + cell * 0.4
+	var reach := clearance + cell * 0.4 + halo
 	for b in world.boxes:
 		var ix0 := _index((b["x0"] - reach - origin.x) / cell - 0.5, size.x) - 1
 		var ix1 := _index((b["x1"] + reach - origin.x) / cell - 0.5, size.x) + 1
@@ -35,12 +37,17 @@ func _init(world: SimWorld, clearance: float = 0.75, cell_size: float = CELL) ->
 		var iy1 := _index((b["y1"] + reach - origin.y) / cell - 0.5, size.y) + 1
 		for ix in range(maxi(ix0, 0), mini(ix1, size.x - 1) + 1):
 			var cx := origin.x + (ix + 0.5) * cell
-			if not (cx > b["x0"] - clearance - cell * 0.4 and cx < b["x1"] + clearance + cell * 0.4):
+			if not (cx > b["x0"] - reach and cx < b["x1"] + reach):
 				continue
 			for iy in range(maxi(iy0, 0), mini(iy1, size.y - 1) + 1):
 				var cy := origin.y + (iy + 0.5) * cell
-				if cy > b["y0"] - clearance - cell * 0.4 and cy < b["y1"] + clearance + cell * 0.4:
+				if not (cy > b["y0"] - reach and cy < b["y1"] + reach):
+					continue
+				var hard := clearance + cell * 0.4
+				if cx > b["x0"] - hard and cx < b["x1"] + hard and cy > b["y0"] - hard and cy < b["y1"] + hard:
 					astar.set_point_solid(Vector2i(ix, iy), true)
+				elif halo > 0.0:
+					astar.set_point_weight_scale(Vector2i(ix, iy), 3.0)
 	for p in world.posts:
 		var lim: float = float(p["r"]) + clearance + cell * 0.3
 		var at := Vector2(p["x"], p["y"])

@@ -73,6 +73,9 @@ var director_on := true
 var alerted_spawns := false
 ## Where the car is going (the story's objective), or INF: newcomers are placed toward it. GameSim sets it.
 var goal := Vector2.INF
+## Creatures waiting in stalled cars: [{pos, release}]. The story arms them (arm_stalled); each is placed, already
+## hunting, the first time the car comes within its `release` distance, and then forgotten.
+var stalled: Array = []
 
 
 func _init(w: SimWorld, n: NavGrid, seed_value: int = 1) -> void:
@@ -249,9 +252,30 @@ func set_size(n: int) -> void:
 	spawn_timer = minf(spawn_timer, 0.0)
 
 
-## The story's hook: creatures the director adds from now on are no longer alerted on arrival.
+## The story's hook: creatures the director adds from now on are no longer alerted on arrival, and the ones
+## waiting in stalled cars are let go quietly (a mission that ends or begins starts with none armed).
 func stand_down() -> void:
 	alerted_spawns = false
+	stalled = []
+
+
+## The story's hook: arm creatures waiting in stalled cars ([{pos: Vector2, release: float}], World.stalled).
+func arm_stalled(list: Array) -> void:
+	stalled = list.duplicate()
+
+
+## Release the armed creatures the car has come within range of: each bursts out of its car already hunting.
+func _release_stalled(car: CarSim) -> void:
+	if stalled.is_empty():
+		return
+	var here := car.body.position
+	var keep: Array = []
+	for h in stalled:
+		if (h["pos"] as Vector2).distance_to(here) <= float(h["release"]):
+			place_hunting(h["pos"], car)
+		else:
+			keep.append(h)
+	stalled = keep
 
 
 ## A fresh pack of `count` creatures out of sight of the car, for a retry, a restart or a load.
@@ -321,6 +345,7 @@ func step(dt: float, car: CarSim, _ctl: Dictionary = {}) -> void:
 		keep.append(g)
 	gaunts = keep
 	_spread_alert(car)
+	_release_stalled(car)
 	_director(dt, car)
 
 

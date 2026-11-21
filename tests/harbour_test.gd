@@ -23,6 +23,9 @@ func _ready() -> void:
 	_test_roads()
 	_test_dev_flags()
 	_test_chapter_two_starts_on_the_highway()
+	_test_stalled_hunters()
+	_test_long_road_driven()
+	_test_after_the_long_road()
 	print("")
 	print("harbour_test: %d failed" % failures)
 	get_tree().quit(1 if failures > 0 else 0)
@@ -174,3 +177,134 @@ func _test_chapter_two_starts_on_the_highway() -> void:
 	var cont := _sim()
 	cont.continue_story(save)
 	_check(cont.mission.active() and cont.car.body.position.distance_to(StoryData.place_pos("highway_start")) < 0.1, "where The Long Road starts on the highway")
+
+
+# ----------------------------------------------------------------------------- The Long Road
+
+func _step_for(sim: GameSim, seconds: float, controls: Dictionary = {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false}) -> void:
+	for i in int(seconds / DT):
+		sim.step(DT, controls)
+		sim.take_events()
+
+
+## The creatures in stalled cars: armed by the mission, each placed (hunting) only when the car comes within its
+## release distance, once, and gone when the mission ends.
+func _test_stalled_hunters() -> void:
+	var list: Array = HarbourLayout.DATA["stalled_hunters"]
+	_check(list.size() >= 4 and list.size() <= 12, "the layout puts a handful of creatures in stalled cars along the highway", "%d" % list.size())
+	var spaced := true
+	var xs: Array = list.map(func(h: Dictionary) -> float: return float(h["x"]))
+	xs.sort()
+	for i in range(1, xs.size()):
+		if xs[i] - xs[i - 1] < 60.0:
+			spaced = false
+	_check(spaced, "one at a time, at least 60 m apart, not a crowd")
+	var first: Dictionary = list[0]
+	var at := Vector2(float(first["x"]), float(first["y"]))
+	var rel := float(first["release"])
+	var sim := _sim()
+	sim.start_story_at(3)
+	sim.pack.director_on = false
+	sim.pack.gaunts.clear()
+	_check(sim.pack.stalled.size() == list.size(), "The Long Road arms them when it begins", "armed=%d" % sim.pack.stalled.size())
+	# The nearest hunter to the car's start is the first to go off; hold the car where it can be placed against it.
+	var nearest := at
+	for h in list:
+		if Vector2(float(h["x"]), float(h["y"])).distance_to(sim.car.body.position) < nearest.distance_to(sim.car.body.position):
+			nearest = Vector2(float(h["x"]), float(h["y"]))
+	var near_rel := rel
+	for h in list:
+		if Vector2(float(h["x"]), float(h["y"])) == nearest:
+			near_rel = float(h["release"])
+	sim.place_car(nearest + Vector2(near_rel + 6.0, 0.0), PI, GameSim.MAX_HULL)
+	_step_for(sim, 1.0)
+	_check(sim.pack.gaunts.is_empty() and sim.pack.stalled.size() == list.size(), "none is released while the car is outside its distance")
+	sim.place_car(nearest + Vector2(near_rel - 6.0, 0.0), PI, GameSim.MAX_HULL)
+	_step_for(sim, 0.1)
+	_check(sim.pack.gaunts.size() == 1 and sim.pack.stalled.size() == list.size() - 1, "and exactly that one is, once the car is within it, already hunting", "gaunts=%d armed=%d" % [sim.pack.gaunts.size(), sim.pack.stalled.size()])
+	_check(sim.pack.gaunts[0].pos.distance_to(nearest) < 4.0, "bursting out of its own car")
+	_step_for(sim, 0.5)
+	_check(sim.pack.gaunts.size() == 1, "and not again")
+	# Not armed outside the mission, and let go when it ends.
+	var roam := _sim()
+	roam.continue_story({"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": ["batteries", "pharmacist", "west_gate", "long_road"], "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}})
+	_check(roam.pack.stalled.is_empty(), "free roam after The Long Road has none armed")
+
+
+## The autopilot drives the whole of The Long Road: with the pack off (the route: toll lanes, the jam's free lane, the
+## truck stop's squeeze, all on its own 1 m grid), and with the creatures live and the hull held (the guard against a
+## road that cannot be finished).
+func _test_long_road_driven() -> void:
+	for seed_in in [1, 2]:
+		var r := _drive_long_road(seed_in, false)
+		_check(r["done"] and r["time"] < 150.0, "seed %d: the autopilot drives The Long Road to the east ring road with the pack off" % seed_in, "t=%.0f hull=%.0f crashes=%d marks=%s" % [r["time"], r["hull"], r["crashes"], str(r["marks"])])
+	for seed_in in [1, 3, 4]:
+		var r := _drive_long_road(seed_in, true)
+		_check(r["done"] and r["time"] < 280.0, "seed %d: and with the creatures in the stalled cars and the pack live, the hull held" % seed_in, "t=%.0f latches=%d crashes=%d marks=%s" % [r["time"], r["latches"], r["crashes"], str(r["marks"])])
+
+
+func _drive_long_road(seed_in: int, live: bool) -> Dictionary:
+	var sim := _sim(seed_in)
+	sim.start_story_at(3)
+	if not live:
+		sim.pack.director_on = false
+		sim.pack.gaunts.clear()
+		sim.pack.stalled = []
+	var pilot := Autopilot.new()
+	var out := {"done": false, "time": 0.0, "hull": 0.0, "crashes": 0, "latches": 0, "marks": []}
+	for i in int(300.0 / DT):
+		if live:
+			sim.hull = GameSim.MAX_HULL
+		sim.step(DT, pilot.controls(sim, DT))
+		for e in sim.take_events():
+			match e["type"]:
+				"crash":
+					out["crashes"] += 1
+				"latch":
+					out["latches"] += 1
+				"objective":
+					(out["marks"] as Array).append(int(sim.time))
+				"mission_complete":
+					out["done"] = true
+				"mission_failed":
+					out["time"] = sim.time
+					return out
+		if out["done"]:
+			break
+	out["time"] = sim.time
+	out["hull"] = sim.hull
+	return out
+
+
+## When the last step is reached the mission is complete and the story is not over: no credits, no card, no
+## chapter change; the car is in free roam in the harbour city, and the save says so.
+func _test_after_the_long_road() -> void:
+	var sim := _sim()
+	sim.start_story_at(3)
+	sim.pack.director_on = false
+	sim.pack.gaunts.clear()
+	sim.pack.stalled = []
+	sim.take_events()
+	var pos: Vector2 = StoryData.place_pos("convoy_call")
+	var events: Array = []
+	# Reach each step's place in turn.
+	for pid in ["toll_plaza", "jam", "truck_stop", "convoy_call"]:
+		sim.place_car(StoryData.place_pos(pid), PI, GameSim.MAX_HULL)
+		for i in 3:
+			sim.step(DT, {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false})
+			events.append_array(sim.take_events())
+	var done: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "mission_complete")
+	var types: Array = events.map(func(e: Dictionary) -> String: return e["type"])
+	_check(done.size() == 1 and done[0]["id"] == "long_road" and done[0]["final"] == false and done[0]["chapter_end"] == false, "reaching the east ring road completes The Long Road, which ends neither the story nor a chapter", str(done))
+	_check(not ("story_complete" in types) and not ("chapter_complete" in types) and not ("escaped" in types), "so there is no ending")
+	var lines: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "line").map(func(e: Dictionary) -> String: return e["id"])
+	_check(lines == ["lr_jam", "lr_overpass", "lr_done"], "with its three calls along the way and the closing one at the end", str(lines))
+	var saves: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "save")
+	_check(saves.size() == 1 and saves[0]["data"]["done"].size() == 4 and saves[0]["data"]["next"] == "" and SaveStore.valid_save(saves[0]["data"]), "it saves with four missions done and none next, a good save", str(saves.size()))
+	_check(sim.mission.state == MissionSim.State.ROAM and sim.mission.objective().is_empty(), "and the car is in free roam with no objective")
+	_check(is_equal_approx(sim.mission.dawn_amount(), float(StoryData.MISSIONS[3]["dawn"])), "the night stays as it was (no first light)")
+	# A wreck in free roam goes back to that save, in the harbour city.
+	sim.damage(1000.0, "dev")
+	_step_for(sim, 0.1)
+	sim.revert_to_save()
+	_check(sim.city_id == Cities.HARBOUR and sim.mission.state == MissionSim.State.ROAM and sim.car.body.position.distance_to(StoryData.place_pos("highway_start")) < 0.1, "a wreck there goes back to the checkpoint in the harbour city, not to the quarter")

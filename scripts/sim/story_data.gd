@@ -70,7 +70,7 @@ const PLACES := {
 	# The harbour city (chapter 2). Its map is one rectangle: the city in the west and, running out of its east
 	# side, the divided highway the chapter opens on. `highway_start` is the cordon's checkpoint at the far end
 	# (the layout's player start). tests/harbour_test.gd measures every leg on the path grid.
-	"highway_start": {"name": "the highway checkpoint", "pos": Vector2(1379.0, 8.0), "radius": 8.0, "angle": PI, "label": "", "city": "harbour", "marker": false, "safe": true},
+	"highway_start": {"name": "the highway checkpoint", "pos": Vector2(1379.0, 11.5), "radius": 8.0, "angle": PI, "label": "", "city": "harbour", "marker": false, "safe": true},
 	"toll_plaza": {"name": "the toll plaza", "pos": Vector2(1244.5, 8.5), "radius": 16.0, "angle": PI, "label": "Toll Plaza", "city": "harbour", "marker": true},
 	"jam": {"name": "the stalled traffic", "pos": Vector2(1127.5, 8.5), "radius": 18.0, "angle": PI, "label": "Traffic", "city": "harbour", "marker": true},
 	"truck_stop": {"name": "the truck stop", "pos": Vector2(650.5, 20.5), "radius": 28.0, "angle": PI, "label": "Truck Stop", "city": "harbour", "marker": true},
@@ -183,7 +183,7 @@ const MISSIONS := [
 	# (the rest of the chapter is built in later slices).
 	{
 		"id": "long_road", "title": "THE LONG ROAD", "city": "harbour", "start": "", "dawn": 0.0, "closes_story": false,
-		"begin": {"lines": ["lr_call_1", "lr_call_2"], "pack": 3},
+		"begin": {"lines": ["lr_call_1", "lr_call_2"], "pack": 2, "stalled": true},
 		"end": {"lines": ["lr_done"]},
 		"steps": [
 			{"id": "toll", "kind": "reach", "place": "toll_plaza", "text": "Drive the highway into the city: through the toll plaza", "end": {"lines": ["lr_jam"]}},

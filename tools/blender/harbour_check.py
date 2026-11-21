@@ -217,7 +217,7 @@ def main(path):
     wg = hw["truck_stop"]["wide_gap"]
     gaps.append(("truck_stop_wide_gap", wg["width"], "y", wg["x"], wg["x"], (wg["y0"] + wg["y1"]) / 2))
     cp = hw["checkpoint"]
-    for k, (gx, gy) in enumerate(((cp["x0"] + 9.5, 13.0), (cp["x0"] + 23.5, 3.0), (cp["x0"] + 9.5, -3.0), (cp["x0"] + 23.5, -13.0))):
+    for k, (gx, gy) in enumerate(((cp["x0"] + 23.5, 11.5), (cp["x0"] + 3.5, 8.5), (cp["x0"] + 23.5, -11.5), (cp["x0"] + 3.5, -8.5))):
         gaps.append(("checkpoint_chicane_%d" % k, cp["chicane_gap"], "y", gx, gx, gy))
     tp = hw["toll_plaza"]
     for k, gy in enumerate((3.0, 8.0, 13.0, -3.0, -8.0, -13.0)):
@@ -277,7 +277,7 @@ def main(path):
         crossed = [i for (i, x, y) in rbpos if near_path(pts, x, y, 9.0)]
         br = [b["id"] for b in bridges if near_path(pts, b["x"], b["y"], 6.0)]
         sets = []
-        for nm, (x, y) in (("toll_plaza", ((hw["toll_plaza"]["x0"] + hw["toll_plaza"]["x1"]) / 2, 8.0)), ("jam", ((hw["jam"]["x0"] + hw["jam"]["x1"]) / 2, 8.0)), ("fallen_overpass", (hw["fallen_overpass"]["x0"] + 8.0, 28.0)), ("checkpoint_chicane", (cp["x0"] + 16.0, 8.0))):
+        for nm, (x, y) in (("toll_plaza", ((hw["toll_plaza"]["x0"] + hw["toll_plaza"]["x1"]) / 2, 8.0)), ("jam", ((hw["jam"]["x0"] + hw["jam"]["x1"]) / 2, 8.0)), ("fallen_overpass", (hw["fallen_overpass"]["x0"] + 8.0, 28.0)), ("checkpoint_chicane", (cp["x0"] + 13.0, 8.0))):
             if near_path(pts, x, y, 14.0 if nm != "jam" else 60.0):
                 sets.append(nm)
         ok = L >= leg["min_by_road"]

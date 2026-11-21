@@ -28,6 +28,8 @@ extends RefCounted
 ##                    clear of everything; a city wants them spread so the car always has some 60 to
 ##                    120 m away in the direction it is going.
 ##   fires            [{x, y}]  burning barrels (the view's light and flame).
+##   stalled_hunters  [{x, y, release}]  optional: a creature waiting in a stalled car at (x, y), placed (already
+##                    hunting) when the car comes within `release` metres. The story arms them (effect `stalled`).
 ##   player_start     {x, y, angle}  where Survive the Night begins.
 ##   gate             {x, y, width[, side]}  the way out: a gap in the wall, centred on an arena
 ##                    edge. `side` ("west", "east", "south", "north") is read from which edge it sits
@@ -51,6 +53,7 @@ var blocks: Array = []  # {x0,y0,x1,y1}: raised sidewalk slabs
 var roads: Array = []  # {axis,c,width,from,to}
 var lights: Array = []  # layout lights: {x,y,z,energy,range,kind,...}
 var spawns: Array = []  # Vector2 hiding places for the creatures
+var stalled: Array = []  # [{pos: Vector2, release: float}] creatures waiting in stalled cars (the layout's stalled_hunters)
 var player_start := {"x": -30.0, "y": -2.5, "angle": 0.0}
 ## The way out: a gap in an arena wall (the quarter's is at the avenue's west end). `pos` is the middle
 ## of the gap on the wall line, `dir` points out of the city, `edge` names the arena side it is in
@@ -91,6 +94,8 @@ static func from_layout(data: Dictionary) -> SimWorld:
 		w.lights.append(l)
 	for s in data["creature_spawns"]:
 		w.spawns.append(Vector2(float(s["x"]), float(s["y"])))
+	for h in data.get("stalled_hunters", []):
+		w.stalled.append({"pos": Vector2(float(h["x"]), float(h["y"])), "release": float(h["release"])})
 	var ps: Dictionary = data["player_start"]
 	w.player_start = {"x": float(ps["x"]), "y": float(ps["y"]), "angle": float(ps["angle"])}
 	if data.has("gate"):

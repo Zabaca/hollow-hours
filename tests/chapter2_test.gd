@@ -21,9 +21,11 @@ func _ready() -> void:
 	_test_ambushes()
 	_test_floodlights()
 	_test_floodlights_dim()
+	_test_bridge_view()
 	_test_continue_places()
 	_test_radar_and_route()
-	_test_lift_bridge_ends_in_roam()
+	_test_lift_bridge_crossing()
+	_test_legacy_save()
 	_test_autopilot_chapter()
 	print("")
 	print("chapter2_test: %d failed" % failures)
@@ -89,6 +91,8 @@ func _test_legs() -> void:
 	for id in CHAPTER:
 		var m: Dictionary = StoryData.MISSIONS[StoryData.mission_index(id)]
 		for leg in _legs_of(m):
+			if StoryData.PLACES[leg[1]].get("needs_bridge", false):
+				continue  # the crossing: the bridge is down for it (tested below)
 			count += 1
 			var path := sim.route_to(StoryData.place_pos(leg[0]), StoryData.place_pos(leg[1]))
 			var len := _length(path)
@@ -117,7 +121,7 @@ func _test_legs() -> void:
 	# Every place a chapter 2 mission uses is reachable from the highway checkpoint on that grid.
 	var lost: Array = []
 	for pid in StoryData.PLACES:
-		if pid != "highway_start" and StoryData.PLACES[pid]["city"] == Cities.HARBOUR and sim.route_to(StoryData.place_pos("highway_start"), StoryData.place_pos(pid)).is_empty():
+		if pid != "highway_start" and not StoryData.PLACES[pid].get("needs_bridge", false) and StoryData.PLACES[pid]["city"] == Cities.HARBOUR and sim.route_to(StoryData.place_pos("highway_start"), StoryData.place_pos(pid)).is_empty():
 			lost.append(pid)
 	_check(lost.is_empty(), "and every chapter 2 place is reachable by road", str(lost))
 	# The checker's own planned legs (the generator's plan) agree with the story's places.
@@ -247,6 +251,33 @@ func _test_floodlights_dim() -> void:
 	city.queue_free()
 
 
+## The lift bridge on screen: its deck and cables are pieces of the model, the deck comes down onto the road level and the
+## cables stretch with it; the harbour city has a bridge to draw and so no west gate's leaves, the quarter the reverse.
+func _test_bridge_view() -> void:
+	var city := City.new()
+	add_child(city)
+	city.build(Cities.layout(Cities.HARBOUR), Cities.model_path(Cities.HARBOUR))
+	var view := BridgeView.new()
+	add_child(view)
+	view.setup(city, Cities.layout(Cities.HARBOUR))
+	_check(view.deck != null and view.cables != null and view.lamps.size() == 4, "the model has the lift bridge's deck and cables as pieces of their own, and the view has four lamps")
+	var up_y := view.deck.position.y
+	view.set_down(true, true)
+	var rec: Dictionary = Cities.layout(Cities.HARBOUR)["bridges"].filter(func(b: Dictionary) -> bool: return b["kind"] == "lift")[0]
+	_check(is_equal_approx(up_y, 0.0) and absf(view.deck.position.y + float(rec["deck_up_z"])) < 0.01, "lowered, the deck has come down by exactly its height above the road", "%.2f" % view.deck.position.y)
+	var deck_top: float = float(rec["deck_up_z"]) + view.deck.position.y
+	var cable_len: float = (float(rec["cable_top_z"]) - float(rec["deck_up_z"])) * view.cables.scale.y
+	_check(absf(deck_top) < 0.01 and absf(float(rec["cable_top_z"]) - deck_top - cable_len) < 0.01, "and the cables reach from the beam down to it", "%.2f" % cable_len)
+	view.set_down(false, true)
+	_check(is_equal_approx(view.deck.position.y, 0.0) and is_equal_approx(view.cables.scale.y, 1.0), "raised, both are back where the model has them")
+	view.set_down(true)
+	view._process(1.0)
+	_check(view.moving() and view.down_amount > 0.0 and view.down_amount < 0.2, "coming down takes nine seconds", "%.2f after one" % view.down_amount)
+	_check(not _sim().world.lift_closers.is_empty() and GameSim.new(CityLayout.DATA, "bruiser", 1, true).world.lift_closers.is_empty(), "the harbour city has a lift bridge and the quarter none, which is how the game picks the bridge's view or the gate's")
+	view.queue_free()
+	city.queue_free()
+
+
 # ----------------------------------------------------------------------------- Continue and the radar
 
 func _test_continue_places() -> void:
@@ -293,30 +324,97 @@ func _test_radar_and_route() -> void:
 	_check(clear and route.size() <= 80, "it is short enough to draw and every stretch of it is drivable", "%d points" % route.size())
 
 
-# ----------------------------------------------------------------------------- the end of what is built
+# ----------------------------------------------------------------------------- the bridge and the end
 
-func _test_lift_bridge_ends_in_roam() -> void:
-	var sim := _sim()
-	sim.start_story_at(6)
+func _quiet(sim: GameSim) -> void:
 	sim.pack.director_on = false
 	sim.pack.gaunts.clear()
 	sim.pack.stalled = []
 	sim.take_events()
+
+
+func _run_for(sim: GameSim, seconds: float, events: Array) -> void:
+	for i in int(seconds / DT):
+		sim.step(DT, {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false})
+		events.append_array(sim.take_events())
+
+
+func _types(events: Array) -> Array:
+	return events.map(func(e: Dictionary) -> String: return e["type"])
+
+
+func _lines(events: Array) -> Array:
+	return events.filter(func(e: Dictionary) -> bool: return e["type"] == "line").map(func(e: Dictionary) -> String: return e["id"])
+
+
+## The hold at the control house: the bridge stays up while Teo works, comes down when it ends (its colliders leave the
+## world and the road opens), the timer starts, and it all goes back if the bridge lifts again.
+func _test_lift_bridge_crossing() -> void:
+	var sim := _sim()
+	sim.start_story_at(6)
+	_quiet(sim)
 	var events: Array = []
-	for pid in ["field_hospital", "control_house"]:
-		sim.place_car(StoryData.place_pos(pid), PI, GameSim.MAX_HULL)
-		for i in int(7.0 / DT):
-			sim.step(DT, {"throttle": 0.0, "turn": 0.0, "handbrake": false, "boost": false})
-			events.append_array(sim.take_events())
-	var done: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "mission_complete")
-	var types: Array = events.map(func(e: Dictionary) -> String: return e["type"])
-	var lines: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "line").map(func(e: Dictionary) -> String: return e["id"])
-	_check(done.size() == 1 and done[0]["id"] == "lift_bridge" and done[0]["final"] == false and done[0]["chapter_end"] == false, "the hold at the control house completes The Lift Bridge as far as it is built, not the story", str(done))
-	_check(not ("story_complete" in types) and not ("escaped" in types) and sim.mission.state == MissionSim.State.ROAM, "and the game goes on in free roam: no credits, no crossing yet")
-	_check(lines == ["lb_aboard", "lb_arrive", "lb_work", "lb_end"], "with Teo's and Ruck's calls", str(lines))
-	_check(sim.mission.objective().is_empty() and sim.pack.stalled.size() == StoryData.AMBUSH_ROAM, "free roam has no objective and a few ambushes armed at random")
-	var saves: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "save")
-	_check(saves.size() >= 1 and saves[-1]["data"]["done"].size() == 7 and saves[-1]["data"]["next"] == "" and SaveStore.valid_save(saves[-1]["data"]), "it saves with seven done and none next, a good save")
+	sim.place_car(StoryData.place_pos("field_hospital"), PI, GameSim.MAX_HULL)
+	_run_for(sim, 4.6, events)
+	sim.place_car(StoryData.place_pos("control_house"), PI, GameSim.MAX_HULL)
+	_run_for(sim, 6.0, events)
+	_check(sim.mission.step_data()["id"] == "work" and not sim.world.lift_down, "holding at the control house the bridge is still up", str(sim.mission.step_data().get("id")))
+	_check(sim.route_to(StoryData.place_pos("control_house"), StoryData.place_pos("lift_gate")).is_empty(), "and there is no road from the control house to the far bank (its colliders shut it)")
+	var boxes_up := sim.world.boxes.size()
+	_run_for(sim, 10.0, events)
+	var types := _types(events)
+	_check(sim.mission.step_data()["id"] == "cross" and sim.world.lift_down and types.has("bridge") and types.has("gate_open"), "the hold ends: the bridge comes down and the gate opens", str(sim.mission.step_data().get("id")))
+	_check(sim.world.boxes.size() == boxes_up - 2, "the two colliders that shut the bridge's road are gone", "%d to %d" % [boxes_up, sim.world.boxes.size()])
+	var route := sim.route_to(StoryData.place_pos("control_house"), StoryData.place_pos("lift_gate"))
+	_check(route.size() >= 2 and _length(route) < 140.0, "and the way to the far bank's gate is open, about 83 m", "%.0f m" % _length(route))
+	_check("lb_down" in _lines(events) and sim.mission.timers_left().size() == 1 and sim.mission.timers_left()[0]["id"] == "bridge", "with Teo's call and a short timer", str(sim.mission.timers_left()))
+	var cp: Dictionary = sim.mission.checkpoint
+	_check(not cp.is_empty() and int(cp["step"]) == 3, "the hold's end is a checkpoint, at the crossing")
+	# The timer runs out: the bridge rises, the gate shuts, the mission fails with its line.
+	sim.mission.timers["bridge"]["left"] = 0.01
+	var more: Array = []
+	_run_for(sim, 0.2, more)
+	var failed: Array = more.filter(func(e: Dictionary) -> bool: return e["type"] == "mission_failed")
+	_check(failed.size() == 1 and failed[0]["reason"] == "bridge" and "lb_failed" in _lines(more), "when it runs out the bridge lifts again and the mission fails", str(failed))
+	_check(not sim.world.lift_down and _types(more).has("gate_closed") and sim.world.boxes.size() == boxes_up, "the colliders come back and the gate shuts")
+	# Retry: back at the control house, the bridge comes down again and the timer starts again.
+	var retry_events: Array = []
+	sim.retry_mission()
+	retry_events.append_array(sim.take_events())
+	_run_for(sim, 0.1, retry_events)
+	_check(sim.mission.step_data()["id"] == "cross" and sim.world.lift_down and sim.mission.timers_left().size() == 1 and float(sim.mission.timers_left()[0]["left"]) > 40.0, "a retry begins at the crossing with the bridge down and a fresh timer", str(sim.mission.timers_left()))
+	# Crossing: the car in the gate's gap while it is open is the escape; the story is over.
+	var end_events: Array = []
+	sim.place_car(Vector2(-195.0, -144.0), PI, GameSim.MAX_HULL)
+	sim.car.body.velocity = Vector2(-12.0, 0.0)
+	_run_for(sim, 0.2, end_events)
+	var done: Array = end_events.filter(func(e: Dictionary) -> bool: return e["type"] == "mission_complete")
+	_check(_types(end_events).has("escaped") and done.size() == 1 and done[0]["id"] == "lift_bridge" and done[0]["final"] == true, "reaching the far bank's gate while the bridge is down is the escape, and the last mission's end", str(done))
+	_check(_lines(end_events) == ["lb_end_1", "lb_end_2"] and sim.mission.timers_left().is_empty(), "with the closing lines, and the timer stopped", str(_lines(end_events)))
+	_run_for(sim, GameSim.ESCAPE_MAX_TIME + 0.5, end_events)
+	var saves: Array = end_events.filter(func(e: Dictionary) -> bool: return e["type"] == "save")
+	_check(_types(end_events).has("story_complete") and not _types(end_events).has("chapter_complete") and saves.size() == 1, "once the car is at rest the story completes and asks for a save", str(_types(end_events).filter(func(t: String) -> bool: return t in ["story_complete", "chapter_complete", "save"])))
+	var d: Dictionary = saves[0]["data"]
+	_check(d["done"].size() == 7 and d["next"] == "" and d["ending_seen"] == true and d["finished"] == true and SaveStore.valid_save(d) and SaveStore.upgraded(d) == d, "a save with every mission done, ending seen and finished: good as it is", str(d.get("finished")))
+	_check(sim.car.body.position.x < sim.world.arena["left"] - 20.0, "the car is out on the road beyond the far bank's gate", str(sim.car.body.position))
+
+
+## A save made when The Lift Bridge was only built as far as the control house (free roam after it: seven done, nothing
+## next, no finished flag) loads as that mission still to play, not as the story over.
+func _test_legacy_save() -> void:
+	var old := {"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": StoryData.MISSIONS.map(func(m: Dictionary) -> String: return m["id"]), "ending_seen": true, "totals": {"kills": 3, "wrecks": 0, "seconds": 900.0}}
+	var path := "user://chapter2_test_save.json"
+	SaveStore.write_save(old, path)
+	var back := SaveStore.load_save(path)
+	_check(not back.is_empty() and back["next"] == "lift_bridge" and back["done"].size() == 6 and back["totals"]["kills"] == 3, "a save from before the bridge came down loads as The Lift Bridge next, with what was done kept", str(back.get("next")))
+	_check(SaveStore.city_of(back) == Cities.HARBOUR and FileAccess.file_exists(path), "in the harbour city, and the file is not set aside")
+	var sim := _sim()
+	sim.continue_story(back)
+	_check(sim.car.body.position.distance_to(StoryData.place_pos("field_hospital")) < 0.1, "and Continue puts the car at the hospital, where it starts")
+	var fin := old.duplicate(true)
+	fin["finished"] = true
+	_check(SaveStore.upgraded(fin) == fin, "while a save that says it is finished stays finished")
+	DirAccess.remove_absolute(path)
 
 
 # ----------------------------------------------------------------------------- the autopilot drives it
@@ -363,10 +461,11 @@ func _drive_chapter(seed_in: int, live: bool, missions: int) -> Dictionary:
 				"latch":
 					out["latches"] += 1
 				"timer":
-					if e["state"] == "stop":
+					if e["state"] == "stop" and e["id"] == "floodlights":
 						out["spare"] = float(at.get("left", 0.0))
 		for tl in sim.mission.timers_left():
-			at["left"] = tl["left"]
+			if tl["id"] == "floodlights":
+				at["left"] = tl["left"]
 		if (out["log"] as Array).size() >= missions:
 			out["ok"] = true
 			break

@@ -264,6 +264,12 @@ func _draw_full() -> void:
 			lx = at.x - w - 12.0
 		elif pl["marker"]:
 			ly += 22.0  # below the spot, so its blip and the car do not sit on the name
+		if id == "lift_gate":
+			lx = at.x + 12.0  # the far bank's gate is on the left edge: its name goes inside
+		if ly > br.y - 6.0:
+			ly = at.y - 12.0  # a place on the bottom road: its name above it, not under the frame's edge
+		if id == "lift_gate":
+			ly = at.y - 42.0  # and above the control house's name, which is a little to its right
 		draw_string(f, Vector2(lx, ly), txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, col if named.has(id) else Color(MenuStyle.BONE, 0.7))
 	for bl in blips:
 		var col: Color = TEAL if bl["kind"] == "start" else AMBER

@@ -119,3 +119,14 @@ Nits and things to know:
 - The route line and the wide radar are for the cities with a route grid (`Cities.ROUTE_GRIDS`, the harbour city's); the quarter has none, so chapter 1 is unchanged. The route is worked out about once a second on the car's 1 m grid (4 ms for the longest), and drawn as a faint amber line.
 - The field hospital's floodlights (layout tag `hospital_flood`) dim over the last third of the floodlights timer and go out when it fails; `main._floodlights` and `City.tag_levels` do it.
 - With `CLOSED_ROADBLOCKS` off every chapter 2 test still passes except the run to the lift bridge (328 m, under 450): the other legs are 361 to 519 m.
+
+## From the chapter 2 slice 4 build (the bridge comes down, the crossing, the ending)
+
+Nits and things to know:
+- The lift bridge's colliders (`closers` on the layout's lift record) leave the world when the mission says `bridge: "down"` (SimWorld.set_lift) and the creatures' and the car's path grids are built again (GameSim.set_bridge, about 70 ms in the harbour city, during a hold). The deck and its cables are their own pieces of the model (`lift_deck`, `lift_cables`) that BridgeView moves; if the generator's lift section changes, keep those two names and `deck_up_z` / `cable_top_z` on the bridge record.
+- The harbour city has no GateView: its way out is the bridge, and the gate record is only the gap in the far bank's wall (the model has the piers and the road beyond). `--gate=open|opening` there shows the bridge instead.
+- A save written when The Lift Bridge was only built as far as the control house (seven done, nothing next, no `finished` flag) loads as that mission still to play (`SaveStore._unfinished_end`); the story's real end writes `finished: true`.
+- Stand-in sounds on the bridge: the gate's klaxon for the horn, the gate's rolling leaves for the motors, a slam for the deck meeting the road. Slice 5 buys the real ones (the list is in the slice 4 report).
+- The credits' last line is still "Red got out." (the option asks the owner to approve a new one); the closing lines are subtitles only (`lb_end_1`, `lb_end_2`).
+- The full map's height is 600 px (not 760) in a city with a route grid so the radio's subtitles sit below it; the quarter's map is unchanged. Place names on the map's bottom road are drawn above their spot.
+- Survive the Night in the harbour city starts at the highway checkpoint (the layout's player start), with the pack's director and the night clock as in the quarter; it has not been tuned for a 1.6 km map.

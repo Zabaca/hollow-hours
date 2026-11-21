@@ -53,6 +53,12 @@ func _ready() -> void:
 	shade.add_child(view)
 
 
+## The full map's height: the whole 760 px by default, or 600 px so that a map of a long, low city (the harbour's) ends above the
+## radio's subtitles instead of under them.
+func set_tall(tall: bool) -> void:
+	view.size = Vector2(1060.0, 760.0 if tall else 600.0)
+
+
 func open(pos: Vector2, angle: float, blips: Array, route: PackedVector2Array = PackedVector2Array()) -> void:
 	if is_open:
 		return

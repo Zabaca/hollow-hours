@@ -78,6 +78,8 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 		nav = game.route_nav() if not grid.is_empty() else NavGrid.new(game.world, CAR_CLEARANCE)
 		tour = _places_to_tour(game.city_id)
 		route_i = 0
+	if nav != null and not Cities.route_grid(game.city_id).is_empty() and nav != game.route_nav():
+		nav = game.route_nav()  # the bridge came down (or went up): the shared grid was built again
 	var obj := {}
 	if game.mission != null:
 		obj = game.mission.objective()

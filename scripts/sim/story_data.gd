@@ -29,6 +29,8 @@ extends RefCounted
 ##                                   placed, already hunting, when the car comes within its `release` distance
 ##   timer {id, seconds, reason, label}   start a timer; it fails the mission with `reason` at zero
 ##   stop_timer id
+##   bridge "down"                   lower the harbour city's lift bridge (its colliders leave the world; it rises again, and
+##                                   the colliders return, when a mission starts or fails)
 ##   gate "open"
 ##   checkpoint true                 (end only) the next step is a checkpoint
 ##   escape true                     (end only) the car drives out through the gate
@@ -87,6 +89,7 @@ const PLACES := {
 	"post_north": {"name": "the north generator post", "pos": Vector2(148.0, 140.5), "radius": 9.0, "angle": PI, "label": "North Post", "city": "harbour", "marker": true},
 	"post_centre_west": {"name": "the west generator post", "pos": Vector2(-160.0, 3.5), "radius": 9.0, "angle": 0.0, "label": "West Post", "city": "harbour", "marker": true},
 	"post_east": {"name": "the east generator post", "pos": Vector2(190.0, -36.0), "radius": 9.0, "angle": -PI / 2.0, "label": "East Post", "city": "harbour", "marker": true},
+	"lift_gate": {"name": "the far bank", "pos": Vector2(-199.0, -144.0), "radius": 6.0, "angle": PI, "label": "Lift Bridge", "city": "harbour", "marker": true, "needs_bridge": true},
 	"control_house": {"name": "the lift bridge's control house", "pos": Vector2(-112.0, -140.5), "radius": 10.0, "angle": PI, "label": "Control House", "city": "harbour", "marker": true},
 }
 
@@ -142,6 +145,11 @@ const LINES := {
 	"lb_arrive": {"speaker": "ruck", "text": "[flat] That's the control house. Stop at the door and hold. Teo's going in."},
 	"lb_work": {"speaker": "teo", "text": "[muffled, strained] The motor is dead. I'm on the manual lever. Don't move the car."},
 	"lb_end": {"speaker": "teo", "text": "[panting] It's turning. Stay exactly where you are, Red. It takes a minute."},
+	"lb_hold": {"speaker": "vera", "text": "[urgent] They heard the motor. Hold still, Red. We can't move until it's down."},
+	"lb_down": {"speaker": "teo", "text": "[shouting over a motor] It's coming down! Go the moment it touches, I can't keep it there!"},
+	"lb_failed": {"speaker": "ruck", "text": "[flat] It's rising. We don't cross tonight."},
+	"lb_end_1": {"speaker": "vera", "text": "[quiet] Look at that, Red. First light, on the far bank."},
+	"lb_end_2": {"speaker": "ruck", "text": "[flat, then softer] Vehicle is across. Nobody tell the cordon. Stop the engine and let the sun find us."},
 }
 
 ## Lines that have no audio file yet: the radio shows their subtitles for their reading time. Buying the
@@ -150,7 +158,7 @@ const UNVOICED := [
 	"lr_call_1", "lr_call_2", "lr_jam", "lr_overpass", "lr_done",
 	"dc_call_1", "dc_call_2", "dc_hold", "dc_aboard", "dc_done",
 	"fl_call_1", "fl_call_2", "fl_load", "fl_loaded", "fl_post_1", "fl_post_2", "fl_done", "fl_failed",
-	"lb_call_1", "lb_call_2", "lb_aboard", "lb_arrive", "lb_work", "lb_end",
+	"lb_call_1", "lb_call_2", "lb_aboard", "lb_arrive", "lb_work", "lb_end", "lb_hold", "lb_down", "lb_failed", "lb_end_1", "lb_end_2",
 ]
 
 ## Why a mission can fail: the text on the fail screen and the line that plays.
@@ -159,6 +167,7 @@ const REASONS := {
 	"shutter": {"text": "The shutter gave way before Teo was in the car.", "line": "ph_failed"},
 	"gate": {"text": "The gate closed before you reached it.", "line": "gate_failed"},
 	"floodlights": {"text": "The floodlights went out before the last generator was fuelled.", "line": "fl_failed"},
+	"bridge": {"text": "The bridge lifted before you were across.", "line": "lb_failed"},
 }
 
 const MISSIONS := [
@@ -272,12 +281,12 @@ const MISSIONS := [
 			{"id": "post_3", "kind": "hold", "place": "post_east", "seconds": 3.0, "text": "Fuel the generator at the east post", "end": {"stop_timer": "floodlights"}},
 		],
 	},
-	# The Lift Bridge, as far as the control house: the bridge coming down and the crossing are the next slice, so the
-	# mission ends at the hold and the story goes on in free roam (`closes_story: false`).
+	# The Lift Bridge: pick up the others, drive to the control house, hold out while Teo brings the bridge down, cross it
+	# before it lifts again and drive out of the far bank's gate into first light. The last mission: it closes the story.
 	{
-		"id": "lift_bridge", "title": "THE LIFT BRIDGE", "city": "harbour", "start": "field_hospital", "resume_at": "field_hospital", "dawn": 0.1, "closes_story": false,
+		"id": "lift_bridge", "title": "THE LIFT BRIDGE", "city": "harbour", "start": "field_hospital", "resume_at": "field_hospital", "dawn": 0.1,
 		"begin": {"lines": ["lb_call_1", "lb_call_2"], "pack": 4},
-		"end": {"lines": ["lb_end"]},
+		"end": {},
 		"steps": [
 			{
 				"id": "pickup", "kind": "hold", "place": "field_hospital", "seconds": 4.0, "text": "Pick up Vera, Teo and Ruck at the hospital door",
@@ -285,9 +294,18 @@ const MISSIONS := [
 			},
 			{"id": "drive", "kind": "reach", "place": "control_house", "text": "Drive to the lift bridge's control house on the harbour road"},
 			{
-				"id": "work", "kind": "hold", "place": "control_house", "seconds": 6.0, "text": "Hold still while Teo works the lift",
+				"id": "work", "kind": "hold", "place": "control_house", "seconds": BRIDGE_HOLD_SECONDS, "text": "Hold out while Teo works the lift",
 				"begin": {"lines": ["lb_arrive"]},
-				"during": [{"t": 2.0, "lines": ["lb_work"]}],
+				"during": [{"t": 2.0, "lines": ["lb_work"]}, {"t": 5.0, "lines": ["lb_hold"], "alert": {"all": true}, "pack": 5}],
+				"end": {"lines": ["lb_end"], "checkpoint": true},
+			},
+			{
+				"id": "cross", "kind": "gate", "place": "lift_gate", "text": "Cross the bridge before it rises",
+				"begin": {
+					"lines": ["lb_down"], "bridge": "down", "gate": "open",
+					"timer": {"id": "bridge", "seconds": BRIDGE_SECONDS, "reason": "bridge", "label": "BRIDGE"},
+				},
+				"end": {"lines": ["lb_end_1", "lb_end_2"], "stop_timer": "bridge", "escape": true},
 			},
 		],
 	},
@@ -303,6 +321,10 @@ const SHUTTER_SECONDS := 180.0
 ## How long the floodlights hold, from the call to the last generator: the legs run 1.8 km by road (tests/harbour_test.gd
 ## drives it with the autopilot and wants spare time).
 const FLOODLIGHT_SECONDS := 360.0
+## The Lift Bridge: how long the car holds still at the control house while Teo works the lift, and how long the bridge
+## stays down once it is (the way to the gate from the control house is 83 m).
+const BRIDGE_HOLD_SECONDS := 14.0
+const BRIDGE_SECONDS := 45.0
 ## Ambushes (effect `ambush`): at most this many on a leg, placed when the car comes this close; and how many spots are
 ## armed at random in free roam so that a known route is not a safe one.
 const AMBUSH_MAX := 2
@@ -314,6 +336,13 @@ const ROAM_PACK := 3  # the pack's size in free roam
 
 ## The closing lines of the last mission, spoken once the car has stopped outside the gate (the presenter holds them).
 const ENDING_LINES := ["end_vera", "end_ruck"]
+## The closing lines of the story, spoken once the car has stopped on the far bank.
+const ENDING_LINES_2 := ["lb_end_1", "lb_end_2"]
+
+
+## Is this one of the lines the presenter holds until the car has stopped (the closing lines of a chapter or the story)?
+static func is_ending_line(id: String) -> bool:
+	return id in ENDING_LINES or id in ENDING_LINES_2
 
 ## The sky's lightening once the story is over, for free roam after the last mission.
 const ENDING_DAWN := 0.3

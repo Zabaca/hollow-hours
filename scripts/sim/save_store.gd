@@ -67,6 +67,8 @@ static func valid_save(d: Dictionary, missions: Array = StoryData.MISSIONS) -> b
 		return false
 	if typeof(d.get("ending_seen")) != TYPE_BOOL:
 		return false
+	if d.has("finished") and typeof(d["finished"]) != TYPE_BOOL:
+		return false
 	var done: Array = d["done"]
 	if done.size() > missions.size():
 		return false
@@ -98,10 +100,24 @@ static func _finished_a_chapter(d: Dictionary, missions: Array) -> bool:
 	return d["next"] == "" and d["ending_seen"] == true and n > 0 and n < missions.size() and (StoryData.ends_chapter(n - 1, missions) or stopped_short)
 
 
+## A save that has every mission done, nothing next and was not written by the end of the story (no `finished`): the
+## last mission was not all there was when it was made.
+static func _unfinished_end(d: Dictionary, missions: Array) -> bool:
+	var n := (d["done"] as Array).size()
+	return n > 0 and n == missions.size() and d["next"] == "" and d.get("finished", false) != true and bool(missions[n - 1].get("closes_story", true))
+
+
 ## The save as the story reads it now: a save that finished a chapter the story has since grown past
 ## (see valid_save) gets the next chapter's first mission as `next`; any other save is returned as it is.
 ## `ending_seen` stays, so what it unlocked (Survive the Night) stays. Pass a valid save.
 static func upgraded(d: Dictionary, missions: Array = StoryData.MISSIONS) -> Dictionary:
+	if _unfinished_end(d, missions):
+		# Written when the last mission's first part was all there was (the story went on in free roam after it, with
+		# no ending): it reads as that mission still to play, from the start.
+		var back := d.duplicate(true)
+		(back["done"] as Array).pop_back()
+		back["next"] = str(missions[missions.size() - 1]["id"])
+		return back
 	if not _finished_a_chapter(d, missions):
 		return d
 	var out := d.duplicate(true)
@@ -142,4 +158,22 @@ static func survive_unlocked(save_path: String = SAVE_PATH) -> bool:
 
 
 static func unlock_survive(save_path: String = SAVE_PATH) -> bool:
-	return write_json(unlocks_path(save_path), {"version": VERSION, "survive": true})
+	return _unlock("survive", save_path)
+
+
+## Survive the Night in the harbour city: unlocked by finishing chapter 2.
+static func harbour_unlocked(save_path: String = SAVE_PATH) -> bool:
+	var d: Variant = read_json(unlocks_path(save_path))
+	return d != null and d.get("survive_harbour") == true
+
+
+static func unlock_survive_harbour(save_path: String = SAVE_PATH) -> bool:
+	return _unlock("survive_harbour", save_path)
+
+
+static func _unlock(key: String, save_path: String) -> bool:
+	var d: Variant = read_json(unlocks_path(save_path))
+	var out: Dictionary = d if d != null else {}
+	out["version"] = VERSION
+	out[key] = true
+	return write_json(unlocks_path(save_path), out)

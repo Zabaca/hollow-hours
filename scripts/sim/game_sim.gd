@@ -131,6 +131,17 @@ func _drain_mission() -> void:
 		events.append_array(mission.take_events())
 
 
+## Lower or raise the lift bridge (the harbour city's): the world's colliders change and the path grids are built again so
+## the creatures, the route line and the autopilot see the road open or shut. A no-op in a city without one.
+func set_bridge(down: bool) -> void:
+	if world.lift_closers.is_empty() or world.lift_down == down:
+		return
+	world.set_lift(down)
+	nav = NavGrid.new(world)
+	pack.nav = nav
+	_route_nav = null
+
+
 ## The car's own path grid for a city that shows routes (Cities.ROUTE_GRIDS), built the first time it is wanted;
 ## null for a city with none.
 func route_nav() -> NavGrid:
@@ -229,6 +240,7 @@ func _reset_state() -> void:
 	car.body.position = Vector2(ps["x"], ps["y"])
 	car.body.angle = ps["angle"]
 	world.gate["open"] = false
+	set_bridge(false)
 	escape_t = 0.0
 	story_done = false
 	pack = PackSim.new(world, nav, seed_value)

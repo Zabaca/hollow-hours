@@ -12282,7 +12282,8 @@ const DATA := {
      "y1": -137.0
     }
    ],
-   "deck_up_z": 12.4
+   "deck_up_z": 13.2,
+   "cable_top_z": 23.2
   }
  ],
  "ambush_spots": [

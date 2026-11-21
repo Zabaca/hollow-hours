@@ -88,6 +88,9 @@ func _test_places() -> void:
 	var w := sim.world
 	var grid := NavGrid.new(w, float(CAR_GRID["clearance"]), float(CAR_GRID["cell"]))
 	var start: Vector2 = StoryData.place_pos("highway_start")
+	var lowered := _sim()
+	lowered.set_bridge(true)
+	var open_grid := NavGrid.new(lowered.world, float(CAR_GRID["clearance"]), float(CAR_GRID["cell"]))
 	var bad: Array = []
 	var unreachable: Array = []
 	for id in StoryData.PLACES:
@@ -105,7 +108,10 @@ func _test_places() -> void:
 		for q in w.posts:
 			if p.distance_to(Vector2(q["x"], q["y"])) - q["r"] < CAR_CLEARANCE:
 				bad.append("%s: too near a %s" % [id, q["kind"]])
-		if grid.path(start, p).is_empty():
+		var from: NavGrid = grid
+		if pl.get("needs_bridge", false):
+			from = open_grid  # a place past the lift bridge is reachable once the bridge is down
+		if from.path(start, p).is_empty():
 			unreachable.append(id)
 	_check(bad.is_empty(), "every harbour place is in the arena and clear of boxes and posts", str(bad))
 	_check(unreachable.is_empty(), "and reachable on the car's path grid from the highway checkpoint", str(unreachable))

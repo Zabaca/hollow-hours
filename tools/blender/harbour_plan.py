@@ -113,9 +113,18 @@ PLACES = {
     "fuel_depot": dict(x=XS[0] + 22.0, y=YS[1] + 3.5, r=10.0),   # the depot's gate, south-west docks, west bank
     "post_north": dict(x=XS[5] + 20.0, y=YS[-1] - 3.5, r=9.0),         # generator post on the north ring road
     "post_centre_west": dict(x=XS[0] + 32.0, y=YS[3] + 3.5, r=9.0),  # generator post on the avenue, west bank
-    "post_east": dict(x=XS[-1] - 3.5, y=YS[2], r=9.0),          # generator post on the east ring road
+    "post_east": dict(x=XS[-1] - 2.0, y=YS[2] + 12.0, r=9.0),   # generator post on the east ring road
     "control_house": dict(x=RIVER_X1 + 6.0, y=YS[0] + 3.5, r=10.0),  # the lift bridge's control house, east bank
 }
+
+# Where each generator post's generator stands: on the sidewalk strip beside the road, a few metres from the place.
+GENERATORS = {
+    "post_north": (XS[5] + 20.0, YS[-1] - 8.5),
+    "post_centre_west": (XS[0] + 32.0, YS[3] + 8.5),
+    "post_east": (XS[-1] - 8.5, YS[2] + 12.0),
+}
+# Ruck's wrecked truck, on the north ring road near the place `ruck_truck`, off the road's line.
+RUCK_TRUCK = (XS[0] + 24.0, YS[-1] + 3.5)
 
 # The gate: the lift bridge's far bank. The exit is a gap in the west perimeter at the south ring road,
 # where the road runs out of the city beyond the bridge.

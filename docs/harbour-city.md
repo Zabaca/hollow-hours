@@ -38,6 +38,7 @@ Every key `city.py` writes is here with the same meaning (`arena`, `boxes`, `pos
 - `roadblocks[]`: `{id, axis, at, pos, kind: squeeze|closed, gap: {lo, hi, width}|null, corridor}`. A roadblock spans kerb to kerb including both sidewalks (20 m), so it cannot be driven round.
 - `bridges[]`: `{id, kind: fixed|lift, x, y, length, width, up?, closed_by?}`; `river`: `{x0, x1, y0, y1}`.
 - `places{}`: `{x, y, r}` for `highway_start`, `convoy_call`, `ruck_truck`, `field_hospital`, `fuel_depot`, `post_north`, `post_centre_west`, `post_east`, `control_house`. `planned_legs[]` names the legs the missions drive and the least by road each may be.
+- `generators[]`: `{post, x, y}`, the generator standing at each generator post (its light is tagged `generator_<post>`). Ruck's burnt-out truck is the `truck` wreck by `ruck_truck`.
 - `ambush_spots[]`: `{id, x, y, count, near}`, one by every roadblock and the highway's set pieces. `stalled_hunters[]`: `{x, y, release}`, stalled cars on the highway to burst out of at `release` metres.
 - `highway{}`: `toll_plaza`, `jam`, `fallen_overpass`, `truck_stop` (with its `squeeze` and `wide_gap`), `checkpoint`.
 - `size{}`: the setting above, as built.

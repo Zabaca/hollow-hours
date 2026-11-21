@@ -732,7 +732,7 @@ def init_layout():
     C.LAYOUT.clear()
     C.LAYOUT.update(
         arena=dict(left=P.ARENA["left"], right=P.ARENA["right"], bottom=P.ARENA["bottom"], top=P.ARENA["top"]),
-        boxes=[], posts=[], lamps=[], lights=[], wrecks=[], blocks=[], creature_spawns=[], fires=[],
+        boxes=[], posts=[], lamps=[], lights=[], wrecks=[], blocks=[], creature_spawns=[], fires=[], generators=[],
         player_start=dict(x=round(P.PLACES["highway_start"]["x"] + 5.0, 2), y=P.PLACES["highway_start"]["y"], angle=round(math.pi, 4)),
         roads=[], roadblocks=[], bridges=[], ambush_spots=[], stalled_hunters=[], places={}, highway={}, planned_legs=[],
         size=dict(blocks_x=P.BLOCKS_X, blocks_y=P.BLOCKS_Y, street_x=P.STREET_X, street_y=P.STREET_Y, road_width=P.RW, highway_length=P.HIGHWAY_LEN),
@@ -765,6 +765,25 @@ def settle_points():
                 break
 
 
+def build_story_props():
+    """What the story's places show: Ruck's burnt-out truck with its lamps on, and a generator at each of the three posts."""
+    L = C.LAYOUT
+    rx, ry = P.RUCK_TRUCK
+    g = cell_group(rx, ry)
+    K.wreck_lp(g, rx, ry, math.pi, "truck", "paint2", burnt=True, lights_on=True, flicker=0.15)
+    C.barrel(g, rx + 10.0, ry - 4.5, fire=True)
+    C.barrel(g, rx - 10.0, ry - 3.5, fire=False)
+    for name, (gx, gy) in P.GENERATORS.items():
+        g = cell_group(gx, gy)
+        C.box(g, "metal", gx - 1.2, gy - 0.6, 0.0, gx + 1.2, gy + 0.6, 1.3)
+        C.box(g, "lit_cool", gx - 0.9, gy - 0.64, 0.5, gx + 0.9, gy - 0.6, 1.1)
+        C.box(g, "rust", gx - 1.0, gy + 0.6, 1.3, gx + 1.0, gy + 0.9, 1.6)
+        C.collider(gx - 1.2, gy - 0.6, gx + 1.2, gy + 0.6, "prop")
+        C.light(gx, gy, 2.2, [0.6, 0.85, 1.0], 3.5, 10.0, 0.3, "omni", fog=1.4)
+        L["lights"][-1]["tag"] = "generator_" + name
+        L["generators"].append(dict(post=name, x=round(gx, 2), y=round(gy, 2)))
+
+
 def build():
     reset()
     C.G.clear()
@@ -779,6 +798,7 @@ def build():
             build_block(i, j, specs, kits[(i, j)])
     for rb in P.ROADBLOCKS:
         build_roadblock(rb)
+    build_story_props()
     build_river()
     build_highway()
     build_world()
@@ -889,6 +909,7 @@ def run_previews(outdir):
     street("lift_bridge.png", (-90, -142, 4.0), (-130, -144, 14.0), (-96, -140, 7.0))
     street("school_field.png", (150, -96, 3.0), (160, -60, 5.0), (150, -90, 7.5))
     street("docks.png", (-30, -144, 3.0), (-10, -118, 6.0), (-26, -140, 7.0))
+    street("ruck_truck.png", (-140, 141, 2.6), (-170, 146, 1.8), (-146, 141, 6.0))
     # highway: from the checkpoint, the toll plaza, the jam, the overpass and truck stop, the open road to the city
     hx1 = P.HW_X1
     street("hw_checkpoint.png", (hx1 - 10, 8, 2.2), (hx1 - 90, 5, 2.5), (hx1 - 14, 8, 6.0))

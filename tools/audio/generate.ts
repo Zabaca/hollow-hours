@@ -51,6 +51,12 @@ const ITEMS: Item[] = [
   { name: 'radio_static_out', kind: 'sfx', seconds: 1.0, prompt: 'A two-way radio transmission ending: a short fading burst of static hiss and then one sharp click, dry, close, no voice, no music' },
   { name: 'gate_klaxon', kind: 'sfx', seconds: 3.0, prompt: 'A harsh industrial warning klaxon sounding on and off three times as a security gate is about to open, outdoors at night in the rain, no voice, no music' },
   { name: 'gate_leaves', kind: 'sfx', seconds: 4.0, prompt: 'Two heavy steel gate leaves rolling open on iron wheels, a deep grinding rumble with metallic clanks, outdoors at night beside a concrete wall, no music' },
+  // chapter 2: the lift bridge and the generators
+  { name: 'bridge_horn', kind: 'sfx', seconds: 2.0, prompt: "A deep ship's horn blast sounding once across open water at night, low and long with a short echo off the water, no voice, no music" },
+  { name: 'bridge_motors', kind: 'sfx', seconds: 8.0, prompt: 'A heavy electric winch and chain hauling a huge steel lift bridge deck down, a starting clunk then a steady low motor whine with chain rattle and iron groans, ending with a wind-down, outdoors at night in the rain, no voice, no music' },
+  { name: 'bridge_thud', kind: 'sfx', seconds: 2.5, prompt: 'A massive steel bridge deck settling onto its seats, one enormous metal impact with a long low ringing resonance and a few rattles, outdoors, no voice, no music' },
+  { name: 'generator_start', kind: 'sfx', seconds: 2.5, prompt: 'Fuel poured from a can into a tank, then a diesel generator coughing twice and catching, settling into a steady chug, outdoors at night, no voice, no music' },
+  { name: 'floodlights_fail', kind: 'sfx', seconds: 2.5, prompt: 'A big floodlight generator failing: a heavy power-down clunk, a fading electric hum and a few metallic ticks as huge lamps go dark, outdoors at night, no voice, no music' },
   // music
   { name: 'music_tension', kind: 'music', seconds: 60, loop: true, prompt: 'Dark ambient horror score for a night drive through an abandoned city. A slow evolving sub-bass drone, distant detuned strings, sparse metallic scrapes and a soft low pulse. No melody, no drums, no vocals. Unsettling, spacious, steady, loopable.' },
   { name: 'music_chase', kind: 'music', seconds: 60, loop: true, prompt: 'Dark horror chase music for a night drive while being hunted. A driving low pulse, tense ostinato of detuned synth and bowed metal, dissonant strings rising, urgent but cold. No vocals, no melody lead, loopable, steady intensity.' },

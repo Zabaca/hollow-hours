@@ -44,7 +44,7 @@ reads "Chapter 2, The next night". The game saves (The Long Road next) and cuts 
 map (chapter 2): the car is at the cordon's highway checkpoint at the far east end, at night again, and The Long Road
 begins at once: drive the divided highway, about 1.2 km, into the city, through a toll plaza, a dead traffic jam with one
 gap in it and past a fallen overpass (the way round is through a truck stop), with creatures waiting in a few of the
-stalled cars. Reaching the east ring road completes the mission, and Dead Convoy begins at once (missions 5 to 7, also subtitles only):
+stalled cars. Reaching the east ring road completes the mission, and Dead Convoy begins at once (missions 5 to 7):
 drive across the river to Ruck's wrecked truck on the north ring road, hold while he drags himself in, and take him to the
 field hospital (a school); Floodlights (a timer, 6 minutes): fuel from the depot on the west docks to three generator posts
 before the hospital's floodlights, which dim in the timer's last third, go out; The Lift Bridge: pick
@@ -307,7 +307,7 @@ Sound: `ELEVENLABS_API_KEY=... bun tools/audio/generate.ts [name ...]` buys only
 its `game/audio/` unchanged.
 
 The radio's voices: `bun tools/audio/voices.ts --dry` prints what is missing and the character count and
-buys nothing; `ELEVENLABS_API_KEY=... bun tools/audio/voices.ts [id ...]` voices the 21 lines of
+buys nothing; `ELEVENLABS_API_KEY=... bun tools/audio/voices.ts [id ...]` voices the 50 lines of
 `scripts/sim/story_data.gd` (read through a headless Godot dump, so there is one copy of the script) with
 `eleven_v4`, Vera as Matilda, Teo as Liam and Ruck as Bill, into `assets/audio/radio/<id>.mp3`. A take is
 cached under the id and a hash of its text and voice, so editing a line re-voices only that line; one run

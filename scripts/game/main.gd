@@ -9,6 +9,7 @@ extends Node3D
 
 var game: GameSim
 var city: City
+var city_id := Cities.QUARTER  # which city is loaded (Cities)
 var gate_view: GateView
 var atmos: Atmosphere
 var car_view: CarView
@@ -89,7 +90,7 @@ func _ready() -> void:
 		game.car.body.angle = debug_start[2]
 	city = City.new()
 	add_child(city)
-	city.build(CityLayout.DATA)
+	city.build(Cities.layout(city_id), Cities.model_path(city_id))
 	gate_view = GateView.new()
 	add_child(gate_view)
 	gate_view.setup(game.world)
@@ -158,11 +159,21 @@ func _ready() -> void:
 ## started directly (--mission=N).
 func _make_game() -> GameSim:
 	if Session.mode != "story":
-		return GameSim.new(CityLayout.DATA)
+		city_id = Session.city if Session.city != "" else Cities.QUARTER
+		return GameSim.new(Cities.layout(city_id), "bruiser", 1, false, city_id)
 	if Session.continue_flag:
 		Session.continue_save = SaveStore.load_save(Session.save_path)
+	# The city the story is in: a flag's, else the one a started mission, a save or a new game puts the player in.
+	if Session.city != "":
+		city_id = Session.city
+	elif Session.mission_flag > 1:
+		city_id = StoryData.mission_city(Session.mission_flag - 1)
+	elif not Session.continue_save.is_empty():
+		city_id = SaveStore.city_of(Session.continue_save)
+	else:
+		city_id = StoryData.mission_city(0)
 	var seed_in := Session.seed_flag if Session.seed_flag >= 0 else randi() % 100000
-	var g := GameSim.new(CityLayout.DATA, "bruiser", seed_in, true)
+	var g := GameSim.new(Cities.layout(city_id), "bruiser", seed_in, true, city_id)
 	if Session.mission_flag > 1:
 		g.start_story_at(Session.mission_flag - 1)
 	elif not Session.continue_save.is_empty():

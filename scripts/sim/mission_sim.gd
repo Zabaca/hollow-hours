@@ -192,7 +192,7 @@ func _reset_progress() -> void:
 ## that is out of sight of it (the layout's own player start is where Survive the Night begins).
 func new_game(game: GameSim) -> void:
 	_reset_progress()
-	var safe: Dictionary = StoryData.PLACES["safe_start"]
+	var safe: Dictionary = StoryData.PLACES[StoryData.safe_start_id(StoryData.mission_city(0))]
 	game.place_car(safe["pos"], float(safe["angle"]), GameSim.MAX_HULL)
 	game.pack.reset_pack(game.car, StoryData.ROAM_PACK, false)
 	_last_kills = game.pack.kills
@@ -210,7 +210,7 @@ func resume(game: GameSim, save: Dictionary) -> void:
 	totals = {"kills": int(t.get("kills", 0)), "wrecks": int(t.get("wrecks", 0)), "seconds": float(t.get("seconds", 0.0))}
 	last_save = save.duplicate(true)
 	_last_kills = game.pack.kills
-	var safe: Dictionary = StoryData.PLACES["safe_start"]
+	var safe: Dictionary = StoryData.PLACES[StoryData.safe_start_id(StoryData.city_after(done.size()))]
 	game.place_car(safe["pos"], float(safe["angle"]), GameSim.MAX_HULL)
 	_enter_roam(game)
 	ev("roam", {"next": next_id})
@@ -481,7 +481,7 @@ func _spawn_hunting(game: GameSim, sp: Dictionary) -> void:
 			var p := center + Vector2.from_angle(start + attempt * TAU / 8.0) * ring
 			var d := p.distance_to(car_at)
 			# Out in the street, where the car can get at it: a few metres from every wall, with a clear line.
-			var open := _wall_gap(game.world, p) >= WALL_GAP and game.world.line_clear(center, p, 0.6)
+			var open := game.world.wall_gap(p, WALL_GAP) >= WALL_GAP and game.world.line_clear(center, p, 0.6)
 			if open and d >= clear:
 				best = p
 				break
@@ -490,16 +490,6 @@ func _spawn_hunting(game: GameSim, sp: Dictionary) -> void:
 				best_score = score
 				best = p
 		game.pack.place_hunting(best, game.car)
-
-
-## How far a point is from the nearest building, wreck or prop (0 inside one).
-func _wall_gap(world: SimWorld, p: Vector2) -> float:
-	var best := INF
-	for b in world.boxes:
-		var dx := maxf(maxf(float(b["x0"]) - p.x, 0.0), p.x - float(b["x1"]))
-		var dy := maxf(maxf(float(b["y0"]) - p.y, 0.0), p.y - float(b["y1"]))
-		best = minf(best, Vector2(dx, dy).length())
-	return best
 
 
 # ----------------------------------------------------------------------------- failing and retrying
@@ -546,8 +536,7 @@ func restart_mission(game: GameSim) -> void:
 	if mission < 0 or state == State.ROAM or state == State.ENDED:
 		return
 	var m := mission_data()
-	var pid: String = m["start"] if m["start"] != "" else "safe_start"
-	var place: Dictionary = StoryData.PLACES[pid]
+	var place: Dictionary = StoryData.PLACES[StoryData.start_place_id(m)]
 	game.place_car(place["pos"], float(place["angle"]), GameSim.MAX_HULL)
 	game.pack.reset_pack(game.car, int(m["begin"].get("pack", StoryData.ROAM_PACK)), false)
 	ev("retry", {"to": "start"})

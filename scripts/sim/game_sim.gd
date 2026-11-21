@@ -24,6 +24,7 @@ const ROADKILL_DENT_SPEED := 17.0  # m/s (61 km/h): above this, running one down
 const BOOST := CarSim.BOOST
 const GRAB := PackSim.GRAB_DRAG * PackSim.GAUNT_MASS / 80.0  # N per (m/s) per clinging creature
 
+var city_id := Cities.QUARTER  # which city this is (the registry's id); the story's places and missions name theirs
 var world: SimWorld
 var nav: NavGrid
 var car: CarSim
@@ -51,9 +52,11 @@ var escape_k := 0.0
 var story_done := false
 
 
-func _init(layout: Dictionary, car_id: String = "bruiser", seed_in: int = 1, story: bool = false) -> void:
+## `layout` is the city's layout (Cities.layout(city) for a city by id; the tests hand CityLayout.DATA, the quarter's).
+func _init(layout: Dictionary, car_id: String = "bruiser", seed_in: int = 1, story: bool = false, city: String = Cities.QUARTER) -> void:
 	seed_value = seed_in
 	story_mode = story
+	city_id = city
 	world = SimWorld.from_layout(layout)
 	nav = NavGrid.new(world)
 	car = CarSim.from_id(car_id)
@@ -95,7 +98,7 @@ func start_story_at(i: int) -> void:
 		"version": SaveStore.VERSION, "saved_at": 0, "next": StoryData.MISSIONS[i]["id"], "done": done,
 		"ending_seen": false, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0},
 	})
-	var at: Dictionary = StoryData.PLACES[StoryData.MISSIONS[i]["start"]]
+	var at: Dictionary = StoryData.PLACES[StoryData.start_place_id(StoryData.MISSIONS[i])]
 	place_car(at["pos"], float(at["angle"]), MAX_HULL)
 	mission.start_mission(self, i)
 	_drain_mission()
@@ -286,6 +289,7 @@ func step(dt: float, controls: Dictionary) -> void:
 		pack.shake(car, 0.6)
 
 	if phase != Phase.WRECKED:
+		pack.goal = mission.objective().get("pos", Vector2.INF) if mission != null else Vector2.INF
 		pack.step(dt, car, c)
 		kills = pack.kills
 		for e in pack.take_events():

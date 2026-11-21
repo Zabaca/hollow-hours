@@ -29,6 +29,12 @@ extends RefCounted
 ##
 ## Places are map metres read from the city layout; tests/mission_test.gd is the arbiter (inside
 ## the arena, clear of everything, reachable on the path grid).
+##
+## Cities. Every place and every mission names its city (`city`, an id Cities knows), and a mission's
+## places are all in its own city. A chapter is a run of missions in one city; `safe: true` marks a
+## city's safe start (where a New Game, a Continue or a restart puts the car when the mission names no
+## start place of its own). The functions below read missions through a `missions` argument that
+## defaults to MISSIONS, so tests can hold a longer story (chapter 2) up against the same code.
 
 const SPEAKERS := {
 	"vera": {"name": "Vera", "color": Color(0.21, 1.0, 0.88)},
@@ -49,16 +55,16 @@ const SPEAKERS := {
 ## Between missions the lit start is 27 m from the hotel after mission 1 (the gas station) and 92 m after
 ## mission 2 (the park hut): the pharmacy and the hotel are buildings, so the gap cannot be wider.
 const PLACES := {
-	"safe_start": {"name": "the safe start", "pos": Vector2(64.0, 0.0), "radius": 5.0, "angle": PI, "label": "", "marker": false},
-	"shop": {"name": "the gas station", "pos": Vector2(46.0, 7.0), "radius": 5.0, "angle": -PI / 2.0, "label": "24H", "marker": true},
-	"hotel": {"name": "the hotel's east door", "pos": Vector2(60.0, -16.0), "radius": 5.0, "angle": PI / 2.0, "label": "Hotel", "marker": true},
-	"hut": {"name": "the park hut", "pos": Vector2(-32.0, -9.0), "radius": 5.0, "angle": PI / 2.0, "label": "Park", "marker": true},
-	"pharmacy": {"name": "the pharmacy", "pos": Vector2(-44.0, 4.0), "radius": 5.0, "angle": 0.0, "label": "Pharmacy", "marker": true},
-	"west_gate": {"name": "the west gate", "pos": Vector2(-70.0, 0.0), "radius": 6.0, "angle": PI, "label": "West Gate", "marker": true},
-	"diner": {"name": "the diner", "pos": Vector2(-20.5, 16.0), "radius": 0.0, "angle": 0.0, "label": "Diner", "marker": false},
-	"motel": {"name": "the motel office", "pos": Vector2(-20.5, 41.5), "radius": 5.0, "angle": PI, "label": "Motel", "marker": true},
-	"bar": {"name": "the bar", "pos": Vector2(19.0, -24.0), "radius": 0.0, "angle": 0.0, "label": "Bar", "marker": false},
-	"pawn": {"name": "the pawn shop", "pos": Vector2(42.5, -32.0), "radius": 0.0, "angle": 0.0, "label": "Pawn", "marker": false},
+	"safe_start": {"name": "the safe start", "pos": Vector2(64.0, 0.0), "radius": 5.0, "angle": PI, "label": "", "city": "quarter", "marker": false, "safe": true},
+	"shop": {"name": "the gas station", "pos": Vector2(46.0, 7.0), "radius": 5.0, "angle": -PI / 2.0, "label": "24H", "city": "quarter", "marker": true},
+	"hotel": {"name": "the hotel's east door", "pos": Vector2(60.0, -16.0), "radius": 5.0, "angle": PI / 2.0, "label": "Hotel", "city": "quarter", "marker": true},
+	"hut": {"name": "the park hut", "pos": Vector2(-32.0, -9.0), "radius": 5.0, "angle": PI / 2.0, "label": "Park", "city": "quarter", "marker": true},
+	"pharmacy": {"name": "the pharmacy", "pos": Vector2(-44.0, 4.0), "radius": 5.0, "angle": 0.0, "label": "Pharmacy", "city": "quarter", "marker": true},
+	"west_gate": {"name": "the west gate", "pos": Vector2(-70.0, 0.0), "radius": 6.0, "angle": PI, "label": "West Gate", "city": "quarter", "marker": true},
+	"diner": {"name": "the diner", "pos": Vector2(-20.5, 16.0), "radius": 0.0, "angle": 0.0, "label": "Diner", "city": "quarter", "marker": false},
+	"motel": {"name": "the motel office", "pos": Vector2(-20.5, 41.5), "radius": 5.0, "angle": PI, "label": "Motel", "city": "quarter", "marker": true},
+	"bar": {"name": "the bar", "pos": Vector2(19.0, -24.0), "radius": 0.0, "angle": 0.0, "label": "Bar", "city": "quarter", "marker": false},
+	"pawn": {"name": "the pawn shop", "pos": Vector2(42.5, -32.0), "radius": 0.0, "angle": 0.0, "label": "Pawn", "city": "quarter", "marker": false},
 }
 
 ## The radio script, 21 lines. `text` carries the cue words in square brackets (they steer the
@@ -96,7 +102,7 @@ const REASONS := {
 
 const MISSIONS := [
 	{
-		"id": "batteries", "title": "BATTERIES", "start": "", "dawn": 0.0,
+		"id": "batteries", "title": "BATTERIES", "city": "quarter", "start": "", "dawn": 0.0,
 		"begin": {"lines": ["bat_call_1", "bat_call_2"], "pack": 3},
 		"end": {"lines": ["bat_done"]},
 		"steps": [
@@ -112,7 +118,7 @@ const MISSIONS := [
 		],
 	},
 	{
-		"id": "pharmacist", "title": "THE PHARMACIST", "start": "shop", "dawn": 0.1,
+		"id": "pharmacist", "title": "THE PHARMACIST", "city": "quarter", "start": "shop", "dawn": 0.1,
 		"begin": {
 			"lines": ["ph_call_1", "ph_call_2"], "pack": 4,
 			"timer": {"id": "shutter", "seconds": SHUTTER_SECONDS, "reason": "shutter", "label": "SHUTTER"},
@@ -134,7 +140,7 @@ const MISSIONS := [
 		],
 	},
 	{
-		"id": "west_gate", "title": "WEST GATE", "start": "hut", "dawn": 0.2,
+		"id": "west_gate", "title": "WEST GATE", "city": "quarter", "start": "hut", "dawn": 0.2,
 		"begin": {"lines": ["gate_call_1", "gate_call_2"], "pack": 4},
 		"end": {},
 		"steps": [
@@ -168,6 +174,56 @@ const ENDING_LINES := ["end_vera", "end_ruck"]
 
 ## The sky's lightening once the story is over, for free roam after the last mission.
 const ENDING_DAWN := 0.3
+
+
+## Which city a place is in.
+static func place_city(id: String) -> String:
+	return str(PLACES[id]["city"])
+
+
+## Which city mission `i` is in.
+static func mission_city(i: int, missions: Array = MISSIONS) -> String:
+	return str(missions[i]["city"])
+
+
+## The story's chapters in order: [{city, first, last}], one per run of missions in the same city
+## (first and last are mission indices).
+static func chapters(missions: Array = MISSIONS) -> Array:
+	var out: Array = []
+	for i in missions.size():
+		var city := str(missions[i]["city"])
+		if out.is_empty() or out[-1]["city"] != city:
+			out.append({"city": city, "first": i, "last": i})
+		else:
+			out[-1]["last"] = i
+	return out
+
+
+## Is mission `i` the last of its chapter (the story's last mission included)?
+static func ends_chapter(i: int, missions: Array = MISSIONS) -> bool:
+	return i + 1 >= missions.size() or str(missions[i + 1]["city"]) != str(missions[i]["city"])
+
+
+## The city the player is in with `done_count` missions finished: the next mission's, or the last
+## one's when the story is over.
+static func city_after(done_count: int, missions: Array = MISSIONS) -> String:
+	if missions.is_empty():
+		return Cities.QUARTER
+	return str(missions[mini(done_count, missions.size() - 1)]["city"])
+
+
+## A city's safe start: the place marked `safe` that is in it ("" when it has none).
+static func safe_start_id(city: String) -> String:
+	for id in PLACES:
+		if PLACES[id].get("safe", false) and PLACES[id]["city"] == city:
+			return id
+	return ""
+
+
+## Where a mission begins: its own start place, else its city's safe start.
+static func start_place_id(mission: Dictionary) -> String:
+	var start: String = mission["start"]
+	return start if start != "" else safe_start_id(str(mission["city"]))
 
 
 static func mission_index(id: String) -> int:

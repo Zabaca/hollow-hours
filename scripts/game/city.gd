@@ -15,11 +15,11 @@ var time := 0.0
 var rng := RandomNumberGenerator.new()
 
 
-func build(layout_data: Dictionary) -> void:
+func build(layout_data: Dictionary, model_path: String) -> void:
 	layout = layout_data
 	rng.seed = 5
 	noise_tex = _make_noise()
-	var scene: PackedScene = load("res://assets/models/city.glb")
+	var scene: PackedScene = load(model_path)
 	var root := scene.instantiate()
 	root.name = "CityMesh"
 	add_child(root)

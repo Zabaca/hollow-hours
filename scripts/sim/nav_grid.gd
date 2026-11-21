@@ -19,21 +19,41 @@ func _init(world: SimWorld, clearance: float = 0.75) -> void:
 	astar.offset = origin + Vector2(CELL, CELL) * 0.5
 	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	astar.update()
-	for ix in size.x:
-		for iy in size.y:
-			var c := origin + Vector2((ix + 0.5) * CELL, (iy + 0.5) * CELL)
-			var blocked := false
-			for b in world.boxes:
-				if c.x > b["x0"] - clearance - CELL * 0.4 and c.x < b["x1"] + clearance + CELL * 0.4 and c.y > b["y0"] - clearance - CELL * 0.4 and c.y < b["y1"] + clearance + CELL * 0.4:
-					blocked = true
-					break
-			if not blocked:
-				for p in world.posts:
-					if c.distance_to(Vector2(p["x"], p["y"])) < float(p["r"]) + clearance + CELL * 0.3:
-						blocked = true
-						break
-			if blocked:
-				astar.set_point_solid(Vector2i(ix, iy), true)
+	# Each box and post marks only the cells it can reach (the box grown by the clearance and 0.4 of a
+	# cell, the post's circle by the clearance and 0.3), not every cell of the city: the same solid cells
+	# the test of every cell against every box gave, found in time that follows the obstacles.
+	var reach := clearance + CELL * 0.4
+	for b in world.boxes:
+		var ix0 := _index((b["x0"] - reach - origin.x) / CELL - 0.5, size.x) - 1
+		var ix1 := _index((b["x1"] + reach - origin.x) / CELL - 0.5, size.x) + 1
+		var iy0 := _index((b["y0"] - reach - origin.y) / CELL - 0.5, size.y) - 1
+		var iy1 := _index((b["y1"] + reach - origin.y) / CELL - 0.5, size.y) + 1
+		for ix in range(maxi(ix0, 0), mini(ix1, size.x - 1) + 1):
+			var cx := origin.x + (ix + 0.5) * CELL
+			if not (cx > b["x0"] - clearance - CELL * 0.4 and cx < b["x1"] + clearance + CELL * 0.4):
+				continue
+			for iy in range(maxi(iy0, 0), mini(iy1, size.y - 1) + 1):
+				var cy := origin.y + (iy + 0.5) * CELL
+				if cy > b["y0"] - clearance - CELL * 0.4 and cy < b["y1"] + clearance + CELL * 0.4:
+					astar.set_point_solid(Vector2i(ix, iy), true)
+	for p in world.posts:
+		var lim: float = float(p["r"]) + clearance + CELL * 0.3
+		var at := Vector2(p["x"], p["y"])
+		var ix0 := _index((at.x - lim - origin.x) / CELL - 0.5, size.x) - 1
+		var ix1 := _index((at.x + lim - origin.x) / CELL - 0.5, size.x) + 1
+		var iy0 := _index((at.y - lim - origin.y) / CELL - 0.5, size.y) - 1
+		var iy1 := _index((at.y + lim - origin.y) / CELL - 0.5, size.y) + 1
+		for ix in range(maxi(ix0, 0), mini(ix1, size.x - 1) + 1):
+			for iy in range(maxi(iy0, 0), mini(iy1, size.y - 1) + 1):
+				var c := origin + Vector2((ix + 0.5) * CELL, (iy + 0.5) * CELL)
+				if c.distance_to(at) < lim:
+					astar.set_point_solid(Vector2i(ix, iy), true)
+
+
+## The cell index a cell-space coordinate falls in, clamped to the grid (floor, so a negative one is not
+## rounded toward zero).
+func _index(u: float, count: int) -> int:
+	return clampi(int(floor(u)), -1, count)
 
 
 func cell_of(p: Vector2) -> Vector2i:

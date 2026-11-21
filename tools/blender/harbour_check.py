@@ -31,7 +31,7 @@ def load(path):
 
 
 class Grid:
-    def __init__(self, lay, r=CAR_R, skip_kinds=()):
+    def __init__(self, lay, r=CAR_R, skip_rects=()):
         a = lay["arena"]
         self.left, self.bottom = a["left"], a["bottom"]
         self.w = int(math.ceil((a["right"] - a["left"]) / CELL))
@@ -39,7 +39,7 @@ class Grid:
         self.solid = bytearray(self.w * self.h)
         self.r = r
         for b in lay["boxes"]:
-            if b["kind"] in skip_kinds:
+            if (b["x0"], b["y0"], b["x1"], b["y1"]) in skip_rects:
                 continue
             self._rect(b["x0"] - r, b["y0"] - r, b["x1"] + r, b["y1"] + r)
         for p in lay["posts"]:
@@ -190,13 +190,13 @@ def main(path):
     print("\nroads (the quarter's are %.0f m wide):" % QUARTER_ROAD)
     narrowest = 1e9
     for r in lay["roads"]:
-        w = r.get("carriageway_width", r["width"])
+        w = r["width"]
         narrowest = min(narrowest, w)
         if w < QUARTER_ROAD - 1e-6:
-            fails.append("road %s at %s is %.1f m" % (r["axis"], r["at"], w))
+            fails.append("road along %s at %s is %.1f m" % (r["axis"], r["c"], w))
     kinds = {}
     for r in lay["roads"]:
-        kinds.setdefault(r["kind"], []).append(r.get("carriageway_width", r["width"]))
+        kinds.setdefault(r["kind"], []).append(r["width"])
     for k, v in kinds.items():
         print("  %-8s %d roads, width %.1f m%s" % (k, len(v), min(v), " per carriageway" if k == "highway" else ""))
     for b in lay["bridges"]:
@@ -210,7 +210,7 @@ def main(path):
     gaps = []
     for rb in lay["roadblocks"]:
         if rb["gap"]:
-            gaps.append((rb["id"], rb["gap"]["width"], rb["axis"], rb["at"], rb["pos"], (rb["gap"]["lo"] + rb["gap"]["hi"]) / 2))
+            gaps.append((rb["id"], rb["gap"]["width"], "y" if rb["axis"] == "x" else "x", rb["c"], rb["pos"], (rb["gap"]["lo"] + rb["gap"]["hi"]) / 2))
     hw = lay["highway"]
     ts = hw["truck_stop"]["squeeze"]
     gaps.append(("truck_stop_squeeze", ts["width"], "y", ts["x"], ts["x"], (ts["y0"] + ts["y1"]) / 2))
@@ -261,7 +261,7 @@ def main(path):
 
     # ---- legs
     print("\nlegs by road (shortest route on a 1 m grid with the car's clearance, pulled straight; min is the option's):")
-    rbpos = [(rb["id"], rb["pos"] if rb["axis"] == "y" else rb["at"], rb["at"] if rb["axis"] == "y" else rb["pos"]) for rb in lay["roadblocks"]]
+    rbpos = [(rb["id"], rb["pos"] if rb["axis"] == "x" else rb["c"], rb["c"] if rb["axis"] == "x" else rb["pos"]) for rb in lay["roadblocks"]]
     bridges = lay["bridges"]
     legs = []
     for leg in lay["planned_legs"]:
@@ -325,10 +325,10 @@ def main(path):
 
     # the lift bridge down: the colliders that close it taken out, the way to the gate runs over it and only over it
     gd = lay["gate"]
-    g2 = Grid(lay, skip_kinds=("lift_up",))
+    lb = next(b for b in lay["bridges"] if b["id"] == "lift_bridge")
+    g2 = Grid(lay, skip_rects=[(r["x0"], r["y0"], r["x1"], r["y1"]) for r in lb["closers"]])
     gate_cell = g2.nearest_free(gd["x"] + 4.0, gd["y"])
     cc = g2.nearest_free(pl["control_house"]["x"], pl["control_house"]["y"])
-    lb = next(b for b in lay["bridges"] if b["id"] == "lift_bridge")
     p1 = g2.astar(cc, gate_cell)
     west = g2.astar(g2.nearest_free(pl["fuel_depot"]["x"], pl["fuel_depot"]["y"]), gate_cell)
     if p1 is None or west is None:

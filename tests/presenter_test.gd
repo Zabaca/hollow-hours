@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_title_continue()
 	_test_unlock_outlives_the_save()
 	_test_ending_returns_to_the_title()
+	_test_chapter_ending_cuts_to_the_next_city()
 	_test_gate_open_line_does_not_play_after_the_closing_lines()
 	_clean()
 	print("")
@@ -560,6 +561,36 @@ func _test_unlock_outlives_the_save() -> void:
 	var rows := _title_rows()
 	_check("Survive the Night:on" in rows and rows[1] == "Continue:off", "the title still offers Survive the Night", str(rows))
 
+## The end of chapter 1: the same ending up to the pull-back, then no credits: it fades to black, shows the card
+## "Chapter 2, The next night" and asks main.gd to load the next city. Nothing returns to the title.
+func _test_chapter_ending_cuts_to_the_next_city() -> void:
+	quits = 0
+	var r := _rig("west_gate")
+	var p := r.presenter
+	var changed: Array = []
+	p.chapter_changed.connect(func(save: Dictionary) -> void: changed.append(save))
+	var before := p.hud.card_title.text
+	p.on_event({"type": "mission_complete", "title": "WEST GATE", "id": "west_gate", "mission": 2, "final": false, "chapter_end": true})
+	_check(p.hud.card_title.text == before, "the third mission shows no completion card: its ending is the chapter's")
+	p.on_event({"type": "escaped"})
+	p.on_event({"type": "chapter_complete", "next": "long_road", "city": "harbour"})
+	_check(p.ending == "pullback" and SaveStore.survive_unlocked(SAVE), "once the car has stopped the camera draws back, and Survive the Night is unlocked")
+	p.update(StoryPresenter.PULLBACK_SECONDS + 0.1, Vector2.ZERO, 0.0)
+	_check(p.ending == "chapter_fade" and not p.credits_roll.playing and p.blocks_pause() and p.in_ending_view(), "then no credits: the screen fades to black, and nothing can be opened over it")
+	p.update(StoryPresenter.FADE_SECONDS * 0.5, Vector2.ZERO, 0.0)
+	_check(p._black.color.a > 0.3 and not p.chapter_card.visible and changed.is_empty(), "it goes dark first, with no card yet")
+	p.update(StoryPresenter.FADE_SECONDS, Vector2.ZERO, 0.0)
+	_check(p.ending == "chapter_card" and p.chapter_card.visible and p._card_kicker.text == "CHAPTER 2" and p._card_title.text == "THE NEXT NIGHT", "then the card: Chapter 2, The next night", "%s / %s" % [p._card_kicker.text, p._card_title.text])
+	p.update(StoryPresenter.CARD_FADE_IN + 0.2, Vector2.ZERO, 0.0)
+	_check(p._card_title.modulate.a > 0.99 and changed.is_empty(), "the card fades in and stays up")
+	p.update(StoryPresenter.CARD_HOLD + 0.2, Vector2.ZERO, 0.0)
+	_check(changed.size() == 1 and p.ending == "done" and quits == 0, "and then the next city is asked for, once, and the game does not go back to the title", "changed=%d quits=%d" % [changed.size(), quits])
+	p.update(1.0, Vector2.ZERO, 0.0)
+	_check(changed.size() == 1, "only once")
+	_drop(r)
+	_clean()
+
+
 ## The ending: the car goes through the gate (first light), stops (the camera draws back), the credits
 ## roll, it fades to black and the title comes back. Nothing is a card and nothing waits on a key.
 func _test_ending_returns_to_the_title() -> void:
@@ -606,7 +637,14 @@ func _test_ending_returns_to_the_title() -> void:
 	f.store_string(JSON.stringify(done))
 	f.close()
 	var rows := _title_rows()
-	_check(rows[1] == "Continue:off" and "Survive the Night:on" in rows, "after the ending Continue is greyed, not an empty free roam", str(rows))
+	_check(rows[1] == "Continue:on" and "Survive the Night:on" in rows, "after chapter 1's ending Continue is lit (chapter 2 is next) and Survive the Night is offered", str(rows))
+	done["done"] = ["batteries", "pharmacist", "west_gate", "long_road"]
+	f = FileAccess.open(SAVE, FileAccess.WRITE)
+	f.store_string(JSON.stringify(done))
+	f.close()
+	var roam_title := _make_title()
+	_check(roam_title.menu_rows[1].enabled and roam_title.menu_rows[1].note == "Free roam", "once The Long Road is done, with nothing after it yet, Continue says Free roam", roam_title.menu_rows[1].note)
+	roam_title.queue_free()
 
 
 ## The reviewer's sequence: the gate opens (Ruck's "Gate's open" is queued behind the opening squelch), the
@@ -655,7 +693,7 @@ func _test_title_continue() -> void:
 	f.store_string(JSON.stringify(done))
 	f.close()
 	var after := _title_rows()
-	_check("Survive the Night:on" in after and after[1] == "Continue:off", "after the ending the old round is offered as Survive the Night", str(after))
+	_check("Survive the Night:on" in after and after[1] == "Continue:on", "after chapter 1's ending the old round is offered as Survive the Night, and Continue goes on to chapter 2", str(after))
 
 
 func _make_title() -> Control:

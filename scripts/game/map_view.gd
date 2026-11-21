@@ -15,6 +15,7 @@ const WRECK := Color(0.3, 0.22, 0.21)
 const ROAD := Color(0.085, 0.09, 0.1)
 const RADAR_RANGE := 60.0  # metres from the centre to the rim
 const RIM_STEPS := 40
+const TERRAIN_SIZE := 120.0  # a box this long on either side is the ground a long road is cut through: the full map leaves it out
 
 var mode: int = Mode.RADAR
 var car_pos := Vector2.ZERO
@@ -47,10 +48,16 @@ func set_state(pos: Vector2, angle: float, new_blips: Array) -> void:
 
 # ----------------------------------------------------------------------------- projection
 
+## The part of the arena the full map shows: the layout's `map_frame` when it has one (the harbour city's
+## frames the city and the highway's first stretch, not the whole 1.6 km), else the arena.
+func _frame() -> Dictionary:
+	return data.get("map_frame", data["arena"])
+
+
 func _scale() -> float:
 	if mode == Mode.RADAR:
 		return minf(size.x, size.y) * 0.5 / RADAR_RANGE
-	var a: Dictionary = data["arena"]
+	var a: Dictionary = _frame()
 	return minf(size.x / (float(a["right"]) - float(a["left"])), size.y / (float(a["top"]) - float(a["bottom"])))
 
 
@@ -62,7 +69,7 @@ func to_screen(p: Vector2) -> Vector2:
 		var h := Vector2.from_angle(car_angle)
 		var right := Vector2(h.y, -h.x)
 		return size * 0.5 + Vector2(d.dot(right), -d.dot(h)) * k
-	var a: Dictionary = data["arena"]
+	var a: Dictionary = _frame()
 	var w := (float(a["right"]) - float(a["left"])) * k
 	var ht := (float(a["top"]) - float(a["bottom"])) * k
 	var origin := (size - Vector2(w, ht)) * 0.5
@@ -149,7 +156,7 @@ func _draw_radar_blip(c: Vector2, r: float, bl: Dictionary) -> void:
 
 
 func _draw_full() -> void:
-	var a: Dictionary = data["arena"]
+	var a: Dictionary = _frame()
 	var tl := to_screen(Vector2(a["left"], a["top"]))
 	var br := to_screen(Vector2(a["right"], a["bottom"]))
 	var rect := Rect2(tl, br - tl)
@@ -171,6 +178,10 @@ func _draw_full() -> void:
 		draw_line(g0 - tick, g0 + tick, Color(MenuStyle.BONE, 0.5), 2.0)
 		draw_line(g1 - tick, g1 + tick, Color(MenuStyle.BONE, 0.5), 2.0)
 	for b in data["boxes"]:
+		if float(b["x0"]) > float(a["right"]) or float(b["x1"]) < float(a["left"]):
+			continue
+		if float(b["x1"]) - float(b["x0"]) > TERRAIN_SIZE or float(b["y1"]) - float(b["y0"]) > TERRAIN_SIZE:
+			continue  # solid ground beside a highway, not a building
 		var kind: String = b["kind"]
 		if kind == "building":
 			draw_colored_polygon(_box_poly(b), Color(BUILDING, 0.8))
@@ -189,6 +200,8 @@ func _draw_full() -> void:
 		var pl: Dictionary = StoryData.PLACES[id]
 		if pl["label"] == "" or pl["city"] != city:
 			continue
+		if float(pl["pos"].x) > float(a["right"]):
+			continue  # on the highway, off the framed part
 		var at := to_screen(pl["pos"])
 		var col: Color = named.get(id, MenuStyle.DIM)
 		var f := MenuStyle.font(600, 3)
@@ -204,10 +217,16 @@ func _draw_full() -> void:
 	for bl in blips:
 		var col: Color = TEAL if bl["kind"] == "start" else AMBER
 		var at := to_screen(bl["pos"])
+		at = Vector2(clampf(at.x, tl.x + 12.0, br.x - 12.0), clampf(at.y, tl.y + 12.0, br.y - 12.0))
 		draw_circle(at, 11.0, Color(col, 0.22))
 		draw_arc(at, 11.0, 0.0, TAU, 24, col, 2.0, true)
 		draw_circle(at, 3.0, col)
 	var me := to_screen(car_pos)
+	var away := not Rect2(tl, br - tl).has_point(me)
+	if away:
+		# Out along the highway, off the framed part: pinned to the frame's edge, with how far it is.
+		me = Vector2(clampf(me.x, tl.x + 14.0, br.x - 14.0), clampf(me.y, tl.y + 14.0, br.y - 14.0))
+		draw_string(MenuStyle.font(600, 1), me + Vector2(-166.0, -16.0), "%d m OUT" % int(roundf(car_pos.x - float(a["right"]))), HORIZONTAL_ALIGNMENT_RIGHT, 150.0, 13, Color(MenuStyle.BONE, 0.9))
 	var h := Vector2.from_angle(car_angle)
 	var fwd := Vector2(h.x, -h.y)
 	var side := Vector2(-fwd.y, fwd.x)

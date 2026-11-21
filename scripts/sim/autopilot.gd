@@ -24,6 +24,9 @@ const HINTS := {
 		],
 		"chicane": {"waypoints": [Vector2(8.0, 0.4), Vector2(3.0, -0.4), Vector2(-14.0, -0.4)], "car_east_of": -12.0, "goal_west_of": -20.0},
 	},
+	# The harbour city's squeezes (a 4 m gap, like the chicane) are for the grid to see, not a hint: its own grid
+	# is 1 m cells with the car's half width plus a hand's breadth, which leaves a cell in every 4 m gap.
+	"harbour": {"nav": {"clearance": 1.0, "cell": 1.0}},
 }
 const CAR_CLEARANCE := 2.4  # metres from a wall to a cell the car may be routed through
 ## Where it drives on a street: a lane's width off the street's centre line, so it does not run down the
@@ -68,8 +71,9 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 	var car := game.car
 	if nav == null or nav_world != game.world:
 		nav_world = game.world
-		nav = NavGrid.new(game.world, CAR_CLEARANCE)
 		hints = HINTS.get(game.city_id, {})
+		var grid: Dictionary = hints.get("nav", {})
+		nav = NavGrid.new(game.world, float(grid.get("clearance", CAR_CLEARANCE)), float(grid.get("cell", NavGrid.CELL)))
 		tour = _places_to_tour(game.city_id)
 		route_i = 0
 	var obj := {}

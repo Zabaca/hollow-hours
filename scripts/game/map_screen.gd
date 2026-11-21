@@ -47,6 +47,7 @@ func _ready() -> void:
 	hint.position = Vector2(MenuStyle.MARGIN_X, 810.0)
 	shade.add_child(hint)
 	view.mode = MapView.Mode.FULL
+	view.clip_contents = true  # a city that is longer than its frame (the harbour's highway) draws only the frame
 	view.position = Vector2(470.0, 70.0)
 	view.size = Vector2(1060.0, 760.0)
 	shade.add_child(view)

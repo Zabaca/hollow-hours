@@ -16,8 +16,9 @@ extends RefCounted
 ##   mission_started {mission, id, title, number}   objective {text, kind, step, place?, pos?}
 ##   line {id, speaker, priority}                   hold {state: filling|paused|done, progress}
 ##   checkpoint {step, pos}                         timer {id, state: start|stop, seconds?}
-##   mission_complete {mission, id, title, final}   mission_failed {mission, id, reason, text}
+##   mission_complete {mission, id, title, final, chapter_end}   mission_failed {mission, id, reason, text}
 ##   gate_open / gate_closed                        escaped                story_complete
+##   chapter_complete {next, city}  (the car is out of the gate and at rest, and the next chapter is in another city)
 ##   retry {to: checkpoint|start}                   roam {next}            roam_wrecked
 ##   save {data}  (a save is asked for: write it with SaveStore)
 
@@ -151,9 +152,10 @@ func blips() -> Array:
 ## How far the night has lightened: a touch more with each mission, a little more after the end.
 func dawn_amount() -> float:
 	var i := mission if state == State.ACTIVE or state == State.FAILED else next_mission
-	if state == State.ENDED or i >= StoryData.MISSIONS.size():
+	var last := StoryData.MISSIONS.size() - 1
+	if state == State.ENDED or (i > last and StoryData.closes_story(last)):
 		return StoryData.ENDING_DAWN
-	return float(StoryData.MISSIONS[maxi(i, 0)]["dawn"])
+	return float(StoryData.MISSIONS[clampi(i, 0, last)]["dawn"])
 
 
 func save_data() -> Dictionary:
@@ -385,12 +387,15 @@ func _complete_mission(game: GameSim) -> void:
 	var m := mission_data()
 	done.append(m["id"])
 	next_mission = mission + 1
-	var final := next_mission >= StoryData.MISSIONS.size()
+	# The story ends here, or a chapter does (the next mission is in another city, which the game loads), or
+	# neither: the player is back in free roam.
+	var final := StoryData.closes_story(mission)
+	var chapter_end := not final and next_mission < StoryData.MISSIONS.size() and StoryData.ends_chapter(mission)
 	timers = {}
 	checkpoint = {}
 	_apply(game, m.get("end", {}), -1, true)
-	ev("mission_complete", {"mission": mission, "id": m["id"], "title": m["title"], "final": final})
-	if final:
+	ev("mission_complete", {"mission": mission, "id": m["id"], "title": m["title"], "final": final, "chapter_end": chapter_end})
+	if final or chapter_end:
 		state = State.ENDED
 	else:
 		state = State.ROAM
@@ -399,18 +404,22 @@ func _complete_mission(game: GameSim) -> void:
 		game.pack.stand_down()
 		_close_gate(game)
 		game.pack.set_size(StoryData.ROAM_PACK)
-	# The last mission asks for no save of its own: the car is still rolling out of the gate, and a
-	# save now (next "", ending not seen) would strand Continue. finish_story saves once it is over.
-	if not final:
+	# The last mission of a chapter asks for no save of its own: the car is still rolling out of the gate,
+	# and a save now (ending not seen) would strand Continue. finish_story saves once it is over.
+	if not final and not chapter_end:
 		last_save = save_data()
 		ev("save", {"data": last_save.duplicate(true)})
 
 
-## The car has gone out of the gate and come to rest: the story is over. GameSim calls this.
+## The car has gone out of the gate and come to rest: the chapter or the story is over. GameSim calls this.
 func finish_story() -> void:
 	ending_seen = true
 	last_save = save_data()
-	ev("story_complete")
+	if next_mission < StoryData.MISSIONS.size():
+		# A chapter's end, not the story's: the save has the next chapter's first mission next.
+		ev("chapter_complete", {"next": StoryData.MISSIONS[next_mission]["id"], "city": StoryData.mission_city(next_mission)})
+	else:
+		ev("story_complete")
 	ev("save", {"data": last_save.duplicate(true)})
 
 

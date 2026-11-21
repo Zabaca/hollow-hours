@@ -7,7 +7,8 @@ extends RefCounted
 ## layout and model.
 
 const QUARTER := "quarter"
-const IDS := [QUARTER]
+const HARBOUR := "harbour"
+const IDS := [QUARTER, HARBOUR]
 
 
 static func has(id: String) -> bool:
@@ -19,6 +20,8 @@ static func layout(id: String) -> Dictionary:
 	match id:
 		QUARTER:
 			return CityLayout.DATA
+		HARBOUR:
+			return HarbourLayout.DATA
 	push_error("Cities.layout: no city called '%s'" % id)
 	return {}
 
@@ -28,5 +31,7 @@ static func model_path(id: String) -> String:
 	match id:
 		QUARTER:
 			return "res://assets/models/city.glb"
+		HARBOUR:
+			return "res://assets/cities/harbour_city.glb"
 	push_error("Cities.model_path: no city called '%s'" % id)
 	return ""

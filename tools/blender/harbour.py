@@ -211,7 +211,8 @@ def build_roadblock(rb):
     bx, by = (pos + 3.5, at + 11.0) if axis == "y" else (at + 11.0, pos + 3.5)
     if (axis == "y" and P.ARENA["bottom"] + 4 < by < P.ARENA["top"] - 4) or (axis == "x" and P.ARENA["left"] + 4 < bx < P.ARENA["right"] - 4):
         C.barrel(g, bx, by, fire=True)
-    rec = dict(id=rb["id"], axis=axis, at=at, pos=pos, kind=rb["kind"], gap=None, corridor=[round(lo, 2), round(hi, 2)])
+    # `axis` is the direction the road runs along, as in roads[]: "x" for an east-west road, whose centre line is y = c
+    rec = dict(id=rb["id"], axis="x" if axis == "y" else "y", c=at, pos=pos, kind=rb["kind"], gap=None, corridor=[round(lo, 2), round(hi, 2)])
     if gap:
         rec["gap"] = dict(lo=round(gap[0], 2), hi=round(gap[1], 2), width=round(gap[1] - gap[0], 2))
     # the ambush: two or three creatures wait in the dark beside the barricade, 8 m up the road on the sidewalk strip
@@ -353,10 +354,12 @@ def build_river():
         C.LAYOUT["bridges"].append(dict(id="bridge_%d" % k, kind="fixed", x=round((x0 + x1) / 2, 2), y=round(yc, 2), length=x1 - x0, width=P.RW, axis="x"))
     # the lift bridge, drawn raised: towers on both banks, a deck hung between them at 13 m, the road cut at the quays
     l0, l1 = lift
+    closers = []
     for (xa, xb) in ((x0, x0 + 3.0), (x1 - 3.0, x1)):
         C.box(g, "concrete", xa, l0, -1.6, xb, l1, 0.3)
         C.box(g, "trim", xa, l0, 0.3, xb, l1, 0.6)
-        C.collider(xa, l0, xb, l1, "lift_up")
+        C.collider(xa, l0, xb, l1, "fence")
+        closers.append(dict(x0=xa, y0=l0, x1=xb, y1=l1))
         for ty in (l0 + 0.2, l1 - 1.6):
             C.box(g, "metal", xa, ty, 0.6, xb, ty + 1.4, 24.0)
             C.box(g, "trim", xa - 0.1, ty - 0.1, 24.0, xb + 0.1, ty + 1.5, 24.4)
@@ -371,7 +374,7 @@ def build_river():
         for ly in (l0 + 1.8, l1 - 1.8):
             C.box(g, "beacon", lx - 0.3, ly - 0.3, 24.4, lx + 0.3, ly + 0.3, 25.0)
     C.LAYOUT["bridges"].append(dict(id="lift_bridge", kind="lift", up=True, x=round((x0 + x1) / 2, 2), y=round(P.YS[P.LIFT_ROW], 2), length=x1 - x0, width=P.RW, axis="x",
-                                      closed_by="lift_up", deck_up_z=12.4))
+                                      closers=closers, deck_up_z=12.4))
     C.LAYOUT["river"] = dict(x0=x0, x1=x1, y0=bot, y1=top, quay_thickness=3.0)
 
 
@@ -735,6 +738,7 @@ def init_layout():
         boxes=[], posts=[], lamps=[], lights=[], wrecks=[], blocks=[], creature_spawns=[], fires=[], generators=[],
         player_start=dict(x=round(P.PLACES["highway_start"]["x"] + 5.0, 2), y=P.PLACES["highway_start"]["y"], angle=round(math.pi, 4)),
         roads=[], roadblocks=[], bridges=[], ambush_spots=[], stalled_hunters=[], places={}, highway={}, planned_legs=[],
+        map_frame=dict(left=P.CITY_LEFT, right=P.CITY_RIGHT + 150.0, bottom=P.CITY_BOTTOM, top=P.CITY_TOP),
         size=dict(blocks_x=P.BLOCKS_X, blocks_y=P.BLOCKS_Y, street_x=P.STREET_X, street_y=P.STREET_Y, road_width=P.RW, highway_length=P.HIGHWAY_LEN),
     )
 
@@ -802,10 +806,22 @@ def build():
     build_river()
     build_highway()
     build_world()
-    # roads as data
-    for r in P.road_lines():
-        C.LAYOUT["roads"].append(dict(axis=r["axis"], at=r["at"], a=r["a"], b=r["b"], kind=r["kind"], width=r["width"]))
-    C.LAYOUT["roads"].append(dict(axis="y", at=P.HIGHWAY_Y, a=P.HW_X0, b=P.HW_X1, kind="highway", width=2 * (P.HW_HALF - 1.0) + 2.0, carriageway_width=P.HW_HALF - 1.0))
+    # roads as data, in the shape sim_world.gd documents: {axis, c, width, from, to}, `axis` the direction it runs along
+    river_rows = set(P.BRIDGE_ROWS + [P.LIFT_ROW])
+    for j, y in enumerate(P.YS):
+        kind = "ring" if j in (0, len(P.YS) - 1) else "street"
+        if j in river_rows:
+            C.LAYOUT["roads"].append(dict(axis="x", c=y, width=P.RW, **{"from": P.CITY_LEFT, "to": P.CITY_RIGHT}, kind=kind))
+        else:
+            C.LAYOUT["roads"].append(dict(axis="x", c=y, width=P.RW, **{"from": P.CITY_LEFT, "to": P.RIVER_X0}, kind=kind))
+            C.LAYOUT["roads"].append(dict(axis="x", c=y, width=P.RW, **{"from": P.RIVER_X1, "to": P.CITY_RIGHT}, kind=kind))
+    for i, x in enumerate(P.XS):
+        if i == P.RIVER_COL:
+            continue
+        kind = "ring" if i in (0, len(P.XS) - 1) else "street"
+        C.LAYOUT["roads"].append(dict(axis="y", c=x, width=P.RW, **{"from": P.CITY_BOTTOM, "to": P.CITY_TOP}, kind=kind))
+    for cy in (P.HW_HALF / 2 + 0.5, -(P.HW_HALF / 2 + 0.5)):
+        C.LAYOUT["roads"].append(dict(axis="x", c=cy, width=P.HW_HALF - 1.0, **{"from": P.HW_X0, "to": P.HW_X1}, kind="highway"))
     settle_points()
     # places and legs
     for name, p in P.PLACES.items():

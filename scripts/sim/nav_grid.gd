@@ -1,51 +1,56 @@
 class_name NavGrid
 extends RefCounted
 ## A coarse A* grid over the city (2 m cells) so the creatures path around buildings instead of
-## pressing against them. Cells a creature's body cannot fit through are solid.
+## pressing against them. Cells a creature's body cannot fit through are solid. A finer grid (`cell_size`)
+## sees narrower gaps: a cell is solid when its centre is within `clearance` plus 0.4 of a cell of a box, so
+## a gap needs to be wider than twice that to leave a cell at all; the car's grid for the harbour city's
+## 4 m squeezes is 1 m cells.
 
 const CELL := 2.0
 
+var cell := CELL
 var astar := AStarGrid2D.new()
 var origin := Vector2.ZERO
 var size := Vector2i.ZERO
 
 
-func _init(world: SimWorld, clearance: float = 0.75) -> void:
+func _init(world: SimWorld, clearance: float = 0.75, cell_size: float = CELL) -> void:
+	cell = cell_size
 	var a: Dictionary = world.arena
 	origin = Vector2(a["left"], a["bottom"])
-	size = Vector2i(int(ceil((a["right"] - a["left"]) / CELL)), int(ceil((a["top"] - a["bottom"]) / CELL)))
+	size = Vector2i(int(ceil((a["right"] - a["left"]) / cell)), int(ceil((a["top"] - a["bottom"]) / cell)))
 	astar.region = Rect2i(Vector2i.ZERO, size)
-	astar.cell_size = Vector2(CELL, CELL)
-	astar.offset = origin + Vector2(CELL, CELL) * 0.5
+	astar.cell_size = Vector2(cell, cell)
+	astar.offset = origin + Vector2(cell, cell) * 0.5
 	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	astar.update()
 	# Each box and post marks only the cells it can reach (the box grown by the clearance and 0.4 of a
 	# cell, the post's circle by the clearance and 0.3), not every cell of the city: the same solid cells
 	# the test of every cell against every box gave, found in time that follows the obstacles.
-	var reach := clearance + CELL * 0.4
+	var reach := clearance + cell * 0.4
 	for b in world.boxes:
-		var ix0 := _index((b["x0"] - reach - origin.x) / CELL - 0.5, size.x) - 1
-		var ix1 := _index((b["x1"] + reach - origin.x) / CELL - 0.5, size.x) + 1
-		var iy0 := _index((b["y0"] - reach - origin.y) / CELL - 0.5, size.y) - 1
-		var iy1 := _index((b["y1"] + reach - origin.y) / CELL - 0.5, size.y) + 1
+		var ix0 := _index((b["x0"] - reach - origin.x) / cell - 0.5, size.x) - 1
+		var ix1 := _index((b["x1"] + reach - origin.x) / cell - 0.5, size.x) + 1
+		var iy0 := _index((b["y0"] - reach - origin.y) / cell - 0.5, size.y) - 1
+		var iy1 := _index((b["y1"] + reach - origin.y) / cell - 0.5, size.y) + 1
 		for ix in range(maxi(ix0, 0), mini(ix1, size.x - 1) + 1):
-			var cx := origin.x + (ix + 0.5) * CELL
-			if not (cx > b["x0"] - clearance - CELL * 0.4 and cx < b["x1"] + clearance + CELL * 0.4):
+			var cx := origin.x + (ix + 0.5) * cell
+			if not (cx > b["x0"] - clearance - cell * 0.4 and cx < b["x1"] + clearance + cell * 0.4):
 				continue
 			for iy in range(maxi(iy0, 0), mini(iy1, size.y - 1) + 1):
-				var cy := origin.y + (iy + 0.5) * CELL
-				if cy > b["y0"] - clearance - CELL * 0.4 and cy < b["y1"] + clearance + CELL * 0.4:
+				var cy := origin.y + (iy + 0.5) * cell
+				if cy > b["y0"] - clearance - cell * 0.4 and cy < b["y1"] + clearance + cell * 0.4:
 					astar.set_point_solid(Vector2i(ix, iy), true)
 	for p in world.posts:
-		var lim: float = float(p["r"]) + clearance + CELL * 0.3
+		var lim: float = float(p["r"]) + clearance + cell * 0.3
 		var at := Vector2(p["x"], p["y"])
-		var ix0 := _index((at.x - lim - origin.x) / CELL - 0.5, size.x) - 1
-		var ix1 := _index((at.x + lim - origin.x) / CELL - 0.5, size.x) + 1
-		var iy0 := _index((at.y - lim - origin.y) / CELL - 0.5, size.y) - 1
-		var iy1 := _index((at.y + lim - origin.y) / CELL - 0.5, size.y) + 1
+		var ix0 := _index((at.x - lim - origin.x) / cell - 0.5, size.x) - 1
+		var ix1 := _index((at.x + lim - origin.x) / cell - 0.5, size.x) + 1
+		var iy0 := _index((at.y - lim - origin.y) / cell - 0.5, size.y) - 1
+		var iy1 := _index((at.y + lim - origin.y) / cell - 0.5, size.y) + 1
 		for ix in range(maxi(ix0, 0), mini(ix1, size.x - 1) + 1):
 			for iy in range(maxi(iy0, 0), mini(iy1, size.y - 1) + 1):
-				var c := origin + Vector2((ix + 0.5) * CELL, (iy + 0.5) * CELL)
+				var c := origin + Vector2((ix + 0.5) * cell, (iy + 0.5) * cell)
 				if c.distance_to(at) < lim:
 					astar.set_point_solid(Vector2i(ix, iy), true)
 
@@ -57,7 +62,7 @@ func _index(u: float, count: int) -> int:
 
 
 func cell_of(p: Vector2) -> Vector2i:
-	var rel := (p - origin) / CELL
+	var rel := (p - origin) / cell
 	return Vector2i(clampi(int(floor(rel.x)), 0, size.x - 1), clampi(int(floor(rel.y)), 0, size.y - 1))
 
 

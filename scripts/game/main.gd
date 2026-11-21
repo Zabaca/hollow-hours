@@ -38,6 +38,12 @@ var debug_cam_side := 0.0  # --cam-side=H: a low camera H metres up, 7 m to the 
 var debug_gate := ""  # --gate=open|opening: the west gate open from the start, or opening 1.5 s in
 var debug_start := PackedFloat64Array()
 var debug_drive := Vector2(INF, 0.0)  # --drive=throttle,turn: constant controls instead of the autopilot
+var perf_seconds := -1.0  # --perf=SECONDS: measure frame time for that long (after a 4 s warm-up) and quit
+var perf_frames: Array = []
+var perf_gpu: Array = []  # the viewport's own measure of the render, in ms: what the frame costs below the display's rate
+var perf_cpu: Array = []
+var perf_draws := 0
+var perf_objects := 0
 var shot_taken := false
 var started_ms := 0
 var threat := 0.0
@@ -73,6 +79,11 @@ func _ready() -> void:
 		elif a.begins_with("--drive="):
 			var dv := a.trim_prefix("--drive=").split_floats(",")
 			debug_drive = Vector2(dv[0], dv[1])
+		elif a.begins_with("--perf="):
+			perf_seconds = float(a.trim_prefix("--perf="))
+			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)  # the cost of a frame, not the screen's rate
+			Engine.max_fps = 0
+			RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 		elif a.begins_with("--shot-speed="):
 			shot_speed = float(a.trim_prefix("--shot-speed="))
 		elif a.begins_with("--shot-game="):
@@ -125,6 +136,7 @@ func _ready() -> void:
 		presenter.save_path = Session.save_path
 		presenter.quit_to_menu.connect(_quit_to_menu)
 		presenter.world_reset.connect(_reset_views)
+		presenter.chapter_changed.connect(_on_chapter_changed)
 		presenter.ending_started.connect(func() -> void: hud.fade_out(2.2))
 		# The sky starts where the story is, not at night.
 		story_dawn = presenter.dawn_target()
@@ -196,6 +208,8 @@ func _story_screen() -> void:
 			game.damage(1000.0, "dev")
 		"complete":
 			presenter.on_event({"type": "mission_complete", "title": "BATTERIES", "id": "batteries", "mission": 0, "final": false})
+		"chapter":
+			presenter.begin_chapter_card()
 		"ending":
 			game.world.gate["open"] = true
 			gate_view.set_open(true, true)
@@ -218,6 +232,19 @@ func _apply_graphics() -> void:
 
 func _open_pause() -> void:
 	pause_menu.open(audio, presenter != null, presenter != null and game.mission.active())
+
+
+## The end of a chapter: load the next chapter's city, as Continue from the save the chapter's end wrote.
+func _on_chapter_changed(save: Dictionary) -> void:
+	Engine.time_scale = 1.0
+	get_tree().paused = false
+	Session.mode = "story"
+	Session.continue_save = save
+	Session.continue_flag = false
+	Session.mission_flag = 0
+	Session.city = ""
+	Session.screen = ""
+	get_tree().change_scene_to_file(Session.MAIN_SCENE)
 
 
 func _quit_to_menu() -> void:
@@ -322,13 +349,15 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if perf_seconds >= 0.0:
+		_perf(delta)
 	_poll_actions()
 	var car := game.car
 	var alpha := Engine.get_physics_interpolation_fraction()
 	var pos := prev_pos.lerp(car.body.position, alpha)
 	var ang := lerp_angle(prev_angle, car.body.angle, alpha)
 	car_view.sync(game, game.world, pos, ang, delta)
-	var ending := presenter != null and presenter.ending in ["pullback", "roll", "fade", "done"]
+	var ending := presenter != null and presenter.in_ending_view()
 	if ending:
 		cam.update_pullback(pos, ang, car_view.ground, presenter.pullback_progress())
 		gate_view.track(GM.to3(pos, 1.2))
@@ -368,6 +397,39 @@ func _process(delta: float) -> void:
 	if shot_path != "" and not shot_taken and ((shot_speed >= 0.0 and car.speed() >= shot_speed and game.time > 5.0) or (shot_game >= 0.0 and game.time >= shot_game) or (shot_game < 0.0 and shot_speed < 0.0 and (Time.get_ticks_msec() - started_ms) / 1000.0 >= shot_at)):
 		shot_taken = true
 		_take_shot()
+
+
+func _avg(a: Array) -> float:
+	var t := 0.0
+	for v in a:
+		t += float(v)
+	return t / maxf(1.0, float(a.size()))
+
+
+## --perf=SECONDS: after four seconds' warm-up, the frame times and what was drawn, printed as a PERF line, then quit.
+## Use with --demo (the autopilot drives) or --drive, --start=x,y,angle for the spot; vsync is off.
+func _perf(delta: float) -> void:
+	var t := (Time.get_ticks_msec() - started_ms) / 1000.0
+	if t < 4.0:
+		return
+	perf_frames.append(delta * 1000.0)
+	var rid := get_viewport().get_viewport_rid()
+	perf_gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(rid))
+	perf_cpu.append(RenderingServer.viewport_get_measured_render_time_cpu(rid))
+	perf_draws = maxi(perf_draws, int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)))
+	perf_objects = maxi(perf_objects, int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)))
+	if t >= 4.0 + perf_seconds:
+		perf_frames.sort()
+		var n := perf_frames.size()
+		var sum := 0.0
+		for f in perf_frames:
+			sum += float(f)
+		perf_gpu.sort()
+		perf_cpu.sort()
+		print("PERF city=%s frames=%d frame avg=%.2f ms p95=%.2f ms max=%.2f ms (%.0f fps) | render gpu avg=%.2f p95=%.2f max=%.2f ms, cpu avg=%.2f p95=%.2f ms | draw_calls_max=%d objects_max=%d low=%s car=%s" % [
+			city_id, n, sum / n, perf_frames[int(n * 0.95)], perf_frames[n - 1], 1000.0 * n / sum, _avg(perf_gpu), perf_gpu[int(n * 0.95)], perf_gpu[n - 1], _avg(perf_cpu), perf_cpu[int(n * 0.95)],
+			perf_draws, perf_objects, str(not Settings.high), str(game.car.body.position.round())])
+		get_tree().quit()
 
 
 func _sync_creatures(delta: float) -> void:

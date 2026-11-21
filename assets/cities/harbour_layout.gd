@@ -3221,14 +3221,14 @@ const DATA := {
    "y0": -151.0,
    "x1": -135.0,
    "y1": -137.0,
-   "kind": "lift_up"
+   "kind": "fence"
   },
   {
    "x0": -121.0,
    "y0": -151.0,
    "x1": -118.0,
    "y1": -137.0,
-   "kind": "lift_up"
+   "kind": "fence"
   },
   {
    "x0": 199.0,
@@ -11802,124 +11802,155 @@ const DATA := {
  },
  "roads": [
   {
-   "axis": "y",
-   "at": -144.0,
-   "a": -192.0,
-   "b": 192.0,
-   "kind": "ring",
-   "width": 14.0
-  },
-  {
-   "axis": "y",
-   "at": -96.0,
-   "a": -192.0,
-   "b": 192.0,
-   "kind": "street",
-   "width": 14.0
-  },
-  {
-   "axis": "y",
-   "at": -48.0,
-   "a": -192.0,
-   "b": 192.0,
-   "kind": "street",
-   "width": 14.0
-  },
-  {
-   "axis": "y",
-   "at": 0.0,
-   "a": -192.0,
-   "b": 192.0,
-   "kind": "street",
-   "width": 14.0
-  },
-  {
-   "axis": "y",
-   "at": 48.0,
-   "a": -192.0,
-   "b": 192.0,
-   "kind": "street",
-   "width": 14.0
-  },
-  {
-   "axis": "y",
-   "at": 96.0,
-   "a": -192.0,
-   "b": 192.0,
-   "kind": "street",
-   "width": 14.0
-  },
-  {
-   "axis": "y",
-   "at": 144.0,
-   "a": -192.0,
-   "b": 192.0,
-   "kind": "ring",
-   "width": 14.0
+   "axis": "x",
+   "c": -144.0,
+   "width": 14.0,
+   "from": -199.0,
+   "to": 199.0,
+   "kind": "ring"
   },
   {
    "axis": "x",
-   "at": -192.0,
-   "a": -144.0,
-   "b": 144.0,
-   "kind": "ring",
-   "width": 14.0
+   "c": -96.0,
+   "width": 14.0,
+   "from": -199.0,
+   "to": 199.0,
+   "kind": "street"
   },
   {
    "axis": "x",
-   "at": -64.0,
-   "a": -144.0,
-   "b": 144.0,
-   "kind": "street",
-   "width": 14.0
+   "c": -48.0,
+   "width": 14.0,
+   "from": -199.0,
+   "to": -138.0,
+   "kind": "street"
   },
   {
    "axis": "x",
-   "at": 0.0,
-   "a": -144.0,
-   "b": 144.0,
-   "kind": "street",
-   "width": 14.0
+   "c": -48.0,
+   "width": 14.0,
+   "from": -118.0,
+   "to": 199.0,
+   "kind": "street"
   },
   {
    "axis": "x",
-   "at": 64.0,
-   "a": -144.0,
-   "b": 144.0,
-   "kind": "street",
-   "width": 14.0
+   "c": 0.0,
+   "width": 14.0,
+   "from": -199.0,
+   "to": 199.0,
+   "kind": "street"
   },
   {
    "axis": "x",
-   "at": 128.0,
-   "a": -144.0,
-   "b": 144.0,
-   "kind": "street",
-   "width": 14.0
+   "c": 48.0,
+   "width": 14.0,
+   "from": -199.0,
+   "to": -138.0,
+   "kind": "street"
   },
   {
    "axis": "x",
-   "at": 192.0,
-   "a": -144.0,
-   "b": 144.0,
-   "kind": "ring",
-   "width": 14.0
+   "c": 48.0,
+   "width": 14.0,
+   "from": -118.0,
+   "to": 199.0,
+   "kind": "street"
+  },
+  {
+   "axis": "x",
+   "c": 96.0,
+   "width": 14.0,
+   "from": -199.0,
+   "to": 199.0,
+   "kind": "street"
+  },
+  {
+   "axis": "x",
+   "c": 144.0,
+   "width": 14.0,
+   "from": -199.0,
+   "to": -138.0,
+   "kind": "ring"
+  },
+  {
+   "axis": "x",
+   "c": 144.0,
+   "width": 14.0,
+   "from": -118.0,
+   "to": 199.0,
+   "kind": "ring"
   },
   {
    "axis": "y",
-   "at": 0.0,
-   "a": 199.0,
-   "b": 1399.0,
-   "kind": "highway",
-   "width": 30.0,
-   "carriageway_width": 14.0
+   "c": -192.0,
+   "width": 14.0,
+   "from": -151.0,
+   "to": 151.0,
+   "kind": "ring"
+  },
+  {
+   "axis": "y",
+   "c": -64.0,
+   "width": 14.0,
+   "from": -151.0,
+   "to": 151.0,
+   "kind": "street"
+  },
+  {
+   "axis": "y",
+   "c": 0.0,
+   "width": 14.0,
+   "from": -151.0,
+   "to": 151.0,
+   "kind": "street"
+  },
+  {
+   "axis": "y",
+   "c": 64.0,
+   "width": 14.0,
+   "from": -151.0,
+   "to": 151.0,
+   "kind": "street"
+  },
+  {
+   "axis": "y",
+   "c": 128.0,
+   "width": 14.0,
+   "from": -151.0,
+   "to": 151.0,
+   "kind": "street"
+  },
+  {
+   "axis": "y",
+   "c": 192.0,
+   "width": 14.0,
+   "from": -151.0,
+   "to": 151.0,
+   "kind": "ring"
+  },
+  {
+   "axis": "x",
+   "c": 8.0,
+   "width": 14.0,
+   "from": 199.0,
+   "to": 1399.0,
+   "kind": "highway"
+  },
+  {
+   "axis": "x",
+   "c": -8.0,
+   "width": 14.0,
+   "from": 199.0,
+   "to": 1399.0,
+   "kind": "highway"
   }
  ],
  "roadblocks": [
   {
    "id": "rb_south_ring_east",
-   "axis": "y",
-   "at": -144.0,
+   "axis": "x",
+   "c": -144.0,
    "pos": 100.0,
    "kind": "closed",
    "gap": null,
@@ -11930,8 +11961,8 @@ const DATA := {
   },
   {
    "id": "rb_south_ring_mid",
-   "axis": "y",
-   "at": -144.0,
+   "axis": "x",
+   "c": -144.0,
    "pos": -32.0,
    "kind": "closed",
    "gap": null,
@@ -11942,8 +11973,8 @@ const DATA := {
   },
   {
    "id": "rb_street_south_east",
-   "axis": "y",
-   "at": -96.0,
+   "axis": "x",
+   "c": -96.0,
    "pos": 96.0,
    "kind": "squeeze",
    "gap": {
@@ -11958,8 +11989,8 @@ const DATA := {
   },
   {
    "id": "rb_street_south_mid",
-   "axis": "y",
-   "at": -96.0,
+   "axis": "x",
+   "c": -96.0,
    "pos": -32.0,
    "kind": "closed",
    "gap": null,
@@ -11970,8 +12001,8 @@ const DATA := {
   },
   {
    "id": "rb_street_mid_south",
-   "axis": "y",
-   "at": -48.0,
+   "axis": "x",
+   "c": -48.0,
    "pos": -32.0,
    "kind": "closed",
    "gap": null,
@@ -11982,8 +12013,8 @@ const DATA := {
   },
   {
    "id": "rb_avenue_east",
-   "axis": "y",
-   "at": 0.0,
+   "axis": "x",
+   "c": 0.0,
    "pos": 96.0,
    "kind": "squeeze",
    "gap": {
@@ -11998,8 +12029,8 @@ const DATA := {
   },
   {
    "id": "rb_avenue_mid",
-   "axis": "y",
-   "at": 0.0,
+   "axis": "x",
+   "c": 0.0,
    "pos": -32.0,
    "kind": "closed",
    "gap": null,
@@ -12010,8 +12041,8 @@ const DATA := {
   },
   {
    "id": "rb_street_mid_north",
-   "axis": "y",
-   "at": 48.0,
+   "axis": "x",
+   "c": 48.0,
    "pos": -32.0,
    "kind": "squeeze",
    "gap": {
@@ -12026,8 +12057,8 @@ const DATA := {
   },
   {
    "id": "rb_avenue_west",
-   "axis": "y",
-   "at": 0.0,
+   "axis": "x",
+   "c": 0.0,
    "pos": -98.0,
    "kind": "squeeze",
    "gap": {
@@ -12042,8 +12073,8 @@ const DATA := {
   },
   {
    "id": "rb_street_north_east",
-   "axis": "y",
-   "at": 96.0,
+   "axis": "x",
+   "c": 96.0,
    "pos": 96.0,
    "kind": "squeeze",
    "gap": {
@@ -12058,8 +12089,8 @@ const DATA := {
   },
   {
    "id": "rb_street_north_west",
-   "axis": "y",
-   "at": 96.0,
+   "axis": "x",
+   "c": 96.0,
    "pos": -96.0,
    "kind": "closed",
    "gap": null,
@@ -12070,8 +12101,8 @@ const DATA := {
   },
   {
    "id": "rb_north_ring_west",
-   "axis": "y",
-   "at": 144.0,
+   "axis": "x",
+   "c": 144.0,
    "pos": -96.0,
    "kind": "squeeze",
    "gap": {
@@ -12086,8 +12117,8 @@ const DATA := {
   },
   {
    "id": "rb_north_ring_east",
-   "axis": "y",
-   "at": 144.0,
+   "axis": "x",
+   "c": 144.0,
    "pos": 100.0,
    "kind": "squeeze",
    "gap": {
@@ -12102,8 +12133,8 @@ const DATA := {
   },
   {
    "id": "rb_east_ring_north",
-   "axis": "x",
-   "at": 192.0,
+   "axis": "y",
+   "c": 192.0,
    "pos": 72.0,
    "kind": "squeeze",
    "gap": {
@@ -12118,8 +12149,8 @@ const DATA := {
   },
   {
    "id": "rb_east_ring_south",
-   "axis": "x",
-   "at": 192.0,
+   "axis": "y",
+   "c": 192.0,
    "pos": -72.0,
    "kind": "closed",
    "gap": null,
@@ -12130,8 +12161,8 @@ const DATA := {
   },
   {
    "id": "rb_west_ring_north",
-   "axis": "x",
-   "at": -192.0,
+   "axis": "y",
+   "c": -192.0,
    "pos": 72.0,
    "kind": "squeeze",
    "gap": {
@@ -12146,8 +12177,8 @@ const DATA := {
   },
   {
    "id": "rb_west_ring_south",
-   "axis": "x",
-   "at": -192.0,
+   "axis": "y",
+   "c": -192.0,
    "pos": -130.0,
    "kind": "closed",
    "gap": null,
@@ -12158,8 +12189,8 @@ const DATA := {
   },
   {
    "id": "rb_road_east_mid",
-   "axis": "x",
-   "at": 128.0,
+   "axis": "y",
+   "c": 128.0,
    "pos": 24.0,
    "kind": "squeeze",
    "gap": {
@@ -12174,8 +12205,8 @@ const DATA := {
   },
   {
    "id": "rb_road_centre",
-   "axis": "x",
-   "at": 0.0,
+   "axis": "y",
+   "c": 0.0,
    "pos": -24.0,
    "kind": "squeeze",
    "gap": {
@@ -12190,8 +12221,8 @@ const DATA := {
   },
   {
    "id": "rb_road_centre_north",
-   "axis": "x",
-   "at": 0.0,
+   "axis": "y",
+   "c": 0.0,
    "pos": 72.0,
    "kind": "closed",
    "gap": null,
@@ -12202,8 +12233,8 @@ const DATA := {
   },
   {
    "id": "rb_road_centre_south",
-   "axis": "x",
-   "at": 0.0,
+   "axis": "y",
+   "c": 0.0,
    "pos": -120.0,
    "kind": "closed",
    "gap": null,
@@ -12214,8 +12245,8 @@ const DATA := {
   },
   {
    "id": "rb_road_west",
-   "axis": "x",
-   "at": -64.0,
+   "axis": "y",
+   "c": -64.0,
    "pos": 24.0,
    "kind": "squeeze",
    "gap": {
@@ -12230,8 +12261,8 @@ const DATA := {
   },
   {
    "id": "rb_road_west_south",
-   "axis": "x",
-   "at": -64.0,
+   "axis": "y",
+   "c": -64.0,
    "pos": -72.0,
    "kind": "squeeze",
    "gap": {
@@ -12246,8 +12277,8 @@ const DATA := {
   },
   {
    "id": "rb_road_east_south",
-   "axis": "x",
-   "at": 64.0,
+   "axis": "y",
+   "c": 64.0,
    "pos": -72.0,
    "kind": "squeeze",
    "gap": {
@@ -12298,7 +12329,20 @@ const DATA := {
    "length": 20.0,
    "width": 14.0,
    "axis": "x",
-   "closed_by": "lift_up",
+   "closers": [
+    {
+     "x0": -138.0,
+     "y0": -151.0,
+     "x1": -135.0,
+     "y1": -137.0
+    },
+    {
+     "x0": -121.0,
+     "y0": -151.0,
+     "x1": -118.0,
+     "y1": -137.0
+    }
+   ],
    "deck_up_z": 12.4
   }
  ],
@@ -12723,6 +12767,12 @@ const DATA := {
    "min_by_road": 450.0
   }
  ],
+ "map_frame": {
+  "left": -199.0,
+  "right": 349.0,
+  "bottom": -151.0,
+  "top": 151.0
+ },
  "size": {
   "blocks_x": 6,
   "blocks_y": 6,

@@ -21,6 +21,8 @@ extends RefCounted
 ##                                   (radians, map angle) says where round the place each one stands; the
 ##                                   pharmacy's two are down the avenue to its west, so a car arriving from
 ##                                   the east has a straight run at them
+##   stalled true                    arm the city layout's stalled-car hunters: each waits in its car and is
+##                                   placed, already hunting, when the car comes within its `release` distance
 ##   timer {id, seconds, reason, label}   start a timer; it fails the mission with `reason` at zero
 ##   stop_timer id
 ##   gate "open"
@@ -65,6 +67,14 @@ const PLACES := {
 	"motel": {"name": "the motel office", "pos": Vector2(-20.5, 41.5), "radius": 5.0, "angle": PI, "label": "Motel", "city": "quarter", "marker": true},
 	"bar": {"name": "the bar", "pos": Vector2(19.0, -24.0), "radius": 0.0, "angle": 0.0, "label": "Bar", "city": "quarter", "marker": false},
 	"pawn": {"name": "the pawn shop", "pos": Vector2(42.5, -32.0), "radius": 0.0, "angle": 0.0, "label": "Pawn", "city": "quarter", "marker": false},
+	# The harbour city (chapter 2). Its map is one rectangle: the city in the west and, running out of its east
+	# side, the divided highway the chapter opens on. `highway_start` is the cordon's checkpoint at the far end
+	# (the layout's player start). tests/harbour_test.gd measures every leg on the path grid.
+	"highway_start": {"name": "the highway checkpoint", "pos": Vector2(1379.0, 8.0), "radius": 8.0, "angle": PI, "label": "", "city": "harbour", "marker": false, "safe": true},
+	"toll_plaza": {"name": "the toll plaza", "pos": Vector2(1244.5, 8.5), "radius": 16.0, "angle": PI, "label": "Toll Plaza", "city": "harbour", "marker": true},
+	"jam": {"name": "the stalled traffic", "pos": Vector2(1127.5, 8.5), "radius": 18.0, "angle": PI, "label": "Traffic", "city": "harbour", "marker": true},
+	"truck_stop": {"name": "the truck stop", "pos": Vector2(650.5, 20.5), "radius": 28.0, "angle": PI, "label": "Truck Stop", "city": "harbour", "marker": true},
+	"convoy_call": {"name": "the east ring road", "pos": Vector2(171.5, -3.5), "radius": 12.0, "angle": PI, "label": "East Ring", "city": "harbour", "marker": true},
 }
 
 ## The radio script, 21 lines. `text` carries the cue words in square brackets (they steer the
@@ -91,7 +101,17 @@ const LINES := {
 	"end_vera": {"speaker": "vera", "text": "[quiet] Look at that, Red. First light."},
 	"end_ruck": {"speaker": "ruck", "text": "Vehicle is out. Seal it."},
 	"wrecked": {"speaker": "vera", "text": "[afraid] Red? Red, answer me."},
+	# Chapter 2, The Long Road. Subtitles only until the voices are bought (UNVOICED).
+	"lr_call_1": {"speaker": "vera", "text": "[urgent] Red, the checkpoint's falling. Don't stop for anything. Drive the highway into the city, the convoy's last call came from the east ring road."},
+	"lr_call_2": {"speaker": "teo", "text": "[whispering] Something is moving in the stalled cars. Please keep your lights on the road."},
+	"lr_jam": {"speaker": "vera", "text": "Dead traffic ahead, both ways. There's a gap in it. Slow down and find it."},
+	"lr_overpass": {"speaker": "teo", "text": "[afraid] The overpass came down across the road. There's a truck stop beside it. Go round through the lot."},
+	"lr_done": {"speaker": "ruck", "text": "[flat, tired voice] I see headlights on the ring road. Is that you, Red? Stay where you are. Do not stop for anyone but us."},
 }
+
+## Lines that have no audio file yet: the radio shows their subtitles for their reading time. Buying the
+## voices (a later slice) empties this list.
+const UNVOICED := ["lr_call_1", "lr_call_2", "lr_jam", "lr_overpass", "lr_done"]
 
 ## Why a mission can fail: the text on the fail screen and the line that plays.
 const REASONS := {
@@ -159,7 +179,23 @@ const MISSIONS := [
 			},
 		],
 	},
+	# Chapter 2. `closes_story: false` keeps the story going in free roam when this is the last mission in the list
+	# (the rest of the chapter is built in later slices).
+	{
+		"id": "long_road", "title": "THE LONG ROAD", "city": "harbour", "start": "", "dawn": 0.0, "closes_story": false,
+		"begin": {"lines": ["lr_call_1", "lr_call_2"], "pack": 3},
+		"end": {"lines": ["lr_done"]},
+		"steps": [
+			{"id": "toll", "kind": "reach", "place": "toll_plaza", "text": "Drive the highway into the city: through the toll plaza", "end": {"lines": ["lr_jam"]}},
+			{"id": "jam", "kind": "reach", "place": "jam", "text": "Find the gap in the stalled traffic", "end": {"lines": ["lr_overpass"]}},
+			{"id": "overpass", "kind": "reach", "place": "truck_stop", "text": "The overpass is down: go round through the truck stop"},
+			{"id": "city", "kind": "reach", "place": "convoy_call", "text": "Drive on to the east ring road"},
+		],
+	},
 ]
+
+## The card shown at the start of each chapter after the first: "Chapter N" over its title.
+const CHAPTER_TITLES := ["The quarter", "The next night"]
 
 ## Tuning numbers MissionSim reads.
 ## How long Teo can hold the shutter, from the call until he is in the car: long enough for a driver to run down
@@ -202,6 +238,11 @@ static func chapters(missions: Array = MISSIONS) -> Array:
 ## Is mission `i` the last of its chapter (the story's last mission included)?
 static func ends_chapter(i: int, missions: Array = MISSIONS) -> bool:
 	return i + 1 >= missions.size() or str(missions[i + 1]["city"]) != str(missions[i]["city"])
+
+
+## Does finishing mission `i` end the story (the credits)? The last mission does, unless it says `closes_story: false`.
+static func closes_story(i: int, missions: Array = MISSIONS) -> bool:
+	return i + 1 >= missions.size() and bool(missions[i].get("closes_story", true))
 
 
 ## The city the player is in with `done_count` missions finished: the next mission's, or the last

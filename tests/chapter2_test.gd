@@ -229,6 +229,13 @@ func _test_floodlights() -> void:
 	_check(done.size() == 1 and done[0]["id"] == "floodlights" and not done[0]["final"], "the third generator completes Floodlights", str(done))
 	_check(said.has("fl_loaded") and said.has("fl_post_1") and said.has("fl_post_2") and said.has("fl_done"), "with a line at each generator and the last one at the end", str(said))
 	_check(f.mission.timers_left().is_empty(), "and the timer is stopped")
+	var sounds: Array = evs.filter(func(e: Dictionary) -> bool: return e["type"] == "sound").map(func(e: Dictionary) -> String: return e["name"])
+	_check(sounds == ["generator_start", "generator_start", "generator_start"], "each generator starts with its sound", str(sounds))
+	var missing: Array = []
+	for name in ["generator_start", "floodlights_fail", "bridge_horn", "bridge_motors", "bridge_thud"]:
+		if not ResourceLoader.exists("res://assets/audio/%s.mp3" % name):
+			missing.append(name)
+	_check(missing.is_empty(), "and the chapter's own sound effects (bridge horn, motors, thud, generator, floodlights failing) all exist", str(missing))
 
 
 ## The field hospital's floodlights are tagged in the layout; the city dims them by their tag's level.

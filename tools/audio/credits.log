@@ -2,3 +2,5 @@
 # so each figure was read after it had settled.
 2026-11-16 slice 5 (21 voiced lines, 1,361 characters with cue words, eleven_v4, and four effects: radio_squelch_in, radio_static_out, gate_klaxon, gate_leaves): used 631 credits
 2026-11-20 checkpoint spread (4 re-voiced lines, 370 characters with cue words: bat_call_2, bat_shop, bat_done, ph_done): counter had not moved when read; expect roughly 170 credits at slice 5's rate
+2026-11-21 chapter 2 voices (29 lines, 2,786 characters with cue words, eleven_v4, bought in the main checkout in several runs): counter 29,519 before, 30,630 once settled, so 1,111 credits (about 0.40 a character). Lines: lr_*, dc_*, fl_*, lb_* (StoryData.UNVOICED is empty again)
+2026-11-21 chapter 2 effects (5, 17.5 s asked for: bridge_horn 2 s, bridge_motors 8 s, bridge_thud 2.5 s, generator_start 2.5 s, floodlights_fail 2.5 s): counter 30,630 before, 30,805 once settled (read twice, 20 s apart, unchanged), so 175 credits (about 10 a second). Chapter 2's total 1,286 of the 1,500 approved

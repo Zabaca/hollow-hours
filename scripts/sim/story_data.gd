@@ -21,6 +21,7 @@ extends RefCounted
 ##                                   (radians, map angle) says where round the place each one stands; the
 ##                                   pharmacy's two are down the avenue to its west, so a car arriving from
 ##                                   the east has a straight run at them
+##   sound "name"                    a sound effect (assets/audio/<name>) played when the effect runs
 ##   ambush {route: [a, b], max?}    arm the layout's ambush spots beside the car's route from place a to place b
 ##                                   (at most `max`, default AMBUSH_MAX, kept apart along it, none at its ends): two or
 ##                                   three creatures wait in the dark and are placed, hunting, when the car comes within
@@ -117,7 +118,7 @@ const LINES := {
 	"end_vera": {"speaker": "vera", "text": "[quiet] Look at that, Red. First light."},
 	"end_ruck": {"speaker": "ruck", "text": "Vehicle is out. Seal it."},
 	"wrecked": {"speaker": "vera", "text": "[afraid] Red? Red, answer me."},
-	# Chapter 2, The Long Road. Subtitles only until the voices are bought (UNVOICED).
+	# Chapter 2, The Long Road.
 	"lr_call_1": {"speaker": "vera", "text": "[urgent] Red, the checkpoint's falling. Don't stop for anything. Drive the highway into the city, the convoy's last call came from the east ring road."},
 	"lr_call_2": {"speaker": "teo", "text": "[whispering] Something is moving in the stalled cars. Please keep your lights on the road."},
 	"lr_jam": {"speaker": "vera", "text": "Dead traffic ahead, both ways. There's a gap in it. Slow down and find it."},
@@ -152,14 +153,9 @@ const LINES := {
 	"lb_end_2": {"speaker": "ruck", "text": "[flat, then softer] Vehicle is across. Nobody tell the cordon. Stop the engine and let the sun find us."},
 }
 
-## Lines that have no audio file yet: the radio shows their subtitles for their reading time. Buying the
-## voices (a later slice) empties this list.
-const UNVOICED := [
-	"lr_call_1", "lr_call_2", "lr_jam", "lr_overpass", "lr_done",
-	"dc_call_1", "dc_call_2", "dc_hold", "dc_aboard", "dc_done",
-	"fl_call_1", "fl_call_2", "fl_load", "fl_loaded", "fl_post_1", "fl_post_2", "fl_done", "fl_failed",
-	"lb_call_1", "lb_call_2", "lb_aboard", "lb_arrive", "lb_work", "lb_end", "lb_hold", "lb_down", "lb_failed", "lb_end_1", "lb_end_2",
-]
+## Lines that have no audio file yet: the radio shows their subtitles for their reading time. Empty now that every line is
+## voiced; a line added without its voice goes here until it is bought (radio_test wants every other line to have its file).
+const UNVOICED := []
 
 ## Why a mission can fail: the text on the fail screen and the line that plays.
 const REASONS := {
@@ -272,13 +268,18 @@ const MISSIONS := [
 			},
 			{
 				"id": "post_1", "kind": "hold", "place": "post_north", "seconds": 3.0, "text": "Fuel the generator at the north post",
+				"begin": {"sound": "generator_start"},
 				"end": {"lines": ["fl_post_1"], "ambush": {"route": ["post_north", "post_centre_west"]}},
 			},
 			{
 				"id": "post_2", "kind": "hold", "place": "post_centre_west", "seconds": 3.0, "text": "Fuel the generator west of the centre",
+				"begin": {"sound": "generator_start"},
 				"end": {"lines": ["fl_post_2"], "ambush": {"route": ["post_centre_west", "post_east"]}},
 			},
-			{"id": "post_3", "kind": "hold", "place": "post_east", "seconds": 3.0, "text": "Fuel the generator at the east post", "end": {"stop_timer": "floodlights"}},
+			{
+				"id": "post_3", "kind": "hold", "place": "post_east", "seconds": 3.0, "text": "Fuel the generator at the east post",
+				"begin": {"sound": "generator_start"}, "end": {"stop_timer": "floodlights"},
+			},
 		],
 	},
 	# The Lift Bridge: pick up the others, drive to the control house, hold out while Teo brings the bridge down, cross it

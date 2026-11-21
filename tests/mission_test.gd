@@ -160,8 +160,11 @@ func _test_script() -> void:
 		var sub := StoryData.subtitle(id)
 		if sub.contains("[") or sub.contains("]") or sub == "" or sub != sub.strip_edges():
 			bad_cue += 1
-	_check(n == 21 + StoryData.UNVOICED.size() and StoryData.UNVOICED.size() == 29, "the radio script has chapter 1's 21 lines and chapter 2's 29, which wait for their voices", "lines=%d" % n)
-	_check(chars <= 1500, "chapter 1's voiced script stays inside the voice generator's 1,500 character limit", "chars with cue words=%d" % chars)
+	_check(n == 50 and StoryData.UNVOICED.is_empty(), "the radio script has chapter 1's 21 lines and chapter 2's 29, and every one is voiced", "lines=%d unvoiced=%d" % [n, StoryData.UNVOICED.size()])
+	var longest := 0
+	for id in StoryData.LINES:
+		longest = maxi(longest, String(StoryData.LINES[id]["text"]).length())
+	_check(longest <= 200, "no line is longer than 200 characters with its cue words (a radio call, not a speech)", "longest=%d, whole script %d" % [longest, chars])
 	_check(bad_cue == 0, "every subtitle is the text without its cue words")
 	var missing: Array = []
 	for id in StoryData.line_ids_used():

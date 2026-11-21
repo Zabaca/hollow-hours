@@ -19,6 +19,7 @@ extends RefCounted
 ##   mission_complete {mission, id, title, final, chapter_end}   mission_failed {mission, id, reason, text}
 ##   gate_open / gate_closed                        escaped                story_complete
 ##   bridge {state: down|up}  (the lift bridge moved: the world and the views follow)
+##   sound {name}             (a sound effect the story asks for, played by the game scene)
 ##   chapter_complete {next, city}  (the car is out of the gate and at rest, and the next chapter is in another city)
 ##   retry {to: checkpoint|start}                   roam {next}            roam_wrecked
 ##   save {data}  (a save is asked for: write it with SaveStore)
@@ -469,6 +470,8 @@ func _apply(game: GameSim, fx: Dictionary, next_step: int = -1, priority: bool =
 		line(id, priority)
 	if fx.has("pack"):
 		game.pack.set_size(int(fx["pack"]))
+	if fx.has("sound"):
+		ev("sound", {"name": str(fx["sound"])})
 	if fx.has("ambush"):
 		var am: Dictionary = fx["ambush"]
 		var route := game.route_to(StoryData.place_pos(am["route"][0]), StoryData.place_pos(am["route"][1]))

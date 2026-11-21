@@ -624,19 +624,18 @@ func _on_event(e: Dictionary) -> void:
 					_gate_leaves_sound()
 				gate_view.set_open(false)
 		"bridge":
-			# Stand-ins from the sounds we have (slice 5 buys the bridge's own): the gate's klaxon for the horn, the
-			# gate's rolling leaves for the motors, a slam for the deck meeting the road.
 			if bridge_view != null:
 				var at := bridge_view.centre + Vector3(0.0, 6.0, 0.0)
+				bridge_view.set_down(e["state"] == "down")
+				audio.play_at("bridge_horn", at, 4.0, 1.0, 220.0)
+				audio.play_at("bridge_motors", at, 3.0, 1.0, 180.0)
 				if e["state"] == "down":
-					bridge_view.set_down(true)
-					audio.play_at("gate_klaxon", at, 4.0, 0.8, 200.0)
-					audio.play_at("gate_leaves", at, 3.0, 0.6, 160.0)
-					get_tree().create_timer(BridgeView.LOWER_SECONDS * 0.92).timeout.connect(func() -> void: audio.play_at("slam", at, 2.0, 0.5, 160.0))
-				else:
-					bridge_view.set_down(false)
-					audio.play_at("gate_klaxon", at, 4.0, 0.8, 200.0)
-					audio.play_at("gate_leaves", at, 3.0, 0.6, 160.0)
+					get_tree().create_timer(BridgeView.LOWER_SECONDS * 0.95).timeout.connect(func() -> void: audio.play_at("bridge_thud", at, 3.0, 1.0, 180.0))
+		"sound":
+			audio.play(String(e["name"]), -2.0, 1.0, "SFX")
+		"mission_failed":
+			if e.get("reason", "") == "floodlights":
+				audio.play("floodlights_fail", 0.0, 1.0, "SFX")
 
 
 ## --audio-log: how long from the start of the physics tick that found the crash to the play()

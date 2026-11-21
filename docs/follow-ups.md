@@ -104,7 +104,7 @@ Nits and things to know:
 - The autopilot is slower than a driver where the road is tight (11 m/s where a wall or a stalled car is within 2.4 m of its way) and, with the creatures in the stalled cars and the pack live and the hull NOT held, finishes The Long Road in 4 of 6 seeds (it is wrecked after the truck stop's east queue in the others). With the hull held all six finish. The creatures' number and spacing (`HUNTER_SPACING`, `HUNTER_RELEASE` in `harbour_plan.py`) and the pack of 2 are the levers; they are for the owner's hand play to set.
 - `City._cull_pieces` hides a block or highway chunk further than `CULL_RANGE` (170 m, plus half its size) from the camera. Godot's visibility range measures to the piece's own bounds, so a very tall piece could pop in late; none does today. The Mac's display caps frames at 120 fps, so `--perf` shows the cap, not the headroom: read the render's CPU time and the draw calls (the quarter about 1,300, the harbour city's centre about 2,600 on High).
 - The full map's frame (`map_frame`) shows the city and 150 m of highway; the car and the objective pin to its edge with the distance when they are out along the road. The place labels past the frame are not drawn. A route line (slice 3) will want the whole highway.
-- `StoryData.UNVOICED` lists The Long Road's five lines, which have subtitles and no audio; buying the voices empties it, and `radio_test` then wants every line voiced again.
+- `StoryData.UNVOICED` is empty now that chapter 2's 29 lines are voiced (slice 5); a line added without its voice goes in it until it is bought, and `radio_test` wants every other line to have its file.
 - The title's Continue says "Free roam" after The Long Road, the end of what is built; it says "The end" only when a story's last mission closes it (`closes_story`).
 - `GateView` still draws the west gate's leaves and searchlights at the harbour city's gate (the lift bridge's far end), which is where the sim's gate record puts them; the lift bridge's own view is slice 4's.
 - `Session`'s chapter cut reloads the main scene with the save the chapter's end wrote as `continue_save`; a developer run started by `--mission=3` uses the scratch save, so it never touches the player's.
@@ -130,3 +130,10 @@ Nits and things to know:
 - The credits' last line is still "Red got out." (the option asks the owner to approve a new one); the closing lines are subtitles only (`lb_end_1`, `lb_end_2`).
 - The full map's height is 600 px (not 760) in a city with a route grid so the radio's subtitles sit below it; the quarter's map is unchanged. Place names on the map's bottom road are drawn above their spot.
 - Survive the Night in the harbour city starts at the highway checkpoint (the layout's player start), with the pack's director and the night clock as in the quarter; it has not been tuned for a 1.6 km map.
+
+## From the chapter 2 slice 5 build (the voices and the effects)
+
+Nits and things to know:
+- Chapter 2's voices cost 1,111 credits (2,786 characters, about 0.40 a character) and its five effects 175 (about 10 a second of sound asked for): 1,286 of the 1,500 approved, counter 29,519 before and 30,805 after (tools/audio/credits.log). Re-voicing a line or buying more effects comes out of the 214 left.
+- The new takes were checked by length against their text, not by ear: all run between 2.8 and 9.7 s, 10.7 to 20.4 characters a second against the radio's 14. The fastest is `fl_call_1` (urgent, 5.7 s for 116 characters), the slowest `dc_hold` and `dc_aboard` (grunting, about 11 characters a second): worth a listen.
+- The story's effects: `bridge_horn`, `bridge_motors` and `bridge_thud` play from the bridge's own view in the harbour city; `generator_start` is a mission effect (`sound`) at each generator hold; `floodlights_fail` plays when Floodlights fails. The gate's klaxon and leaves are no longer used there.

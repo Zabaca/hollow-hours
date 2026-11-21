@@ -50,6 +50,7 @@ var escape_time := 5.0  # how long this roll-out takes: it starts at the car's o
 var escape_v0 := 0.0
 var escape_k := 0.0
 var story_done := false
+var _route_nav: NavGrid
 
 
 ## `layout` is the city's layout (Cities.layout(city) for a city by id; the tests hand CityLayout.DATA, the quarter's).
@@ -128,6 +129,72 @@ func restart_mission() -> void:
 func _drain_mission() -> void:
 	if mission != null:
 		events.append_array(mission.take_events())
+
+
+## The car's own path grid for a city that shows routes (Cities.ROUTE_GRIDS), built the first time it is wanted;
+## null for a city with none.
+func route_nav() -> NavGrid:
+	var par := Cities.route_grid(city_id)
+	if par.is_empty():
+		return null
+	if _route_nav == null:
+		_route_nav = NavGrid.new(world, float(par["clearance"]), float(par["cell"]), float(par.get("halo", 0.0)))
+	return _route_nav
+
+
+## The way a car would drive from `a` to `b` as a short polyline (the route line on the radar and the map, and how the
+## story picks the ambushes on a leg), or empty when the city shows no routes or there is no way.
+func route_to(a: Vector2, b: Vector2) -> PackedVector2Array:
+	var grid := route_nav()
+	if grid == null:
+		return PackedVector2Array()
+	var cells := grid.path(a, b)
+	if cells.size() < 2:
+		return PackedVector2Array()
+	# Pull it straight wherever the line between two of its points is clear of everything by the car's half width.
+	var out := PackedVector2Array([cells[0]])
+	var i := 0
+	while i < cells.size() - 1:
+		var j := mini(cells.size() - 1, i + 80)
+		while j > i + 1 and not world.line_clear(cells[i], cells[j], 1.2):
+			j -= 1
+		out.append(cells[j])
+		i = j
+	return out
+
+
+## The ambush spots (World.ambush_spots) beside a route, as arming entries ({pos, release, count}) for PackSim.arm_more:
+## at most `limit` of them, those within `reach` metres of the polyline, kept at least `spacing` metres apart along it, none
+## within `start_clear` metres of its start (where the car is) or of its end.
+func ambushes_on(route: PackedVector2Array, limit: int, release: float, reach: float = 16.0, spacing: float = 80.0, start_clear: float = 60.0) -> Array:
+	var total := 0.0
+	var marks := PackedFloat32Array([0.0])
+	for k in range(1, route.size()):
+		total += route[k].distance_to(route[k - 1])
+		marks.append(total)
+	var found: Array = []
+	for sp in world.ambush_spots:
+		var best := INF
+		var along := 0.0
+		for k in range(1, route.size()):
+			var ab: Vector2 = route[k] - route[k - 1]
+			var t := clampf((sp["pos"] - route[k - 1]).dot(ab) / maxf(ab.length_squared(), 0.0001), 0.0, 1.0)
+			var d: float = (sp["pos"] as Vector2).distance_to(route[k - 1] + ab * t)
+			if d < best:
+				best = d
+				along = marks[k - 1] + ab.length() * t
+		if best <= reach and along >= start_clear and along <= total - 25.0:
+			found.append({"along": along, "spot": sp})
+	found.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x["along"] < y["along"])
+	var out: Array = []
+	var last := -INF
+	for f in found:
+		if out.size() >= limit:
+			break
+		if f["along"] - last >= spacing:
+			out.append({"pos": f["spot"]["pos"], "release": release, "count": f["spot"]["count"]})
+			last = f["along"]
+	return out
 
 
 ## A fresh car of the Bruiser kind.

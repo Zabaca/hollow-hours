@@ -392,6 +392,7 @@ func _process(delta: float) -> void:
 	hud.update_hud(game, latched, delta)
 	if presenter != null:
 		presenter.update(delta, pos, ang)
+		_floodlights()
 	fx.vignette = 0.42 + threat * 0.3
 	fx.chroma = maxf(fx.chroma, clampf((car.speed() - 22.0) / 40.0, 0.0, 0.25))
 	# Dawn creeps in over the last stretch of the night; in the story the sky lightens a touch with each mission.
@@ -441,6 +442,18 @@ func _perf(delta: float) -> void:
 			city_id, n, sum / n, perf_frames[int(n * 0.95)], perf_frames[n - 1], 1000.0 * n / sum, _avg(perf_gpu), perf_gpu[int(n * 0.95)], perf_gpu[n - 1], _avg(perf_cpu), perf_cpu[int(n * 0.95)],
 			perf_draws, perf_objects, str(not Settings.high), str(game.car.body.position.round())])
 		get_tree().quit()
+
+
+## The field hospital's floodlights dim as the floodlights timer runs down in its last third and are out at zero.
+func _floodlights() -> void:
+	var level := 1.0
+	for t in game.mission.timers_left():
+		if t["id"] == "floodlights":
+			level = clampf(float(t["left"]) / (float(t["total"]) * 0.33), 0.0, 1.0)
+	if game.mission.state == MissionSim.State.FAILED and game.mission.fail_reason == "floodlights":
+		level = 0.0
+	if not is_equal_approx(float(city.tag_levels.get("hospital_flood", 1.0)), level):
+		city.tag_levels["hospital_flood"] = level
 
 
 func _sync_creatures(delta: float) -> void:

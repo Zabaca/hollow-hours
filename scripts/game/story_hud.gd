@@ -310,5 +310,5 @@ func hide_card() -> void:
 	card.modulate.a = 0.0
 
 
-func set_radar(pos: Vector2, angle: float, blips: Array) -> void:
-	radar.set_state(pos, angle, blips)
+func set_radar(pos: Vector2, angle: float, blips: Array, speed: float = 0.0, route: PackedVector2Array = PackedVector2Array()) -> void:
+	radar.set_state(pos, angle, blips, speed, route)

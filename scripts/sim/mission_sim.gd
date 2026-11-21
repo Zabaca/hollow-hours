@@ -137,7 +137,7 @@ func hold_progress() -> float:
 func timers_left() -> Array:
 	var out: Array = []
 	for id in timers:
-		out.append({"id": id, "label": timers[id]["label"], "left": maxf(0.0, timers[id]["left"])})
+		out.append({"id": id, "label": timers[id]["label"], "left": maxf(0.0, timers[id]["left"]), "total": float(timers[id].get("total", timers[id]["left"]))})
 	return out
 
 
@@ -212,7 +212,12 @@ func resume(game: GameSim, save: Dictionary) -> void:
 	totals = {"kills": int(t.get("kills", 0)), "wrecks": int(t.get("wrecks", 0)), "seconds": float(t.get("seconds", 0.0))}
 	last_save = save.duplicate(true)
 	_last_kills = game.pack.kills
-	var safe: Dictionary = StoryData.PLACES[StoryData.safe_start_id(StoryData.city_after(done.size()))]
+	# The safe start, or where the next mission says Continue puts the car (`resume_at`: the harbour city's missions
+	# start where the last one ended, which is not its far end of the highway).
+	var at_id := StoryData.safe_start_id(StoryData.city_after(done.size()))
+	if not next_data().is_empty() and next_data().has("resume_at"):
+		at_id = str(next_data()["resume_at"])
+	var safe: Dictionary = StoryData.PLACES[at_id]
 	game.place_car(safe["pos"], float(safe["angle"]), GameSim.MAX_HULL)
 	_enter_roam(game)
 	ev("roam", {"next": next_id})
@@ -237,6 +242,21 @@ func _enter_roam(game: GameSim) -> void:
 	_close_gate(game)
 	game.pack.reset_pack(game.car, StoryData.ROAM_PACK, false)
 	game.pack.set_size(StoryData.ROAM_PACK)
+	_arm_roam_ambushes(game)
+
+
+## In free roam a few of the city's ambush spots are armed at random, so that a known route is not a safe one (the
+## highway's own are left out). A city with none draws nothing from the pack's generator.
+func _arm_roam_ambushes(game: GameSim) -> void:
+	var spots: Array = game.world.ambush_spots.filter(func(sp: Dictionary) -> bool: return not String(sp["id"]).begins_with("hw_"))
+	if spots.is_empty():
+		return
+	var armed: Array = []
+	for k in mini(StoryData.AMBUSH_ROAM, spots.size()):
+		var pick: int = game.pack.rng.randi() % spots.size()
+		var sp: Dictionary = spots.pop_at(pick)
+		armed.append({"pos": sp["pos"], "release": StoryData.AMBUSH_RELEASE, "count": sp["count"]})
+	game.pack.arm_more(armed)
 
 
 func start_mission(game: GameSim, i: int) -> void:
@@ -404,6 +424,7 @@ func _complete_mission(game: GameSim) -> void:
 		game.pack.stand_down()
 		_close_gate(game)
 		game.pack.set_size(StoryData.ROAM_PACK)
+		_arm_roam_ambushes(game)
 	# The last mission of a chapter asks for no save of its own: the car is still rolling out of the gate,
 	# and a save now (ending not seen) would strand Continue. finish_story saves once it is over.
 	if not final and not chapter_end:
@@ -433,6 +454,10 @@ func _apply(game: GameSim, fx: Dictionary, next_step: int = -1, priority: bool =
 		line(id, priority)
 	if fx.has("pack"):
 		game.pack.set_size(int(fx["pack"]))
+	if fx.has("ambush"):
+		var am: Dictionary = fx["ambush"]
+		var route := game.route_to(StoryData.place_pos(am["route"][0]), StoryData.place_pos(am["route"][1]))
+		game.pack.arm_more(game.ambushes_on(route, int(am.get("max", StoryData.AMBUSH_MAX)), StoryData.AMBUSH_RELEASE))
 	if fx.get("stalled", false):
 		game.pack.arm_stalled(game.world.stalled)
 	if fx.has("alert"):
@@ -446,7 +471,7 @@ func _apply(game: GameSim, fx: Dictionary, next_step: int = -1, priority: bool =
 		_spawn_hunting(game, sp)
 	if fx.has("timer"):
 		var t: Dictionary = fx["timer"]
-		timers[t["id"]] = {"left": float(t["seconds"]), "label": t["label"], "reason": t["reason"]}
+		timers[t["id"]] = {"left": float(t["seconds"]), "total": float(t["seconds"]), "label": t["label"], "reason": t["reason"]}
 		ev("timer", {"id": t["id"], "state": "start", "seconds": float(t["seconds"]), "label": t["label"]})
 	if fx.has("stop_timer") and timers.has(fx["stop_timer"]):
 		timers.erase(fx["stop_timer"])
@@ -462,6 +487,7 @@ func _apply(game: GameSim, fx: Dictionary, next_step: int = -1, priority: bool =
 			"hull": game.hull,
 			"pack": game.pack.size_override,
 			"alert_all": _alert_all,
+			"timers": timers.duplicate(true),  # a retry brings back the time that was left when the checkpoint was reached
 		}
 		ev("checkpoint", {"step": next_step, "pos": game.car.body.position})
 	if fx.get("escape", false):
@@ -534,7 +560,9 @@ func retry(game: GameSim) -> void:
 	game.pack.set_size(int(cp["pack"]))
 	_close_gate(game)
 	state = State.ACTIVE
-	timers = {}
+	timers = (cp.get("timers", {}) as Dictionary).duplicate(true)
+	for id in timers:
+		ev("timer", {"id": id, "state": "start", "seconds": float(timers[id]["left"]), "label": timers[id]["label"]})
 	fail_reason = ""
 	_alert_all = bool(cp["alert_all"])
 	ev("retry", {"to": "checkpoint", "step": cp["step"]})

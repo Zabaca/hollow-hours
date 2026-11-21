@@ -47,7 +47,9 @@ unused part beside the highway is solid colliders (`building`). Everything else 
 - `places{}`: `{x, y, r}` for `highway_start`, `convoy_call`, `ruck_truck`, `field_hospital`, `fuel_depot`, `post_north`,
   `post_centre_west`, `post_east`, `control_house`; `planned_legs[]` names the legs the missions drive and the least by road each
   may be. (`StoryData.PLACES` holds the places chapter 2's first mission uses, at the same coordinates where they overlap.)
-- `ambush_spots[]`: `{id, x, y, count, near}`, one by every roadblock and the highway's set pieces (slice 3 uses them).
+- `ambush_spots[]`: `{id, x, y, count, near}`, one by every roadblock, one at each fixed bridge's east end and three on the highway's set
+  pieces. A mission's `ambush` effect arms the ones beside a leg's route (`GameSim.ambushes_on`); free roam arms a few at random
+  (`StoryData.AMBUSH_ROAM`); `count` is `AMBUSH_COUNT` in the plan (2).
   `stalled_hunters[]`: `{x, y, release}`, creatures waiting in stalled cars on the highway, placed hunting when the car comes
   within `release` metres (the mission's `stalled` effect arms them; `HUNTER_SPACING`, `HUNTER_RELEASE` in the plan).
 - `generators[]`: `{post, x, y}`. `highway{}`: `toll_plaza`, `jam`, `fallen_overpass`, `truck_stop` (with its `squeeze` and

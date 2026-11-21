@@ -44,9 +44,17 @@ reads "Chapter 2, The next night". The game saves (The Long Road next) and cuts 
 map (chapter 2): the car is at the cordon's highway checkpoint at the far east end, at night again, and The Long Road
 begins at once: drive the divided highway, about 1.2 km, into the city, through a toll plaza, a dead traffic jam with one
 gap in it and past a fallen overpass (the way round is through a truck stop), with creatures waiting in a few of the
-stalled cars. Reaching the east ring road completes the mission and leaves the car in free roam in the harbour city (the
-rest of chapter 2 is built in later slices; Continue then reads "Free roam"). The credits are for the story's last mission,
-which is not built yet.
+stalled cars. Reaching the east ring road completes the mission, and Dead Convoy begins at once (missions 5 to 7, also subtitles only):
+drive across the river to Ruck's wrecked truck on the north ring road, hold while he drags himself in, and take him to the
+field hospital (a school); Floodlights (a timer, 6 minutes): fuel from the depot on the west docks to three generator posts
+before the hospital's floodlights, which dim in the timer's last third, go out; The Lift Bridge, as far as it is built: pick
+up Vera, Teo and Ruck at the hospital and drive to the lift bridge's control house on the harbour road, then hold while Teo
+works the lift. The bridge coming down, the crossing and the credits are not built yet: after the hold the game goes on in
+free roam in the harbour city and Continue reads "Free roam". Every leg is a 360 to 610 m drive along streets cut by
+roadblocks (a few barricades shut, the rest leave a 4 m gap) and over the river's bridges; two creatures wait in the dark
+beside two of the roadblocks and bridges on a leg and spring when the car comes within 35 m, and a few more places are armed
+at random in free roam. The radar is 60 m across the rim crawling and 110 m flat out, and a faint amber line on the radar and
+the map shows the way to the objective along the streets (the quarter has neither: chapter 1 is as it was).
 
 How to survive: creatures stay out of your headlights and the few live street lamps while they
 stalk you, then sprint, flank and pounce. A pounce is a tell you can read: the creature stops and
@@ -133,7 +141,9 @@ command from anywhere with `--path` pointing at this folder.
    `world_test` holds the bucketed world to the whole-city loops it replaced (the same answers on the quarter, on a city
    three times as wide and tall and on a long thin one with a 1.2 km barrier), the path grid to the same solid cells, a
    query and a step to the same cost whatever the city's size, the pack to following the car, and LayoutCheck to what a
-   layout must be. `harbour_test` checks the harbour city: its layout, its model, every place clear and reachable by road
+   layout must be. `chapter2_test` checks Dead Convoy, Floodlights and The Lift Bridge: every leg 300 m or more by road (the run to the bridge 450),
+   the ambushes on the legs and springing only in range, the floodlights timer (fail, retry, the lights' dimming), Continue's
+   start places, the radar's widening and the route, and the autopilot driving it all. `harbour_test` checks the harbour city: its layout, its model, every place clear and reachable by road
    from the highway checkpoint, the highway leg at 1 km or more, the dev flags, the stalled-car creatures (released only
    within range, once), the autopilot driving The Long Road (pack off, and live with the hull held), and what happens after
    it. `settings_test` checks the settings file's round trip and the defaults on a missing or damaged one.
@@ -161,8 +171,9 @@ command from anywhere with `--path` pointing at this folder.
    and quits; `--low` starts on the Low graphics preset (not saved); `--no-hud` hides the HUD;
    `--write-movie` is Godot's Movie Maker (a PNG sequence).
 
-   Story flags: `--story` starts a new story, `--continue` continues from the save, and `--mission=N` (1 to 4) starts mission N directly, the car at
-   its start (4 is The Long Road, on the highway in the harbour city); `--city=ID` loads that city (`quarter` or `harbour`;
+   Story flags: `--story` starts a new story, `--continue` continues from the save, and `--mission=N` (1 to 7) starts mission N directly, the car at
+   its start (4 is The Long Road, on the highway in the harbour city; 5, 6 and 7 are Dead Convoy, Floodlights and The Lift
+   Bridge, from the east ring road and the field hospital); `--city=ID` loads that city (`quarter` or `harbour`;
    by default the one the story is in; with no mission it is Survive the Night there); `--seed=N` fixes the pack; `--save=PATH` reads and writes the save there (for Continue
    screenshots). A story run started by a flag with no `--save=` uses `user://dev_save.json`, never the player's
    `save.json`, so screenshot runs cannot overwrite a real save. Combine them with `--start=x,y,angle`, `--drive=0,0` and `--shot-game=SECONDS` (game time)

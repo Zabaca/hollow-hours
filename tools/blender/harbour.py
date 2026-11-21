@@ -355,6 +355,8 @@ def build_river():
         # piers under the deck
         C.box(g, "concrete", (x0 + x1) / 2 - 1.5, g0 + 1.0, -1.6, (x0 + x1) / 2 + 1.5, g0 + 3.0, -1.0)
         C.box(g, "concrete", (x0 + x1) / 2 - 1.5, g1 - 3.0, -1.6, (x0 + x1) / 2 + 1.5, g1 - 1.0, -1.0)
+        # the creatures wait on the east bank's sidewalk, a few metres from the bridge's end, out of the headlights
+        C.LAYOUT["ambush_spots"].append(dict(id="bridge_%d" % k, x=round(x1 + 8.0, 1), y=round(yc + P.RW / 2 + 1.5, 1), count=P.AMBUSH_COUNT, near="bridge_%d" % k))
         C.LAYOUT["bridges"].append(dict(id="bridge_%d" % k, kind="fixed", x=round((x0 + x1) / 2, 2), y=round(yc, 2), length=x1 - x0, width=P.RW, axis="x"))
     # the lift bridge, drawn raised: towers on both banks, a deck hung between them at 13 m, the road cut at the quays
     l0, l1 = lift

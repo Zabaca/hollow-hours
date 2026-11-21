@@ -90,10 +90,12 @@ static func _index(id: String, missions: Array) -> int:
 
 
 ## A save that ended the story when it was written (next empty, the ending seen) and finished exactly
-## a chapter's last mission, with missions still to come after it.
+## a chapter's last mission, or a mission that said the story went on (closes_story false), with missions still to come after it.
 static func _finished_a_chapter(d: Dictionary, missions: Array) -> bool:
 	var n := (d["done"] as Array).size()
-	return d["next"] == "" and d["ending_seen"] == true and n > 0 and n < missions.size() and StoryData.ends_chapter(n - 1, missions)
+	# ...or stopped after a mission that did not close the story (the missions after it had not been built yet).
+	var stopped_short: bool = n > 0 and n < missions.size() and not bool(missions[n - 1].get("closes_story", true))
+	return d["next"] == "" and d["ending_seen"] == true and n > 0 and n < missions.size() and (StoryData.ends_chapter(n - 1, missions) or stopped_short)
 
 
 ## The save as the story reads it now: a save that finished a chapter the story has since grown past

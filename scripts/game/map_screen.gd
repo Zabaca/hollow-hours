@@ -53,14 +53,14 @@ func _ready() -> void:
 	shade.add_child(view)
 
 
-func open(pos: Vector2, angle: float, blips: Array) -> void:
+func open(pos: Vector2, angle: float, blips: Array, route: PackedVector2Array = PackedVector2Array()) -> void:
 	if is_open:
 		return
 	is_open = true
 	_opened_frame = Engine.get_process_frames()
 	_was_paused = get_tree().paused
 	get_tree().paused = true
-	view.set_state(pos, angle, blips)
+	view.set_state(pos, angle, blips, 0.0, route)
 	get_viewport().gui_release_focus()  # the pause menu's row that opened this must not hold the keys
 	visible = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

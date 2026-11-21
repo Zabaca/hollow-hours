@@ -108,3 +108,14 @@ Nits and things to know:
 - The title's Continue says "Free roam" after The Long Road, the end of what is built; it says "The end" only when a story's last mission closes it (`closes_story`).
 - `GateView` still draws the west gate's leaves and searchlights at the harbour city's gate (the lift bridge's far end), which is where the sim's gate record puts them; the lift bridge's own view is slice 4's.
 - `Session`'s chapter cut reloads the main scene with the save the chapter's end wrote as `continue_save`; a developer run started by `--mission=3` uses the scratch save, so it never touches the player's.
+
+## From the chapter 2 slice 3 build (Dead Convoy, Floodlights, The Lift Bridge up to the control house)
+
+Nits and things to know:
+- The autopilot is weak against creatures clinging to it in a tight street: with the ambushes live, the director off and the hull held, it finishes Dead Convoy (in 190 to 330 s, against 112 s with them off) but not Floodlights inside its 360 s timer (it needs about 220 s with the ambushes off, and loses 200 s or more to creatures at the depot and the posts); with the pack on as well it can stall in a squeeze for good. A change in the autopilot's handling of a latched creature in a squeeze (it keeps its line and boosts on through; in the open it swerves as before) helped a little. The numbers that set how deadly the legs are: `AMBUSH_COUNT` (2) in `harbour_plan.py`, `AMBUSH_MAX` (2 a leg), `AMBUSH_RELEASE` (35 m) and `AMBUSH_ROAM` (3) in `story_data.gd`, `FLOODLIGHT_SECONDS` (360). Hand play sets them.
+- Dead Convoy begins the moment The Long Road ends (its start place is the east ring road, where the car stands), so there is no free-roam gap there; Continue puts the car at a mission's `resume_at` place, not at the far end of the highway.
+- A save made when The Long Road was the last built mission (next empty, ending seen) loads as Dead Convoy next; the same rule reads a save made at the end of whatever mission says `closes_story: false` (today The Lift Bridge) as the next mission once one exists.
+- A retry from a checkpoint brings the floodlights timer back to what was left when the checkpoint was reached, not a fresh clock.
+- The route line and the wide radar are for the cities with a route grid (`Cities.ROUTE_GRIDS`, the harbour city's); the quarter has none, so chapter 1 is unchanged. The route is worked out about once a second on the car's 1 m grid (4 ms for the longest), and drawn as a faint amber line.
+- The field hospital's floodlights (layout tag `hospital_flood`) dim over the last third of the floodlights timer and go out when it fails; `main._floodlights` and `City.tag_levels` do it.
+- With `CLOSED_ROADBLOCKS` off every chapter 2 test still passes except the run to the lift bridge (328 m, under 450): the other legs are 361 to 519 m.

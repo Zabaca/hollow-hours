@@ -12290,189 +12290,210 @@ const DATA := {
    "id": "rb_south_ring_east",
    "x": 92.0,
    "y": -135.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_south_ring_east"
   },
   {
    "id": "rb_south_ring_mid",
    "x": -40.0,
    "y": -135.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_south_ring_mid"
   },
   {
    "id": "rb_street_south_east",
    "x": 88.0,
    "y": -87.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_street_south_east"
   },
   {
    "id": "rb_street_south_mid",
    "x": -40.0,
    "y": -87.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_street_south_mid"
   },
   {
    "id": "rb_street_mid_south",
    "x": -40.0,
    "y": -39.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_street_mid_south"
   },
   {
    "id": "rb_avenue_east",
    "x": 88.0,
    "y": 8.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_avenue_east"
   },
   {
    "id": "rb_avenue_mid",
    "x": -40.0,
    "y": 8.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_avenue_mid"
   },
   {
    "id": "rb_street_mid_north",
    "x": -40.0,
    "y": 56.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_street_mid_north"
   },
   {
    "id": "rb_avenue_west",
    "x": -106.0,
    "y": 8.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_avenue_west"
   },
   {
    "id": "rb_street_north_east",
    "x": 88.0,
    "y": 104.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_street_north_east"
   },
   {
    "id": "rb_street_north_west",
    "x": -104.0,
    "y": 104.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_street_north_west"
   },
   {
    "id": "rb_north_ring_west",
    "x": -104.0,
    "y": 135.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_north_ring_west"
   },
   {
    "id": "rb_north_ring_east",
    "x": 92.0,
    "y": 135.5,
-   "count": 3,
+   "count": 2,
    "near": "rb_north_ring_east"
   },
   {
    "id": "rb_east_ring_north",
    "x": 197.5,
    "y": 64.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_east_ring_north"
   },
   {
    "id": "rb_east_ring_south",
    "x": 197.5,
    "y": -80.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_east_ring_south"
   },
   {
    "id": "rb_west_ring_north",
    "x": -183.5,
    "y": 64.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_west_ring_north"
   },
   {
    "id": "rb_west_ring_south",
    "x": -183.5,
    "y": -138.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_west_ring_south"
   },
   {
    "id": "rb_road_east_mid",
    "x": 136.5,
    "y": 16.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_road_east_mid"
   },
   {
    "id": "rb_road_centre",
    "x": 8.5,
    "y": -32.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_road_centre"
   },
   {
    "id": "rb_road_centre_north",
    "x": 8.5,
    "y": 64.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_road_centre_north"
   },
   {
    "id": "rb_road_centre_south",
    "x": 8.5,
    "y": -128.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_road_centre_south"
   },
   {
    "id": "rb_road_west",
    "x": -55.5,
    "y": 16.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_road_west"
   },
   {
    "id": "rb_road_west_south",
    "x": -55.5,
    "y": -80.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_road_west_south"
   },
   {
    "id": "rb_road_east_south",
    "x": 72.5,
    "y": -80.0,
-   "count": 3,
+   "count": 2,
    "near": "rb_road_east_south"
+  },
+  {
+   "id": "bridge_0",
+   "x": -110.0,
+   "y": -87.5,
+   "count": 2,
+   "near": "bridge_0"
+  },
+  {
+   "id": "bridge_1",
+   "x": -110.0,
+   "y": 8.5,
+   "count": 2,
+   "near": "bridge_1"
+  },
+  {
+   "id": "bridge_2",
+   "x": -110.0,
+   "y": 104.5,
+   "count": 2,
+   "near": "bridge_2"
   },
   {
    "id": "hw_truck_stop",
    "x": 685.0,
    "y": 36.0,
-   "count": 3,
+   "count": 2,
    "near": "truck_stop"
   },
   {
    "id": "hw_jam",
    "x": 1126.5,
    "y": -5.0,
-   "count": 3,
+   "count": 2,
    "near": "jam"
   },
   {
    "id": "hw_toll",
    "x": 1221.0,
    "y": -12.0,
-   "count": 3,
+   "count": 2,
    "near": "toll_plaza"
   }
  ],

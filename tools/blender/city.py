@@ -3,7 +3,7 @@
 x, y are map metres (the same numbers the GDScript sim uses; glTF turns y into Godot -Z, which is
 exactly how the game maps them), Blender Z is up. Writes:
   assets/models/city.glb                   one mesh per block plus roads and props, flat-colour materials
-  scripts/game/city_layout.gd              the colliders, lamps, lights, wrecks and spawn points as a const
+  scripts/game/city_layout.gd              the colliders, roads, lamps, lights, wrecks and spawn points as a const
 Material names are the contract with scripts/game/city.gd, which swaps the road, sidewalk and
 glass materials for the wet and reflective ones. Run (headless, foreground):
   Blender --background --python-exit-code 1 --python tools/blender/city.py -- [preview]
@@ -38,6 +38,14 @@ ROADS_X = [-64.0, 0.0, 64.0]
 ROADS_Y = [-48.0, 0.0, 48.0]
 RW = 14.0
 SW = 3.0
+# The streets as the layout lists them (SimWorld's header says what each field means): a road along x at
+# y = c runs the arena's width, one along y at x = c its height. The map draws them and the autopilot finds
+# the street at a place from them.
+_ax = LAYOUT["arena"]
+LAYOUT["roads"] = (
+    [{"axis": "x", "c": yc, "width": RW, "from": _ax["left"], "to": _ax["right"]} for yc in ROADS_Y]
+    + [{"axis": "y", "c": xc, "width": RW, "from": _ax["bottom"], "to": _ax["top"]} for xc in ROADS_X]
+)
 BLOCKS = {"NW": (-57, 7, -7, 41), "NE": (7, 7, 57, 41), "SW": (-57, -41, -7, -7), "SE": (7, -41, 57, -7)}
 
 # ---------------------------------------------------------------- materials

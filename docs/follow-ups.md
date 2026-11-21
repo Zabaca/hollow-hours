@@ -78,7 +78,7 @@ Should-fix:
 - **Straight and fast is strong.** At 60 km/h on a straight the pack is near-harmless (creatures ahead are run down 83% of the time, about 14% latch). The danger sits at corners, stops and crashes. If the owner wants more threat: flank and rear pressure from side streets, or a smaller mid-leap kill window (LEAP_KILL_SPEED).
 
 Nits:
-- autopilot.gd's kill step hard-codes the avenue's coordinates.
+- ~~autopilot.gd's kill step hard-codes the avenue's coordinates.~~ Closed by the chapter 2 slice 1 build: it reads the street at the objective's place from the layout's roads.
 - The "lands clear" check passes at exactly its 2.5 m threshold.
 - Throw-off at a crawl is still long (5 km/h: swerves 4.1 s, slide 2.4 s).
 
@@ -89,3 +89,11 @@ Nits:
 - Hand tests still open: whether a creature on a side slot sinks into the door, whether a latched creature blocks the chase camera in hard turns, and frame time on a weak graphics card.
 - The wind-up crouch at 10 m is a faint rim in dark fog; the rim strength (0.55 in gaunt_view.gd) is the lever.
 - The model is built by script and still reads simple up close (tube-like limbs, a plain jaw). Decided 2026-11-20: keep the script-built model. One free image-to-3D try (Hunyuan3D 2.1, shape only) only smoothed the same shapes and grew a second pair of arms, and the owner judged ours better. Improve the creature in tools/blender/gaunt_body.py; a generator would need a realistic painted concept as input to be worth another try.
+
+## From the chapter 2 slice 1 build (a second, bigger city: the simulation looks only at what is near)
+
+Nits and things to know:
+- The autopilot's chicane at the quarter's central junction (the narrow gap its own grid calls shut) is now a per-city hint (`Autopilot.HINTS`). Chapter 2's squeezes (a gap a car and a half wide) will meet the same limit: the car's grid should learn to take a gap rather than gain a hint per roadblock.
+- The full map drew the west gate's gap 10 m wide, a number written into the map; it now draws the gate record's 8 m, which is the width of the wall's gap.
+- GateView, the atmosphere and the `--screen=ending` developer flag still assume the west gate and the quarter; the sim, the camera and the map do not. The harbour city's slice builds the lift bridge's view beside the gate's.
+- With the pack's director on, the autopilot finishes no story run, before or after (it is a proxy for the guard with the director off; 0 of 10 with the hull held in both). The pack's newcomers now come in 60 to 120 m out and ahead of the car, which is the change the option asked for.

@@ -1,9 +1,9 @@
 class_name MapView
 extends Control
-## The quarter drawn from the city layout, at two sizes. RADAR is the round, car-up one in the corner
+## A city drawn from its layout, at two sizes. RADAR is the round, car-up one in the corner
 ## (about 120 m across): the buildings and wrecks, the car at the centre, the objective as an amber
 ## blip pinned to the rim with its distance when it is further than the edge, a mission start as a
-## teal blip. FULL is the whole quarter north-up with the places named. No Gaunts on either: seeing
+## teal blip. FULL is the whole city north-up with the places named. No Gaunts on either: seeing
 ## them would undo the stalking.
 
 enum Mode { RADAR, FULL }
@@ -13,10 +13,6 @@ const TEAL := Color(0.22, 0.88, 0.82)
 const BUILDING := Color(0.3, 0.33, 0.37)
 const WRECK := Color(0.3, 0.22, 0.21)
 const ROAD := Color(0.085, 0.09, 0.1)
-## The roads' centre lines and width (tools/blender/city.py ROADS_X, ROADS_Y, RW).
-const ROADS_X := [-64.0, 0.0, 64.0]
-const ROADS_Y := [-48.0, 0.0, 48.0]
-const ROAD_WIDTH := 14.0
 const RADAR_RANGE := 60.0  # metres from the centre to the rim
 const RIM_STEPS := 40
 
@@ -24,7 +20,8 @@ var mode: int = Mode.RADAR
 var car_pos := Vector2.ZERO
 var car_angle := 0.0
 var blips: Array = []  # [{kind: objective|start, pos}]
-var data: Dictionary = CityLayout.DATA
+var city := Cities.QUARTER
+var data: Dictionary = Cities.layout(Cities.QUARTER)  # the city's layout: its arena, roads, boxes and gate
 var _rim := PackedVector2Array()
 
 
@@ -32,6 +29,13 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in RIM_STEPS:
 		_rim.append(Vector2.from_angle(TAU * i / RIM_STEPS))
+
+
+## Draw another city: its layout, and the places the story keeps in it.
+func set_city(id: String) -> void:
+	city = id
+	data = Cities.layout(id)
+	queue_redraw()
 
 
 func set_state(pos: Vector2, angle: float, new_blips: Array) -> void:
@@ -85,10 +89,13 @@ func _box_poly(b: Dictionary) -> PackedVector2Array:
 func _road_boxes() -> Array:
 	var a: Dictionary = data["arena"]
 	var out: Array = []
-	for x in ROADS_X:
-		out.append({"x0": maxf(x - ROAD_WIDTH * 0.5, a["left"]), "y0": a["bottom"], "x1": minf(x + ROAD_WIDTH * 0.5, a["right"]), "y1": a["top"]})
-	for y in ROADS_Y:
-		out.append({"x0": a["left"], "y0": maxf(y - ROAD_WIDTH * 0.5, a["bottom"]), "x1": a["right"], "y1": minf(y + ROAD_WIDTH * 0.5, a["top"])})
+	for r in data.get("roads", []):
+		var half: float = float(r["width"]) * 0.5
+		var c: float = r["c"]
+		if r["axis"] == "x":
+			out.append({"x0": maxf(r["from"], a["left"]), "y0": maxf(c - half, a["bottom"]), "x1": minf(r["to"], a["right"]), "y1": minf(c + half, a["top"])})
+		else:
+			out.append({"x0": maxf(c - half, a["left"]), "y0": maxf(r["from"], a["bottom"]), "x1": minf(c + half, a["right"]), "y1": minf(r["to"], a["top"])})
 	return out
 
 
@@ -150,13 +157,19 @@ func _draw_full() -> void:
 	for rd in _road_boxes():
 		draw_colored_polygon(_box_poly(rd), ROAD)
 	draw_rect(rect, Color(MenuStyle.BONE, 0.28), false, 2.0)
-	# The gap in the west wall, where the gate is.
-	var g: Dictionary = {"x": a["left"], "y": 0.0, "w": 10.0}
-	var g0 := to_screen(Vector2(g["x"], -g["w"] * 0.5))
-	var g1 := to_screen(Vector2(g["x"], g["w"] * 0.5))
-	draw_line(g0, g1, Color(0.03, 0.033, 0.038, 1.0), 4.0)
-	draw_line(g0 + Vector2(-7.0, 0.0), g0 + Vector2(7.0, 0.0), Color(MenuStyle.BONE, 0.5), 2.0)
-	draw_line(g1 + Vector2(-7.0, 0.0), g1 + Vector2(7.0, 0.0), Color(MenuStyle.BONE, 0.5), 2.0)
+	# The gap in the wall where the gate is, from the layout's gate record.
+	if data.has("gate"):
+		var gr: Dictionary = data["gate"]
+		var gw: float = float(gr["width"])
+		var side := SimWorld.gate_side(a, gr)
+		var along := Vector2(0.0, 1.0) if side in ["west", "east"] else Vector2(1.0, 0.0)  # the wall's direction on the map
+		var gpos := Vector2(float(gr["x"]), float(gr["y"]))
+		var g0 := to_screen(gpos - along * gw * 0.5)
+		var g1 := to_screen(gpos + along * gw * 0.5)
+		var tick := Vector2(7.0, 0.0) if side in ["west", "east"] else Vector2(0.0, 7.0)  # across it, on the screen
+		draw_line(g0, g1, Color(0.03, 0.033, 0.038, 1.0), 4.0)
+		draw_line(g0 - tick, g0 + tick, Color(MenuStyle.BONE, 0.5), 2.0)
+		draw_line(g1 - tick, g1 + tick, Color(MenuStyle.BONE, 0.5), 2.0)
 	for b in data["boxes"]:
 		var kind: String = b["kind"]
 		if kind == "building":
@@ -174,7 +187,7 @@ func _draw_full() -> void:
 		named[bl["place"]] = TEAL if bl["kind"] == "start" else AMBER
 	for id in StoryData.PLACES:
 		var pl: Dictionary = StoryData.PLACES[id]
-		if pl["label"] == "":
+		if pl["label"] == "" or pl["city"] != city:
 			continue
 		var at := to_screen(pl["pos"])
 		var col: Color = named.get(id, MenuStyle.DIM)

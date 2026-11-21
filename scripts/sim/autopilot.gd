@@ -9,15 +9,36 @@ extends RefCounted
 ##   var pilot := Autopilot.new()
 ##   sim.step(dt, pilot.controls(sim, dt))
 
-const DEMO_ROUTE := [
-	Vector2(-14, -0.4), Vector2(3, -0.4), Vector2(8, 0.4), Vector2(50, 0.4), Vector2(62, 8), Vector2(62, 42),
-	Vector2(40, 44), Vector2(10, 44), Vector2(5.8, 36), Vector2(5.8, 10), Vector2(2, -0.4), Vector2(-30, -0.4),
-]
-## The burned bus and two wrecks leave the avenue a chicane at the central junction, about 4 m wide. The car's own
-## grid (CAR_CLEARANCE) calls that shut and would send a car crossing town round the ring road, to arrive at the
-## pharmacy from the wrong side; a driver takes the chicane, so westbound the car is steered through these.
-const CHICANE_WEST := [Vector2(8.0, 0.4), Vector2(3.0, -0.4), Vector2(-14.0, -0.4)]
+## What the driver knows about a city that its layout cannot say, by city id. `demo_route` is the loop
+## `--demo` drives (a city without one is toured place to place); `chicane` is the narrow gap that the
+## car's own grid (CAR_CLEARANCE) calls shut: the burned bus and two wrecks leave the avenue a chicane
+## about 4 m wide at the central junction, which would send a car crossing town round the ring road, to
+## arrive at the pharmacy from the wrong side. A driver takes the chicane, so a car east of `car_east_of`
+## whose goal is west of `goal_west_of` is steered through the waypoints on the way. A city whose
+## squeezes the grid cannot see wants the grid to learn them, not another hint.
+const HINTS := {
+	"quarter": {
+		"demo_route": [
+			Vector2(-14, -0.4), Vector2(3, -0.4), Vector2(8, 0.4), Vector2(50, 0.4), Vector2(62, 8), Vector2(62, 42),
+			Vector2(40, 44), Vector2(10, 44), Vector2(5.8, 36), Vector2(5.8, 10), Vector2(2, -0.4), Vector2(-30, -0.4),
+		],
+		"chicane": {"waypoints": [Vector2(8.0, 0.4), Vector2(3.0, -0.4), Vector2(-14.0, -0.4)], "car_east_of": -12.0, "goal_west_of": -20.0},
+	},
+}
 const CAR_CLEARANCE := 2.4  # metres from a wall to a cell the car may be routed through
+## Where it drives on a street: a lane's width off the street's centre line, so it does not run down the
+## middle (the avenue's centre is y = 0 and it drives y = -0.4).
+const LANE_BIAS := -0.4
+## The run-down passes (the kill step): along the street at the objective's place, with this much room kept
+## from the end of the street (a wall end, or a junction's near edge, which the wrecks and the burned bus
+## crowd) and then this far in again for the turn about (a car at 15 m/s takes 15 m to turn, and the junction
+## end is cluttered).
+const WALL_MARGIN := 4.0
+const JUNCTION_MARGIN := 3.0
+const WALL_TURN_ROOM := 6.0
+const JUNCTION_TURN_ROOM := 16.0
+const STREET_SLACK := 1.5  # beyond the road's half width that still counts as on the street
+const PATROL_FROM := 25.0  # waiting for a gate: this far from it along its street, and this much further on
 const REACTION := 0.3  # seconds from the tell to the hand moving
 const BRAKE_DECEL := 5.0  # m/s^2 the stopping plan assumes (the car manages about 11)
 
@@ -35,6 +56,8 @@ var wind_seen := -1.0  # game time a creature near the car began its wind-up (th
 var rng := RandomNumberGenerator.new()
 var nav: NavGrid  # the car's own grid: wider berth than the Gaunts', so it does not take an alley it cannot fit
 var nav_world: SimWorld
+var hints := {}  # this city's HINTS entry
+var tour: Array = []  # the places toured when the city has no demo route
 
 
 func _init() -> void:
@@ -46,6 +69,9 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 	if nav == null or nav_world != game.world:
 		nav_world = game.world
 		nav = NavGrid.new(game.world, CAR_CLEARANCE)
+		hints = HINTS.get(game.city_id, {})
+		tour = _places_to_tour(game.city_id)
+		route_i = 0
 	var obj := {}
 	if game.mission != null:
 		obj = game.mission.objective()
@@ -68,7 +94,7 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 		# one off (a handbrake slide is faster but leaves the car standing).
 		var flip := 1.0 if int(game.time / 0.5) % 2 == 0 else -1.0
 		var ahead: Vector2 = car.body.position + car.body.velocity * 1.6 + car.forward() * 6.0
-		var room: bool = absf(ahead.x) < 64.0 and absf(ahead.y) < 50.0 and game.world.line_clear(car.body.position, ahead, 2.0)
+		var room: bool = _inside_arena(game.world, ahead) and game.world.line_clear(car.body.position, ahead, 2.0)
 		# Boost only with road ahead (a boosted car goes into the first wall it meets); without it, slide.
 		return {"throttle": 1.0, "turn": flip, "handbrake": not room, "boost": room and car.speed() < 14.0}
 	# A creature is crouching to pounce: read the tell, and a beat later throw the car away from its side.
@@ -151,16 +177,19 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 func _target(game: GameSim, obj: Dictionary) -> Vector2:
 	var car := game.car
 	if obj.is_empty():
-		return _demo_target(car)
+		return _demo_target(game)
 	match obj["kind"]:
 		"kill":
-			# Charge them on the avenue: a car doing 45 km/h or more kills one it meets, whether it is
-			# crouching, running or in mid-leap (PackSim.RUNDOWN_SPEED, LEAP_KILL_SPEED), and meets only
-			# the grille. So keep the speed up along the avenue, aim at one that is ahead, and turn about at
-			# the ends. Off the avenue there are only walls: get back onto it.
+			# Charge them along the street at the objective's place: a car doing 45 km/h or more kills one it
+			# meets, whether it is crouching, running or in mid-leap (PackSim.RUNDOWN_SPEED, LEAP_KILL_SPEED), and
+			# meets only the grille. So keep the speed up along the street, aim at one that is ahead, and turn
+			# about at the ends. Off the street there are only walls: get back onto it.
+			var street := _street(game.world, obj["pos"])
+			if street.is_empty():
+				return _through_hints(car, obj["pos"])  # no street to run: drive to the place
 			var here: Vector2 = car.body.position
-			if absf(here.y) > 8.5 or here.x < -66.0 or here.x > -10.0:
-				return Vector2(-38.0, -0.4)  # the middle of it, a good way off, so there is room to get up speed
+			if absf(_across(street, here) - street["c"]) > street["half"] + STREET_SLACK or _along(street, here) < street["lo"] or _along(street, here) > street["hi"]:
+				return _on(street, (street["lo"] + street["hi"]) * 0.5, street["c"] + LANE_BIAS)  # the middle of it, so there is room to get up speed
 			var best := INF
 			var at := Vector2.INF
 			for g in game.pack.gaunts:
@@ -176,45 +205,107 @@ func _target(game: GameSim, obj: Dictionary) -> Vector2:
 			if at != Vector2.INF and car.speed() > 10.0:
 				return at
 			cap_speed = 15.0
-			# Nothing lined up: run the avenue end to end, building speed.
-			var east: bool = cos(car.body.angle) > 0.0
-			if here.x > -30.0:
-				east = false
-			elif here.x < -56.0:
-				east = true
-			# (The east end has wrecks and the burned bus, and 15 m/s takes 15 m to turn: aim well short.)
-			return Vector2(-26.0 if east else -60.0, -0.4)
+			# Nothing lined up: run the street end to end, building speed.
+			var up: bool = Vector2.from_angle(car.body.angle).dot(_axis(street)) > 0.0  # heading toward the high end
+			if _along(street, here) > street["run_hi"] - 4.0:
+				up = false
+			elif _along(street, here) < street["run_lo"] + 4.0:
+				up = true
+			# (The ends have wrecks, and 15 m/s takes 15 m to turn: the runs stop well short of them.)
+			return _on(street, street["run_hi"] if up else street["run_lo"], street["c"] + LANE_BIAS)
 		"survive":
 			if obj.has("next_pos"):
-				# Wait for the gate on the avenue, far enough from it to reach it in time.
-				var base: Vector2 = obj["next_pos"] + Vector2(25.0, -0.4)
-				var pts := [base, base + Vector2(25.0, 0.0)]
-				if car.body.position.distance_to(pts[patrol_i % 2]) < 9.0:
-					patrol_i += 1
-				return _by_the_chicane(car, pts[patrol_i % 2])
-			return _demo_target(car)
+				# Wait for the gate on its street, far enough from it to reach it in time.
+				var street := _street(game.world, obj["next_pos"])
+				if not street.is_empty():
+					var gate_at: float = _along(street, obj["next_pos"])
+					var inward: float = 1.0 if (street["lo"] + street["hi"]) * 0.5 > gate_at else -1.0
+					var pts := [_on(street, gate_at + inward * PATROL_FROM, street["c"] + LANE_BIAS), _on(street, gate_at + inward * PATROL_FROM * 2.0, street["c"] + LANE_BIAS)]
+					if car.body.position.distance_to(pts[patrol_i % 2]) < 9.0:
+						patrol_i += 1
+					return _through_hints(car, pts[patrol_i % 2])
+			return _demo_target(game)
 		_:
 			# A reach that is not a stop (the pharmacy, where the hunters wait) is entered at a speed the car can
 			# still turn about from: the kill step begins the moment it is inside, 13 m from the west wall.
 			if obj["kind"] == "reach" and not obj.get("stop", false) and car.body.position.distance_to(obj["pos"]) < 40.0:
 				cap_speed = 14.0
-			return _by_the_chicane(car, obj["pos"])
+			return _through_hints(car, obj["pos"])
 
 
-## `goal`, or the next chicane waypoint when the car is east of the central junction and the goal is far west of it.
-func _by_the_chicane(car: CarSim, goal: Vector2) -> Vector2:
-	var here: Vector2 = car.body.position
-	if goal.x > -20.0 or here.x < -12.0:
+## The street at a map point as the kill step and the patrol use it, or {} when there is none:
+## {axis: "x"|"y", c, half, lo, hi, run_lo, run_hi}. `lo` and `hi` are the stretch's ends along its axis (walls or
+## a junction's near edge) less the room kept from them; `run_lo` and `run_hi` are where the end-to-end runs turn.
+func _street(world: SimWorld, p: Vector2) -> Dictionary:
+	var st := world.street_stretch(p)
+	if st.is_empty():
+		return {}
+	var road: Dictionary = st["road"]
+	var lo: float = float(st["lo"]) + (WALL_MARGIN if st["lo_wall"] else JUNCTION_MARGIN)
+	var hi: float = float(st["hi"]) - (WALL_MARGIN if st["hi_wall"] else JUNCTION_MARGIN)
+	var run_lo := lo + (WALL_TURN_ROOM if st["lo_wall"] else JUNCTION_TURN_ROOM)
+	var run_hi := hi - (WALL_TURN_ROOM if st["hi_wall"] else JUNCTION_TURN_ROOM)
+	if run_hi - run_lo < 12.0:  # a short street: run its middle
+		run_lo = (lo + hi) * 0.5 - 6.0
+		run_hi = (lo + hi) * 0.5 + 6.0
+	return {"axis": road["axis"], "c": float(road["c"]), "half": float(road["width"]) * 0.5, "lo": lo, "hi": hi, "run_lo": run_lo, "run_hi": run_hi}
+
+
+func _axis(street: Dictionary) -> Vector2:
+	return Vector2(1.0, 0.0) if street["axis"] == "x" else Vector2(0.0, 1.0)
+
+
+func _along(street: Dictionary, p: Vector2) -> float:
+	return p.x if street["axis"] == "x" else p.y
+
+
+func _across(street: Dictionary, p: Vector2) -> float:
+	return p.y if street["axis"] == "x" else p.x
+
+
+## The map point `along` the street's axis and `across` it.
+func _on(street: Dictionary, along: float, across: float) -> Vector2:
+	return Vector2(along, across) if street["axis"] == "x" else Vector2(across, along)
+
+
+## Is a point inside the arena with room to spare (6 m east and west, 4 m north and south)?
+func _inside_arena(world: SimWorld, p: Vector2) -> bool:
+	var a: Dictionary = world.arena
+	return p.x > a["left"] + 6.0 and p.x < a["right"] - 6.0 and p.y > a["bottom"] + 4.0 and p.y < a["top"] - 4.0
+
+
+## `goal`, or the next waypoint of the city's chicane hint when the car is on the far side of it from the goal.
+func _through_hints(car: CarSim, goal: Vector2) -> Vector2:
+	var chicane: Dictionary = hints.get("chicane", {})
+	if chicane.is_empty():
 		return goal
-	for w in CHICANE_WEST:
+	var here: Vector2 = car.body.position
+	if goal.x > chicane["goal_west_of"] or here.x < chicane["car_east_of"]:
+		return goal
+	for w in chicane["waypoints"]:
 		if (w as Vector2).x < here.x - 4.0:
 			return w
 	return goal
 
 
-func _demo_target(car: CarSim) -> Vector2:
-	var target: Vector2 = DEMO_ROUTE[route_i]
+## The places a city without a demo route is toured through: its marked places.
+func _places_to_tour(city: String) -> Array:
+	var out: Array = []
+	for id in StoryData.PLACES:
+		var pl: Dictionary = StoryData.PLACES[id]
+		if pl["city"] == city and pl["marker"] and not pl.get("safe", false):
+			out.append(pl["pos"])
+	return out
+
+
+func _demo_target(game: GameSim) -> Vector2:
+	var car := game.car
+	var route: Array = hints.get("demo_route", tour)
+	if route.is_empty():
+		return Vector2.INF
+	route_i = route_i % route.size()
+	var target: Vector2 = route[route_i]
 	if car.body.position.distance_to(target) < 9.0:
-		route_i = (route_i + 1) % DEMO_ROUTE.size()
-		target = DEMO_ROUTE[route_i]
+		route_i = (route_i + 1) % route.size()
+		target = route[route_i]
 	return target

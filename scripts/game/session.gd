@@ -10,7 +10,8 @@ extends RefCounted
 ## then save a frame of that screen and quit.
 ##
 ## Story flags: `--story` starts a new story, `--continue` continues from the save, `--mission=N` (1 to 3)
-## starts mission N directly, with the car at its start; all skip the menus. `--gate=open` or
+## starts mission N directly, with the car at its start; all skip the menus. `--city=ID` loads that city (a
+## Cities id) instead of the one the story is in, or the quarter for Survive the Night. `--gate=open` or
 ## `--gate=opening` (opens 1.5 s in) shows the west gate open, for screenshots.
 ##
 ## `--save=PATH` reads and writes the save (and the unlocks beside it) there; it does not skip the menus.
@@ -19,7 +20,7 @@ extends RefCounted
 
 const GAME_FLAGS := [
 	"--demo", "--shot", "--shot-at", "--shot-game", "--shot-speed", "--low", "--start", "--drive",
-	"--cam-log", "--audio-log", "--no-hud", "--story", "--mission", "--continue",
+	"--cam-log", "--audio-log", "--no-hud", "--story", "--mission", "--continue", "--city",
 ]
 ## Screens that live in the story: the game scene opens them over a mission.
 const STORY_SCREENS := ["map", "fail", "complete", "ending"]
@@ -35,6 +36,8 @@ static var continue_save := {}
 static var mission_flag := 0
 static var save_path := SaveStore.SAVE_PATH
 static var seed_flag := -1
+## The city a flag asked for, "" to take the one the story (or the old round) is in.
+static var city := ""
 static var continue_flag := false
 ## The screen a screenshot run asked for, "" for none.
 static var screen := ""
@@ -75,6 +78,9 @@ static func apply_args(args: Array) -> void:
 			save_given = true
 		elif a.begins_with("--seed="):
 			seed_flag = int(a.trim_prefix("--seed="))
+		elif a.begins_with("--city="):
+			var id := a.trim_prefix("--city=")
+			city = id if Cities.has(id) else ""
 	if mode == "story" and not save_given:
 		save_path = SCRATCH_SAVE_PATH
 
@@ -86,6 +92,7 @@ static func reset() -> void:
 	mission_flag = 0
 	save_path = SaveStore.SAVE_PATH
 	seed_flag = -1
+	city = ""
 	continue_flag = false
 	screen = ""
 	shot_path = ""

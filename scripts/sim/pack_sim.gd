@@ -34,6 +34,14 @@ const MISS_STUN := 0.7
 const GRAB_DRAG := 140.0  # N per (m/s) per 80 kg (Roadkill CAR.grabDrag)
 const GAUNT_MASS := 70.0
 const MAX_LATCHED := 4
+## The pack follows the car: newcomers come in this far from it (never closer than SPAWN_MIN, whatever
+## the caller asks), ahead of it and toward where it is going; a creature that is not hunting and is
+## left further than STRAGGLER_DISTANCE behind is dropped and replaced ahead. In a city barely wider than
+## these (the quarter) they change little.
+const SPAWN_MIN := 60.0
+const SPAWN_MAX := 120.0
+const STRAGGLER_DISTANCE := 150.0
+const AHEAD := 0.35  # cosine of the widest angle off the heading that still counts as ahead (about 70 degrees)
 ## Where a creature can hold on: local position on the car (x forward, y left), height, and the
 ## heading offset it faces.
 const SLOTS := [
@@ -63,6 +71,8 @@ var size_override := -1
 var director_on := true
 ## True after alert_all(): creatures the director adds from then on come in alerted too.
 var alerted_spawns := false
+## Where the car is going (the story's objective), or INF: newcomers are placed toward it. GameSim sets it.
+var goal := Vector2.INF
 
 
 func _init(w: SimWorld, n: NavGrid, seed_value: int = 1) -> void:
@@ -128,20 +138,48 @@ func notice_range(car: CarSim) -> float:
 # ----------------------------------------------------------------------------- director
 
 
-func spawn_one(car: CarSim, min_dist: float = 60.0) -> GauntSim:
-	var cands: Array = []
+## The way the car is going, as a unit vector: its velocity once it is moving, else the way it faces,
+## leaning toward the goal when it has one and is not on top of it.
+func heading_of(car: CarSim) -> Vector2:
+	var v := car.body.velocity
+	var h: Vector2 = v.normalized() if v.length() > 3.0 else car.forward()
+	if goal != Vector2.INF:
+		var to := goal - car.body.position
+		if to.length() > 30.0:
+			var lean := h + to.normalized() * 0.6
+			if lean.length() > 0.01:
+				h = lean.normalized()
+	return h
+
+
+## A hiding place for a newcomer: 60 to 120 m from the car, out of its light and the lamps, ahead of it
+## and toward its goal when there is one; else any such place in that band; else any 60 m or more away;
+## else the furthest there is. One draw from the pack's generator whenever there is a choice, as before.
+func spawn_one(car: CarSim, min_dist: float = SPAWN_MIN) -> GauntSim:
+	var here := car.body.position
+	var heading := heading_of(car)
+	var ahead: Array = []
+	var band: Array = []
+	var far: Array = []
 	for s in world.spawns:
-		var d := (s as Vector2).distance_to(car.body.position)
-		if d >= min_dist and not world.is_lit(s) and not in_cone(car, s):
-			cands.append(s)
+		var d := (s as Vector2).distance_to(here)
+		if d < min_dist or world.is_lit(s) or in_cone(car, s):
+			continue
+		if d > maxf(SPAWN_MAX, min_dist):
+			far.append(s)
+			continue
+		band.append(s)
+		if (s - here).dot(heading) > AHEAD * d:
+			ahead.append(s)
+	var cands: Array = ahead if not ahead.is_empty() else (band if not band.is_empty() else far)
 	var p: Vector2
 	if cands.is_empty():
-		var far := 0.0
+		var furthest := 0.0
 		p = world.spawns[0]
 		for s in world.spawns:
-			var d2 := (s as Vector2).distance_to(car.body.position)
-			if d2 > far:
-				far = d2
+			var d2 := (s as Vector2).distance_to(here)
+			if d2 > furthest:
+				furthest = d2
 				p = s
 	else:
 		p = cands[rng.randi() % cands.size()]
@@ -291,9 +329,31 @@ func _director(dt: float, car: CarSim) -> void:
 		return
 	spawn_timer -= dt
 	var want := size_override if size_override >= 0 else pack_size_for(time)
+	_drop_stragglers(car, want)
 	if alive_count() < want and spawn_timer <= 0.0:
 		spawn_one(car)
 		spawn_timer = 5.0
+
+
+## A creature left far behind that is only lurking or stalking is of no use there: remove it and, if
+## the pack is short, put its replacement ahead of the car at once.
+func _drop_stragglers(car: CarSim, want: int) -> void:
+	var here := car.body.position
+	var heading := heading_of(car)
+	var dropped := 0
+	var keep: Array = []
+	for g in gaunts:
+		var behind: bool = (g.pos - here).dot(heading) < 0.0
+		if (g.state == GauntSim.State.LURK or g.state == GauntSim.State.STALK) and behind and g.pos.distance_to(here) > STRAGGLER_DISTANCE:
+			dropped += 1
+		else:
+			keep.append(g)
+	if dropped == 0:
+		return
+	gaunts = keep
+	for i in dropped:
+		if alive_count() < want:
+			spawn_one(car)
 
 
 func _spread_alert(car: CarSim) -> void:

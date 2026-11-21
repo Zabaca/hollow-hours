@@ -58,6 +58,8 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 	fail_menu.quit_to_menu.connect(_on_quit)
 	map_screen = MapScreen.new()
 	add_child(map_screen)
+	hud.radar.set_city(game.city_id)
+	map_screen.view.set_city(game.city_id)
 	credits_roll = CreditsRoll.new()
 	add_child(credits_roll)
 	credits_roll.finished.connect(_on_roll_finished)

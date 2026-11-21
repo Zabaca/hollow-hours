@@ -54,8 +54,13 @@ static func set_aside(path: String) -> String:
 
 
 ## Is this a save we can use: the version we know, the next mission a real one, the missions done
-## the story's first few in order, and the totals numbers.
-static func valid_save(d: Dictionary) -> bool:
+## the story's first few in order, and the totals numbers. `missions` is the story it is read against
+## (StoryData.MISSIONS; a test hands a longer one).
+##
+## A save that finished the story as it was (next empty, the ending seen) is still good when the story
+## has grown past it: it is one that finished a whole chapter, with the next chapter still to play
+## (see upgraded()). Every other save with an empty `next` before the story's end is damaged.
+static func valid_save(d: Dictionary, missions: Array = StoryData.MISSIONS) -> bool:
 	if not d.has("version") or typeof(d["version"]) not in [TYPE_FLOAT, TYPE_INT] or int(d["version"]) != VERSION:
 		return false
 	if typeof(d.get("next")) != TYPE_STRING or typeof(d.get("done")) != TYPE_ARRAY or typeof(d.get("totals")) != TYPE_DICTIONARY:
@@ -63,13 +68,13 @@ static func valid_save(d: Dictionary) -> bool:
 	if typeof(d.get("ending_seen")) != TYPE_BOOL:
 		return false
 	var done: Array = d["done"]
-	if done.size() > StoryData.MISSIONS.size():
+	if done.size() > missions.size():
 		return false
 	for i in done.size():
-		if typeof(done[i]) != TYPE_STRING or StoryData.mission_index(done[i]) != i:
+		if typeof(done[i]) != TYPE_STRING or _index(done[i], missions) != i:
 			return false
-	var expected := "" if done.size() >= StoryData.MISSIONS.size() else str(StoryData.MISSIONS[done.size()]["id"])
-	if d["next"] != expected:
+	var expected := "" if done.size() >= missions.size() else str(missions[done.size()]["id"])
+	if d["next"] != expected and not _finished_a_chapter(d, missions):
 		return false
 	for k in ["kills", "wrecks", "seconds"]:
 		if typeof(d["totals"].get(k)) not in [TYPE_FLOAT, TYPE_INT]:
@@ -77,15 +82,46 @@ static func valid_save(d: Dictionary) -> bool:
 	return true
 
 
-## The save, or {} when there is none (or it was damaged: then it is set aside).
-static func load_save(path: String = SAVE_PATH) -> Dictionary:
+static func _index(id: String, missions: Array) -> int:
+	for i in missions.size():
+		if missions[i]["id"] == id:
+			return i
+	return -1
+
+
+## A save that ended the story when it was written (next empty, the ending seen) and finished exactly
+## a chapter's last mission, with missions still to come after it.
+static func _finished_a_chapter(d: Dictionary, missions: Array) -> bool:
+	var n := (d["done"] as Array).size()
+	return d["next"] == "" and d["ending_seen"] == true and n > 0 and n < missions.size() and StoryData.ends_chapter(n - 1, missions)
+
+
+## The save as the story reads it now: a save that finished a chapter the story has since grown past
+## (see valid_save) gets the next chapter's first mission as `next`; any other save is returned as it is.
+## `ending_seen` stays, so what it unlocked (Survive the Night) stays. Pass a valid save.
+static func upgraded(d: Dictionary, missions: Array = StoryData.MISSIONS) -> Dictionary:
+	if not _finished_a_chapter(d, missions):
+		return d
+	var out := d.duplicate(true)
+	out["next"] = str(missions[(d["done"] as Array).size()]["id"])
+	return out
+
+
+## The city the save puts the player in: the next mission's, or the last chapter's when the story is over.
+static func city_of(d: Dictionary, missions: Array = StoryData.MISSIONS) -> String:
+	return StoryData.city_after((d["done"] as Array).size(), missions)
+
+
+## The save, or {} when there is none (or it was damaged: then it is set aside). A save from before the
+## story grew comes back upgraded.
+static func load_save(path: String = SAVE_PATH, missions: Array = StoryData.MISSIONS) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
 	var d: Variant = read_json(path)
-	if d == null or not valid_save(d):
+	if d == null or not valid_save(d, missions):
 		set_aside(path)
 		return {}
-	return d
+	return upgraded(d, missions)
 
 
 static func write_save(data: Dictionary, path: String = SAVE_PATH) -> bool:

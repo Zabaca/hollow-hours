@@ -76,55 +76,48 @@ static func box_height(kind: String) -> float:
 
 
 ## Where along from -> to (0..1) a ball of radius `pad` first meets one of the world's boxes;
-## 1.0 when the way is clear. A box the start is already inside is skipped.
+## 1.0 when the way is clear. A box the start is already inside is skipped. Only the boxes near the
+## line are tested (the world's buckets), and the perimeter wall, which is not one of the boxes, is
+## added with the gate's gap cut in it when the gate is open.
 static func clear_fraction(world: SimWorld, from: Vector3, to: Vector3, pad: float) -> float:
 	var d := to - from
 	var best := 1.0
 	# The perimeter wall (city.py draws it just outside the arena, 4.5 m high) is not one of the
 	# boxes, so a camera behind a car at the edge would end up outside it, looking at its far side.
-	var boxes: Array = world.boxes.duplicate()
-	var a: Dictionary = world.arena
-	var far := 400.0
-	if world.gate["open"]:
-		# The west wall has a gap where the gate stands: through it the way is clear.
-		var g: Dictionary = world.gate
-		var half := float(g["width"]) * 0.5
-		boxes.append({"x0": -far, "y0": float(g["pos"].y) + half, "x1": a["left"], "y1": far, "kind": "perimeter"})
-		boxes.append({"x0": -far, "y0": -far, "x1": a["left"], "y1": float(g["pos"].y) - half, "kind": "perimeter"})
-	else:
-		boxes.append({"x0": -far, "y0": -far, "x1": a["left"], "y1": far, "kind": "perimeter"})
-	boxes.append({"x0": a["right"], "y0": -far, "x1": far, "y1": far, "kind": "perimeter"})
-	boxes.append({"x0": -far, "y0": -far, "x1": far, "y1": a["bottom"], "kind": "perimeter"})
-	boxes.append({"x0": -far, "y0": a["top"], "x1": far, "y1": far, "kind": "perimeter"})
-	for b in boxes:
-		var lo := Vector3(float(b["x0"]) - pad, -pad, -float(b["y1"]) - pad)
-		var hi := Vector3(float(b["x1"]) + pad, box_height(String(b["kind"])) + pad, -float(b["y0"]) + pad)
-		var tmin := 0.0
-		var tmax := 1.0
-		var miss := false
-		for axis in 3:
-			var o: float = from[axis]
-			var dir: float = d[axis]
-			if absf(dir) < 1e-9:
-				if o < lo[axis] or o > hi[axis]:
-					miss = true
-					break
-			else:
-				var t1: float = (lo[axis] - o) / dir
-				var t2: float = (hi[axis] - o) / dir
-				if t1 > t2:
-					var tmp := t1
-					t1 = t2
-					t2 = tmp
-				tmin = maxf(tmin, t1)
-				tmax = minf(tmax, t2)
-				if tmin > tmax:
-					miss = true
-					break
-		if miss or tmin <= 0.0:
-			continue  # no hit, or the start is inside this box
-		best = minf(best, tmin)
+	for b in world.perimeter_boxes():
+		best = minf(best, _hit_fraction(b, from, d, pad))
+	# The map plane is (x, -z) in the world.
+	for i in world.boxes_along(Vector2(from.x, -from.z), Vector2(to.x, -to.z), pad):
+		best = minf(best, _hit_fraction(world.boxes[i], from, d, pad))
 	return best
+
+
+## Where (0..1) the ball first meets the box, or 1.0 for no hit or a start already inside it.
+static func _hit_fraction(b: Dictionary, from: Vector3, d: Vector3, pad: float) -> float:
+	var lo := Vector3(float(b["x0"]) - pad, -pad, -float(b["y1"]) - pad)
+	var hi := Vector3(float(b["x1"]) + pad, box_height(String(b["kind"])) + pad, -float(b["y0"]) + pad)
+	var tmin := 0.0
+	var tmax := 1.0
+	for axis in 3:
+		var o: float = from[axis]
+		var dir: float = d[axis]
+		if absf(dir) < 1e-9:
+			if o < lo[axis] or o > hi[axis]:
+				return 1.0
+		else:
+			var t1: float = (lo[axis] - o) / dir
+			var t2: float = (hi[axis] - o) / dir
+			if t1 > t2:
+				var tmp := t1
+				t1 = t2
+				t2 = tmp
+			tmin = maxf(tmin, t1)
+			tmax = minf(tmax, t2)
+			if tmin > tmax:
+				return 1.0
+	if tmin <= 0.0:
+		return 1.0  # the start is inside this box
+	return tmin
 
 
 ## The ending: the camera leaves the car's shoulder and swings round to its front while rising and

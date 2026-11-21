@@ -22,6 +22,7 @@ func _ready() -> void:
 	_test_script()
 	_test_places()
 	_test_legs()
+	_test_cities_and_chapters()
 	_test_new_game()
 	_test_start_story_at()
 	_test_hold()
@@ -38,6 +39,7 @@ func _ready() -> void:
 	_test_missions_in_order()
 	_test_continue_and_revert()
 	_test_save_file()
+	_test_save_across_chapters()
 	_test_gate_trigger()
 	_test_gate_needs_the_gap()
 	_test_camera_through_the_gap()
@@ -187,8 +189,8 @@ func _test_places() -> void:
 	var start: Vector2 = StoryData.place_pos("safe_start")
 	for id in StoryData.PLACES:
 		var pl: Dictionary = StoryData.PLACES[id]
-		if not pl["marker"]:
-			continue
+		if not pl["marker"] or pl["city"] != sim.city_id:
+			continue  # (a place in another city is checked against that city)
 		var p: Vector2 = pl["pos"]
 		if p.x < w.arena["left"] or p.x > w.arena["right"] or p.y < w.arena["bottom"] or p.y > w.arena["top"]:
 			bad.append(id + ": outside the arena")
@@ -224,7 +226,9 @@ func _test_legs() -> void:
 	var short: Array = []
 	var shortest := INF
 	for m in StoryData.MISSIONS:
-		var at_id: String = m["start"] if m["start"] != "" else "safe_start"
+		if m["city"] != Cities.QUARTER:
+			continue  # (a later chapter's legs are long drives, measured on its own city's path grid)
+		var at_id: String = StoryData.start_place_id(m)
 		for s in m["steps"]:
 			if not s.has("place") or s["place"] == at_id:
 				continue  # a hold at the place just reached is not a leg
@@ -601,6 +605,88 @@ func _test_save_file() -> void:
 	_check(SaveStore.load_save(path)["next"] == "pharmacist", "a second write replaces the first")
 
 
+# ----------------------------------------------------------------------------- cities and chapters
+
+
+## The story as it will be with a second chapter: today's three missions, then three in another city.
+func _two_chapters() -> Array:
+	var out: Array = StoryData.MISSIONS.duplicate()
+	for k in 3:
+		out.append({"id": "later_%d" % (k + 1), "title": "LATER %d" % (k + 1), "city": "harbour", "start": "", "dawn": 0.3, "begin": {}, "end": {}, "steps": []})
+	return out
+
+
+func _test_cities_and_chapters() -> void:
+	var unknown: Array = []
+	var elsewhere: Array = []
+	for id in StoryData.PLACES:
+		if not Cities.has(StoryData.PLACES[id]["city"]):
+			unknown.append(id)
+	for m in StoryData.MISSIONS:
+		if not Cities.has(m["city"]):
+			unknown.append(m["id"])
+		var named: Array = [StoryData.start_place_id(m)]
+		for s in m["steps"]:
+			if s.has("place"):
+				named.append(s["place"])
+		for pid in named:
+			if StoryData.place_city(pid) != m["city"]:
+				elsewhere.append("%s: %s is in %s" % [m["id"], pid, StoryData.place_city(pid)])
+	_check(unknown.is_empty(), "every place and every mission names a city the game has", str(unknown))
+	_check(elsewhere.is_empty(), "and every place a mission uses is in the mission's own city", str(elsewhere))
+	_check(StoryData.safe_start_id(Cities.QUARTER) == "safe_start" and StoryData.start_place_id(StoryData.MISSIONS[0]) == "safe_start" and StoryData.start_place_id(StoryData.MISSIONS[1]) == "shop", "a mission with no start place starts at its city's safe start")
+	_check(Cities.layout(Cities.QUARTER) == CityLayout.DATA and Cities.model_path(Cities.QUARTER).ends_with("city.glb") and not Cities.has("nowhere"), "the registry hands out the quarter's layout and model")
+	var ch := StoryData.chapters()
+	_check(ch.size() == 1 and ch[0] == {"city": Cities.QUARTER, "first": 0, "last": 2}, "today's story is one chapter in the quarter", str(ch))
+	var story := _two_chapters()
+	ch = StoryData.chapters(story)
+	_check(ch.size() == 2 and ch[0] == {"city": "quarter", "first": 0, "last": 2} and ch[1] == {"city": "harbour", "first": 3, "last": 5}, "a story with three missions in a second city is two chapters", str(ch))
+	_check(StoryData.ends_chapter(2, story) and not StoryData.ends_chapter(3, story) and StoryData.ends_chapter(5, story) and StoryData.ends_chapter(2), "the third mission ends a chapter in both stories, the sixth ends the story")
+	_check(StoryData.city_after(0, story) == "quarter" and StoryData.city_after(2, story) == "quarter" and StoryData.city_after(3, story) == "harbour" and StoryData.city_after(6, story) == "harbour" and StoryData.city_after(3) == "quarter", "the city a player is in follows the next mission, the last one's when the story is over")
+	_check(StoryData.mission_city(4, story) == "harbour", "a mission's city is read from its row")
+
+
+func _test_save_across_chapters() -> void:
+	var story := _two_chapters()
+	var path := DIR + "/chapters.json"
+	var three := ["batteries", "pharmacist", "west_gate"]
+	var finished := {"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": three, "ending_seen": true, "totals": {"kills": 4, "wrecks": 1, "seconds": 600.0}}
+	_check(SaveStore.valid_save(finished) and SaveStore.upgraded(finished) == finished, "a save that finished the story is good as it is while the story has three missions")
+	_check(SaveStore.valid_save(finished, story), "and once a second chapter exists it is still a good save, not a damaged one")
+	var up := SaveStore.upgraded(finished, story)
+	_check(up["next"] == "later_1" and up["done"] == three and up["ending_seen"] == true and up["totals"]["kills"] == 4, "it reads as chapter 2 next: the next mission is chapter 2's first, and what was done, seen and counted stays", str(up))
+	_check(SaveStore.city_of(finished, story) == "harbour" and SaveStore.city_of(up, story) == "harbour", "so Continue would open the second city")
+	_check(SaveStore.city_of(_save_at("pharmacist")) == "quarter" and SaveStore.city_of(_save_at("pharmacist"), story) == "quarter", "a save in the middle of chapter 1 still opens the quarter")
+	# Saves a chapter-2 story writes.
+	var mid := {"version": SaveStore.VERSION, "saved_at": 0, "next": "later_2", "done": three + ["later_1"], "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}}
+	var over := {"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": three + ["later_1", "later_2", "later_3"], "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}}
+	_check(SaveStore.valid_save(mid, story) and SaveStore.valid_save(over, story), "a save between chapter 2's missions and one at the end of the story are good")
+	_check(SaveStore.city_of(mid, story) == "harbour" and SaveStore.city_of(over, story) == "harbour", "and both are in the second city")
+	_check(not SaveStore.valid_save(mid) and not SaveStore.valid_save(over), "against today's three missions they are not (they name missions that do not exist)")
+	# What is still damaged.
+	var cases := {
+		"empty next after one mission": {"next": "", "done": ["batteries"], "ending_seen": true},
+		"empty next in the middle of chapter 1": {"next": "", "done": ["batteries", "pharmacist"], "ending_seen": true},
+		"empty next, chapter 1 done, its ending never seen": {"next": "", "done": three, "ending_seen": false},
+		"the wrong next after chapter 1": {"next": "later_3", "done": three, "ending_seen": true},
+		"empty next with nothing done": {"next": "", "done": [], "ending_seen": true},
+		"missions out of order": {"next": "later_1", "done": ["batteries", "west_gate", "pharmacist"], "ending_seen": true},
+	}
+	for name in cases:
+		var d: Dictionary = {"version": SaveStore.VERSION, "saved_at": 0, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}}
+		d.merge(cases[name])
+		_check(not SaveStore.valid_save(d, story), "a save with %s is still damaged with a second chapter" % name)
+	# Through the file: the upgrade is made on loading, the file is not set aside.
+	_clean()
+	SaveStore.write_save(finished, path)
+	var back := SaveStore.load_save(path, story)
+	_check(back["next"] == "later_1" and FileAccess.file_exists(path) and _files_starting(DIR, "chapters.json.bad").is_empty(), "a finished save on disk loads as chapter 2 next and stays where it is")
+	_check(SaveStore.load_save(path)["next"] == "", "and read against today's story it is as it was written")
+	SaveStore.write_save(up, path)
+	_check(SaveStore.load_save(path, story)["next"] == "later_1", "an upgraded save, written back, loads the same")
+	_clean()
+
+
 func _files_starting(dir: String, prefix: String) -> Array:
 	var out: Array = []
 	var d := DirAccess.open(dir)
@@ -770,7 +856,7 @@ func _test_hunters_not_in_the_car() -> void:
 		_at(sim, "pharmacy")
 		_run(sim, 0.1)
 		for g in sim.pack.gaunts:
-			if sim.mission._wall_gap(sim.world, g.pos) < MissionSim.WALL_GAP - 1.5:
+			if sim.world.wall_gap(g.pos, MissionSim.WALL_GAP) < MissionSim.WALL_GAP - 1.5:
 				tight += 1
 	_check(tight == 0, "and they stand clear of the walls, where the car can get at them", "against a wall=%d" % tight)
 

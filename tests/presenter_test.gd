@@ -285,6 +285,12 @@ func _test_flags_never_touch_the_players_save() -> void:
 	Session.apply_args(["--demo", "--shot-at=3"])
 	_check(Session.mode == "survival" and Session.save_path == real, "while the old round's flags leave the real path alone (it writes no save)")
 	Session.reset()
+	Session.apply_args(["--city=quarter"])
+	_check(Session.city == Cities.QUARTER, "--city= names the city to load")
+	Session.reset()
+	Session.apply_args(["--city=nowhere"])
+	_check(Session.city == "", "and a city the game does not have is ignored")
+	Session.reset()
 	Session.save_path = kept
 
 
@@ -301,6 +307,10 @@ func _test_map_view() -> void:
 	_check(right.x > centre.x, "and what is on its right on the right")
 	radar.set_state(pos, 0.0, [])  # now facing east: north is on its left
 	_check(radar.to_screen(pos + Vector2(0.0, 10.0)).x < 100.0, "turning the car turns the radar")
+	var roads := radar._road_boxes()
+	_check(radar.city == Cities.QUARTER and roads.size() == CityLayout.DATA["roads"].size() and roads.size() == 6, "the map draws the roads its city's layout lists", str(roads.size()))
+	var avenue: Dictionary = roads.filter(func(r: Dictionary) -> bool: return is_equal_approx(float(r["y0"]), -7.0) and is_equal_approx(float(r["y1"]), 7.0))[0]
+	_check(is_equal_approx(float(avenue["x0"]), -70.0) and is_equal_approx(float(avenue["x1"]), 70.0), "the avenue runs the width of the quarter")
 	var full := MapView.new()
 	full.mode = MapView.Mode.FULL
 	full.size = Vector2(1000, 760)
@@ -322,6 +332,7 @@ func _test_mission_start_on_screen() -> void:
 	var h := r.presenter.hud
 	_listen(r)
 	_check(h.objective_label.text == "Drive to the motel office on the north road" and h.objective_label.visible, "the objective line shows the first step", h.objective_label.text)
+	_check(h.radar.city == r.game.city_id and r.presenter.map_screen.view.city == r.game.city_id and r.game.city_id == Cities.QUARTER, "the radar and the full map draw the city the game is in")
 	_check(h.card_kicker.text == "MISSION 1" and h.card_title.text == "BATTERIES", "a title card opens the mission", "%s / %s" % [h.card_kicker.text, h.card_title.text])
 	_check(r.presenter.radio.current_subtitle()["id"] == "bat_call_1" and h.subtitle_panel.visible and h.speaker_label.text == "VERA" and h.subtitle_label.text.replace("\n", " ").begins_with("Red car on the avenue."), "Vera's call is subtitled with her name", h.subtitle_label.text)
 	var blips: Array = h.radar.blips

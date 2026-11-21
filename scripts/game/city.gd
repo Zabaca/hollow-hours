@@ -18,6 +18,7 @@ var noise_tex: ImageTexture
 var ground_mats := {}
 var time := 0.0
 var rng := RandomNumberGenerator.new()
+var tag_levels := {}  # light tag -> 0..1, how much of its light it gives (the field hospital's floodlights fail)
 var pieces := 0  # how many parts of the model are culled by distance (zero for the quarter, which is one small piece per block)
 
 
@@ -147,7 +148,7 @@ func _add_lights() -> void:
 		node.distance_fade_enabled = true
 		node.distance_fade_begin = 70.0
 		node.distance_fade_length = 25.0
-		lights.append({"node": node, "base": energy, "flicker": float(l["flicker"]), "off_t": 0.0, "phase": rng.randf() * 10.0})
+		lights.append({"node": node, "base": energy, "flicker": float(l["flicker"]), "off_t": 0.0, "phase": rng.randf() * 10.0, "tag": String(l.get("tag", ""))})
 
 
 func _add_fires() -> void:
@@ -194,15 +195,20 @@ func _process(delta: float) -> void:
 	for l in lights:
 		var node: Light3D = l["node"]
 		var f: float = l["flicker"]
+		var level := 1.0
+		if l["tag"] != "" and tag_levels.has(l["tag"]):
+			level = float(tag_levels[l["tag"]])
 		if f <= 0.0:
+			if level < 1.0:
+				node.light_energy = float(l["base"]) * level
 			continue
 		# A failing lamp: now and then it drops almost out for a fraction of a second, with a
 		# constant tremble in between.
 		if l["off_t"] > 0.0:
 			l["off_t"] = float(l["off_t"]) - delta
-			node.light_energy = float(l["base"]) * 0.06
+			node.light_energy = float(l["base"]) * 0.06 * level
 		else:
 			var tremble := 1.0 - f * 0.25 * (0.5 + 0.5 * sin(time * 31.0 + float(l["phase"])))
-			node.light_energy = float(l["base"]) * tremble
+			node.light_energy = float(l["base"]) * tremble * level
 			if rng.randf() < f * 0.9 * delta:
 				l["off_t"] = rng.randf_range(0.05, 0.25)

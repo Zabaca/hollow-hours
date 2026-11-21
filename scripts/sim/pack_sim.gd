@@ -264,6 +264,19 @@ func arm_stalled(list: Array) -> void:
 	stalled = list.duplicate()
 
 
+## The story's hook: arm more waiting places without disarming the ones already armed ({pos, release, count?}, each
+## placing `count` creatures, default 1, a few metres apart, when the car comes within `release`). A place already
+## armed (same position) is not armed twice.
+func arm_more(list: Array) -> void:
+	for h in list:
+		var known := false
+		for k in stalled:
+			if (k["pos"] as Vector2).is_equal_approx(h["pos"]):
+				known = true
+		if not known:
+			stalled.append(h)
+
+
 ## Release the armed creatures the car has come within range of: each bursts out of its car already hunting.
 func _release_stalled(car: CarSim) -> void:
 	if stalled.is_empty():
@@ -272,7 +285,11 @@ func _release_stalled(car: CarSim) -> void:
 	var keep: Array = []
 	for h in stalled:
 		if (h["pos"] as Vector2).distance_to(here) <= float(h["release"]):
-			place_hunting(h["pos"], car)
+			var n := int(h.get("count", 1))
+			for k in n:
+				# several: spread round the spot, a step apart, so they do not start inside one another
+				var off := Vector2.from_angle(TAU * k / maxf(1.0, float(n)) + 0.7) * (2.5 if n > 1 else 0.0)
+				place_hunting((h["pos"] as Vector2) + off, car)
 		else:
 			keep.append(h)
 	stalled = keep

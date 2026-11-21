@@ -642,8 +642,15 @@ func _test_ending_returns_to_the_title() -> void:
 	f = FileAccess.open(SAVE, FileAccess.WRITE)
 	f.store_string(JSON.stringify(done))
 	f.close()
+	var after_road := _make_title()
+	_check(after_road.menu_rows[1].enabled and after_road.menu_rows[1].note == "Mission 5", "a save from when The Long Road ended the built story reads as Dead Convoy next", after_road.menu_rows[1].note)
+	after_road.queue_free()
+	done["done"] = ["batteries", "pharmacist", "west_gate", "long_road", "dead_convoy", "floodlights", "lift_bridge"]
+	f = FileAccess.open(SAVE, FileAccess.WRITE)
+	f.store_string(JSON.stringify(done))
+	f.close()
 	var roam_title := _make_title()
-	_check(roam_title.menu_rows[1].enabled and roam_title.menu_rows[1].note == "Free roam", "once The Long Road is done, with nothing after it yet, Continue says Free roam", roam_title.menu_rows[1].note)
+	_check(roam_title.menu_rows[1].enabled and roam_title.menu_rows[1].note == "Free roam", "once every built mission is done, with nothing after it yet, Continue says Free roam", roam_title.menu_rows[1].note)
 	roam_title.queue_free()
 
 

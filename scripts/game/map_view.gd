@@ -13,7 +13,9 @@ const TEAL := Color(0.22, 0.88, 0.82)
 const BUILDING := Color(0.3, 0.33, 0.37)
 const WRECK := Color(0.3, 0.22, 0.21)
 const ROAD := Color(0.085, 0.09, 0.1)
-const RADAR_RANGE := 60.0  # metres from the centre to the rim
+const RADAR_RANGE := 60.0  # metres from the centre to the rim, crawling
+const RADAR_RANGE_FAST := 110.0  # and flat out, in a city that widens it (Cities.route_grid is not empty)
+const RADAR_FAST_SPEED := 40.0  # m/s at which it is as wide as it gets
 const RIM_STEPS := 40
 const TERRAIN_SIZE := 120.0  # a box this long on either side is the ground a long road is cut through: the full map leaves it out
 
@@ -21,6 +23,8 @@ var mode: int = Mode.RADAR
 var car_pos := Vector2.ZERO
 var car_angle := 0.0
 var blips: Array = []  # [{kind: objective|start, pos}]
+var route := PackedVector2Array()  # the way to the objective, as a polyline in map metres (empty: none)
+var radar_range := RADAR_RANGE
 var city := Cities.QUARTER
 var data: Dictionary = Cities.layout(Cities.QUARTER)  # the city's layout: its arena, roads, boxes and gate
 var _rim := PackedVector2Array()
@@ -39,10 +43,17 @@ func set_city(id: String) -> void:
 	queue_redraw()
 
 
-func set_state(pos: Vector2, angle: float, new_blips: Array) -> void:
+func set_state(pos: Vector2, angle: float, new_blips: Array, speed: float = 0.0, new_route: PackedVector2Array = PackedVector2Array()) -> void:
 	car_pos = pos
 	car_angle = angle
 	blips = new_blips
+	route = new_route
+	# The radar reaches further the faster the car goes (in the cities that show routes): a driver at 140 km/h needs to see
+	# the next turn sooner. It eases toward its range rather than snapping to it.
+	var want := RADAR_RANGE
+	if not Cities.route_grid(city).is_empty():
+		want = lerpf(RADAR_RANGE, RADAR_RANGE_FAST, clampf((speed - 4.0) / (RADAR_FAST_SPEED - 4.0), 0.0, 1.0))
+	radar_range = lerpf(radar_range, want, 0.06)
 	queue_redraw()
 
 
@@ -56,7 +67,7 @@ func _frame() -> Dictionary:
 
 func _scale() -> float:
 	if mode == Mode.RADAR:
-		return minf(size.x, size.y) * 0.5 / RADAR_RANGE
+		return minf(size.x, size.y) * 0.5 / radar_range
 	var a: Dictionary = _frame()
 	return minf(size.x / (float(a["right"]) - float(a["left"])), size.y / (float(a["top"]) - float(a["bottom"])))
 
@@ -121,11 +132,12 @@ func _draw_radar() -> void:
 		var kind: String = b["kind"]
 		if kind != "building" and kind != "wreck":
 			continue
-		if absf(float(b["x0"] + b["x1"]) * 0.5 - car_pos.x) > RADAR_RANGE * 1.6 or absf(float(b["y0"] + b["y1"]) * 0.5 - car_pos.y) > RADAR_RANGE * 1.6:
+		if absf(float(b["x0"] + b["x1"]) * 0.5 - car_pos.x) > radar_range * 1.6 or absf(float(b["y0"] + b["y1"]) * 0.5 - car_pos.y) > radar_range * 1.6:
 			continue
 		var poly := _clip(_box_poly(b), circle)
 		if _area(poly) > 1.0:
 			draw_colored_polygon(poly, Color(BUILDING, 0.72) if kind == "building" else Color(WRECK, 0.85))
+	_draw_route(c, r - 2.0)
 	draw_arc(c, r - 1.0, 0.0, TAU, 64, Color(MenuStyle.BONE, 0.42), 2.0, true)
 	# North, so a turning car still knows where it is.
 	var north := to_screen(car_pos + Vector2(0.0, 1.0)) - c
@@ -135,6 +147,44 @@ func _draw_radar() -> void:
 		_draw_radar_blip(c, r, bl)
 	var car := PackedVector2Array([c + Vector2(0.0, -8.0), c + Vector2(5.5, 6.0), c + Vector2(0.0, 3.0), c + Vector2(-5.5, 6.0)])
 	draw_colored_polygon(car, MenuStyle.BONE)
+
+
+## The route to the objective, a faint amber line along the streets. On the radar (`radius` > 0) each segment is cut
+## to the circle; on the full map the view's own clip does it.
+func _draw_route(centre: Vector2, radius: float) -> void:
+	if route.size() < 2:
+		return
+	var col := Color(AMBER, 0.62)
+	for k in range(1, route.size()):
+		var a := to_screen(route[k - 1])
+		var b := to_screen(route[k])
+		if radius > 0.0:
+			var seg := _segment_in_circle(a, b, centre, radius)
+			if seg.is_empty():
+				continue
+			a = seg[0]
+			b = seg[1]
+		draw_line(a, b, col, 2.5 if radius <= 0.0 else 2.0, true)
+
+
+## The part of segment a-b inside the circle, as [from, to], or [] when none of it is.
+func _segment_in_circle(a: Vector2, b: Vector2, centre: Vector2, radius: float) -> Array:
+	var d := b - a
+	var f := a - centre
+	var qa := d.dot(d)
+	if qa < 0.000001:
+		return [a, b] if f.length() <= radius else []
+	var qb := 2.0 * f.dot(d)
+	var qc := f.dot(f) - radius * radius
+	var disc := qb * qb - 4.0 * qa * qc
+	if disc < 0.0:
+		return []
+	var root := sqrt(disc)
+	var t0 := clampf((-qb - root) / (2.0 * qa), 0.0, 1.0)
+	var t1 := clampf((-qb + root) / (2.0 * qa), 0.0, 1.0)
+	if t1 <= t0:
+		return []
+	return [a + d * t0, a + d * t1]
 
 
 func _draw_radar_blip(c: Vector2, r: float, bl: Dictionary) -> void:
@@ -193,6 +243,7 @@ func _draw_full() -> void:
 			var from: Vector2 = (p[0] + p[1]) * 0.5 if thin_in_x else (p[0] + p[3]) * 0.5
 			var to: Vector2 = (p[3] + p[2]) * 0.5 if thin_in_x else (p[1] + p[2]) * 0.5
 			draw_line(from, to, Color(MenuStyle.DIM, 0.5), 1.5)
+	_draw_route(Vector2.ZERO, 0.0)
 	var named := {}
 	for bl in blips:
 		named[bl["place"]] = TEAL if bl["kind"] == "start" else AMBER

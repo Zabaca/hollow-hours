@@ -24,6 +24,7 @@ const PULLBACK_SECONDS := 11.0  # the slow pull-back from the stopped car
 const FADE_SECONDS := 2.6  # to black, after the credits
 const CARD_HOLD := 3.4  # how long the next chapter's card stays up, once it has faded in
 const CARD_FADE_IN := 0.9
+const ROUTE_EVERY := 1.0  # seconds between the route line being worked out again
 
 var game: GameSim
 var hud: StoryHud
@@ -51,6 +52,9 @@ var _black := ColorRect.new()
 var _ending_t := 0.0
 var _held_lines: Array = []  # the closing lines, until the story completes
 var _blips_key := ""
+var route := PackedVector2Array()  # the way to the objective, for the radar and the map (cities that show one)
+var _route_in := 0.0
+var _route_for := Vector2.INF
 
 
 func setup(g: GameSim, with_hud: bool = true) -> void:
@@ -201,7 +205,8 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 	hud.set_hold(m.hold_progress())
 	hud.set_timers(m.timers_left())
 	var blips := m.blips()
-	hud.set_radar(pos, angle, blips)
+	_update_route(delta, blips)
+	hud.set_radar(pos, angle, blips, game.car.speed(), route)
 	var key := ""
 	for bl in blips:
 		key += "%s:%s;" % [bl["place"], bl["kind"]]
@@ -220,6 +225,21 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 			game.revert_to_save()
 			_after_reset()
 	_step_ending(delta)
+
+
+## The route to the objective (or to the next mission's start), recomputed about once a second and at once when the
+## objective moves. The car's own path grid answers; the quarter has none.
+func _update_route(delta: float, blips: Array) -> void:
+	if blips.is_empty() or game.route_nav() == null:
+		route = PackedVector2Array()
+		_route_for = Vector2.INF
+		return
+	var goal: Vector2 = blips[0]["pos"]
+	_route_in -= delta
+	if _route_in <= 0.0 or goal != _route_for:
+		_route_in = ROUTE_EVERY
+		_route_for = goal
+		route = game.route_to(game.car.body.position, goal)
 
 
 func _ending_over() -> bool:
@@ -326,4 +346,6 @@ func _after_reset() -> void:
 # ----------------------------------------------------------------------------- the map
 
 func open_map() -> void:
-	map_screen.open(game.car.body.position, game.car.body.angle, game.mission.blips())
+	var blips: Array = game.mission.blips()
+	_update_route(1.0, blips)  # fresh when the map opens
+	map_screen.open(game.car.body.position, game.car.body.angle, blips, route)

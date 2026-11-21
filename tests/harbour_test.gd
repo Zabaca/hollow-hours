@@ -225,10 +225,11 @@ func _test_stalled_hunters() -> void:
 	_check(sim.pack.gaunts[0].pos.distance_to(nearest) < 4.0, "bursting out of its own car")
 	_step_for(sim, 0.5)
 	_check(sim.pack.gaunts.size() == 1, "and not again")
-	# Not armed outside the mission, and let go when it ends.
+	# Free roam arms a few ambush spots in the city (never the highway's), not the highway's stalled creatures.
 	var roam := _sim()
-	roam.continue_story({"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": ["batteries", "pharmacist", "west_gate", "long_road"], "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}})
-	_check(roam.pack.stalled.is_empty(), "free roam after The Long Road has none armed")
+	roam.continue_story({"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": StoryData.MISSIONS.map(func(m: Dictionary) -> String: return m["id"]), "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}})
+	var in_city := roam.pack.stalled.all(func(h: Dictionary) -> bool: return (h["pos"] as Vector2).x < 200.0)
+	_check(roam.pack.stalled.size() == StoryData.AMBUSH_ROAM and in_city, "free roam arms a few of the city's ambush spots at random, and none of the highway's creatures", "armed=%d" % roam.pack.stalled.size())
 
 
 ## The autopilot drives the whole of The Long Road: with the pack off (the route: toll lanes, the jam's free lane, the
@@ -276,8 +277,8 @@ func _drive_long_road(seed_in: int, live: bool) -> Dictionary:
 	return out
 
 
-## When the last step is reached the mission is complete and the story is not over: no credits, no card, no
-## chapter change; the car is in free roam in the harbour city, and the save says so.
+## When the last step is reached the mission is complete and the story goes straight on: Dead Convoy begins at the east
+## ring road (the car is inside its start marker), with the save written for it.
 func _test_after_the_long_road() -> void:
 	var sim := _sim()
 	sim.start_story_at(3)
@@ -285,7 +286,6 @@ func _test_after_the_long_road() -> void:
 	sim.pack.gaunts.clear()
 	sim.pack.stalled = []
 	sim.take_events()
-	var pos: Vector2 = StoryData.place_pos("convoy_call")
 	var events: Array = []
 	# Reach each step's place in turn.
 	for pid in ["toll_plaza", "jam", "truck_stop", "convoy_call"]:
@@ -298,13 +298,16 @@ func _test_after_the_long_road() -> void:
 	_check(done.size() == 1 and done[0]["id"] == "long_road" and done[0]["final"] == false and done[0]["chapter_end"] == false, "reaching the east ring road completes The Long Road, which ends neither the story nor a chapter", str(done))
 	_check(not ("story_complete" in types) and not ("chapter_complete" in types) and not ("escaped" in types), "so there is no ending")
 	var lines: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "line").map(func(e: Dictionary) -> String: return e["id"])
-	_check(lines == ["lr_jam", "lr_overpass", "lr_done"], "with its three calls along the way and the closing one at the end", str(lines))
+	_check(lines.slice(0, 3) == ["lr_jam", "lr_overpass", "lr_done"], "with its three calls along the way and the closing one at the end", str(lines))
 	var saves: Array = events.filter(func(e: Dictionary) -> bool: return e["type"] == "save")
-	_check(saves.size() == 1 and saves[0]["data"]["done"].size() == 4 and saves[0]["data"]["next"] == "" and SaveStore.valid_save(saves[0]["data"]), "it saves with four missions done and none next, a good save", str(saves.size()))
-	_check(sim.mission.state == MissionSim.State.ROAM and sim.mission.objective().is_empty(), "and the car is in free roam with no objective")
-	_check(is_equal_approx(sim.mission.dawn_amount(), float(StoryData.MISSIONS[3]["dawn"])), "the night stays as it was (no first light)")
-	# A wreck in free roam goes back to that save, in the harbour city.
+	_check(saves.size() == 1 and saves[0]["data"]["done"].size() == 4 and saves[0]["data"]["next"] == "dead_convoy" and SaveStore.valid_save(saves[0]["data"]), "it saves with four missions done and Dead Convoy next, a good save", str(saves.size()))
+	_check(sim.mission.active() and sim.mission.mission_data()["id"] == "dead_convoy" and "dc_call_1" in lines, "and Dead Convoy begins at once, where the car stands")
+	# A wreck in that mission goes back to that save, in the harbour city, at Dead Convoy's start.
 	sim.damage(1000.0, "dev")
 	_step_for(sim, 0.1)
 	sim.revert_to_save()
-	_check(sim.city_id == Cities.HARBOUR and sim.mission.state == MissionSim.State.ROAM and sim.car.body.position.distance_to(StoryData.place_pos("highway_start")) < 0.1, "a wreck there goes back to the checkpoint in the harbour city, not to the quarter")
+	_step_for(sim, 0.05)
+	_check(sim.city_id == Cities.HARBOUR and sim.mission.active() and sim.car.body.position.distance_to(StoryData.place_pos("convoy_call")) < 0.1, "a wreck there goes back to that save in the harbour city (Continue puts the car at the mission's start, not at the far end of the highway)")
+	# A save from when the story ended at The Long Road reads as Dead Convoy next, not as damaged.
+	var old := {"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": ["batteries", "pharmacist", "west_gate", "long_road"], "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}}
+	_check(SaveStore.valid_save(old) and SaveStore.upgraded(old)["next"] == "dead_convoy" and SaveStore.city_of(old) == Cities.HARBOUR, "a save from when The Long Road was the last built mission is a good save, with Dead Convoy next")

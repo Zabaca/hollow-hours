@@ -183,7 +183,7 @@ ROADBLOCKS = [
 
 # Ambush spots: a place and a count, beside the squeezes and the highway's set pieces (ambushes.id
 # matches the roadblock or feature it hides beside; harbour.py adds the highway's).
-AMBUSH_COUNT = 3
+AMBUSH_COUNT = 2
 HUNTER_SPACING = 70.0   # least distance along the highway between two stalled-car hunters, outside the jam
 HUNTER_RELEASE = 35.0   # a stalled-car hunter is placed, hunting, when the car comes this close
 

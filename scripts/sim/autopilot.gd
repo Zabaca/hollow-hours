@@ -25,10 +25,10 @@ const HINTS := {
 		"chicane": {"waypoints": [Vector2(8.0, 0.4), Vector2(3.0, -0.4), Vector2(-14.0, -0.4)], "car_east_of": -12.0, "goal_west_of": -20.0},
 	},
 	# The harbour city's squeezes (a 4 m gap, like the chicane) are for the grid to see, not a hint: its own grid
-	# is 1 m cells with the car's half width plus a hand's breadth, which leaves a cell in every 4 m gap.
+	# (Cities.ROUTE_GRIDS, shared with the route line) is 1 m cells, which leaves a cell in every 4 m gap.
 	# `tight` slows the car where a wall, wreck or kerb is within `gap` metres of the way ahead (the toll lanes, a
 	# squeeze, a jam's free lane), as a driver would.
-	"harbour": {"nav": {"clearance": 1.0, "cell": 1.0, "halo": 3.0}, "tight": {"gap": 2.4, "speed": 11.0}},
+	"harbour": {"tight": {"gap": 2.4, "speed": 11.0}},
 }
 const CAR_CLEARANCE := 2.4  # metres from a wall to a cell the car may be routed through
 ## Where it drives on a street: a lane's width off the street's centre line, so it does not run down the
@@ -74,8 +74,8 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 	if nav == null or nav_world != game.world:
 		nav_world = game.world
 		hints = HINTS.get(game.city_id, {})
-		var grid: Dictionary = hints.get("nav", {})
-		nav = NavGrid.new(game.world, float(grid.get("clearance", CAR_CLEARANCE)), float(grid.get("cell", NavGrid.CELL)), float(grid.get("halo", 0.0)))
+		var grid: Dictionary = Cities.route_grid(game.city_id)
+		nav = game.route_nav() if not grid.is_empty() else NavGrid.new(game.world, CAR_CLEARANCE)
 		tour = _places_to_tour(game.city_id)
 		route_i = 0
 	var obj := {}
@@ -95,7 +95,10 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 		reverse_t = 1.3
 		reverse_turn = 1.0 if rng.randf() < 0.5 else -1.0
 	# Something on the car: do what a player would, slide and swerve until it lets go.
-	if game.pack.latched().size() > 0:
+	# (Where the way is tight a swerve or a slide only wedges the car: a driver in a squeeze keeps the line and boosts
+	# on through it, with the creature still on, and shakes it off in the open beyond.)
+	var squeezed: bool = not hints.get("tight", {}).is_empty() and game.world.wall_gap(car.body.position + car.forward() * 5.0, 3.0) < 3.0
+	if game.pack.latched().size() > 0 and not squeezed:
 		# Swerve hard and boost: it throws one off in about a second and keeps the speed that keeps the next
 		# one off (a handbrake slide is faster but leaves the car standing).
 		var flip := 1.0 if int(game.time / 0.5) % 2 == 0 else -1.0
@@ -164,6 +167,8 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 	var want := (aim - car.body.position).angle()
 	var err := angle_difference(car.body.angle, want)
 	var throttle := 0.7 if absf(err) < 0.5 else 0.4
+	if squeezed and game.pack.latched().size() > 0:
+		throttle = 1.0
 	var turn := clampf(err * 2.4, -1.0, 1.0)
 	var boosting := false
 	var slide := false

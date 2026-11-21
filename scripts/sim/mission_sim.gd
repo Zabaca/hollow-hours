@@ -18,6 +18,7 @@ extends RefCounted
 ##   checkpoint {step, pos}                         timer {id, state: start|stop, seconds?}
 ##   mission_complete {mission, id, title, final, chapter_end}   mission_failed {mission, id, reason, text}
 ##   gate_open / gate_closed                        escaped                story_complete
+##   bridge {state: down|up}  (the lift bridge moved: the world and the views follow)
 ##   chapter_complete {next, city}  (the car is out of the gate and at rest, and the next chapter is in another city)
 ##   retry {to: checkpoint|start}                   roam {next}            roam_wrecked
 ##   save {data}  (a save is asked for: write it with SaveStore)
@@ -30,6 +31,7 @@ var state: int = State.ROAM
 var next_mission := 0
 var done: Array = []  # ids of the missions finished, in order
 var ending_seen := false
+var finished := false  # the story is over (the last mission was finished); a save made before that says false
 var totals := {"kills": 0, "wrecks": 0, "seconds": 0.0}
 var last_save := {}  # what a wreck in free roam goes back to; empty before the first mission is done
 var mission := -1  # index of the current (or just failed) mission
@@ -168,6 +170,7 @@ func save_data() -> Dictionary:
 		"next": next_id,
 		"done": done.duplicate(),
 		"ending_seen": ending_seen,
+		"finished": finished,
 		"totals": {"kills": int(totals["kills"]), "wrecks": int(totals["wrecks"]), "seconds": float(totals["seconds"])},
 	}
 
@@ -180,6 +183,7 @@ func _reset_progress() -> void:
 	next_mission = 0
 	done = []
 	ending_seen = false
+	finished = false
 	totals = {"kills": 0, "wrecks": 0, "seconds": 0.0}
 	last_save = {}
 	mission = -1
@@ -208,6 +212,7 @@ func resume(game: GameSim, save: Dictionary) -> void:
 	var next_id := str(save.get("next", ""))
 	next_mission = StoryData.mission_index(next_id) if next_id != "" else StoryData.MISSIONS.size()
 	ending_seen = bool(save.get("ending_seen", false))
+	finished = bool(save.get("finished", false))
 	var t: Dictionary = save.get("totals", {})
 	totals = {"kills": int(t.get("kills", 0)), "wrecks": int(t.get("wrecks", 0)), "seconds": float(t.get("seconds", 0.0))}
 	last_save = save.duplicate(true)
@@ -223,6 +228,14 @@ func resume(game: GameSim, save: Dictionary) -> void:
 	ev("roam", {"next": next_id})
 	if not next_data().is_empty() and next_data()["start"] == "":
 		start_mission(game, next_mission)
+
+
+## Lower or raise the lift bridge, saying so when it moves (the world's colliders and the path grids follow).
+func _set_bridge(game: GameSim, down: bool) -> void:
+	if game.world.lift_down == down:
+		return
+	game.set_bridge(down)
+	ev("bridge", {"state": "down" if down else "up"})
 
 
 ## Shut the gate, saying so when it was open, so a drawn gate never stays open over a closed wall.
@@ -269,6 +282,7 @@ func start_mission(game: GameSim, i: int) -> void:
 	_alert_all = false
 	game.pack.stand_down()
 	_close_gate(game)
+	_set_bridge(game, false)
 	game.hull = GameSim.MAX_HULL
 	ev("mission_started", {"mission": i, "id": m["id"], "title": m["title"], "number": i + 1})
 	_apply(game, m.get("begin", {}))
@@ -435,6 +449,7 @@ func _complete_mission(game: GameSim) -> void:
 ## The car has gone out of the gate and come to rest: the chapter or the story is over. GameSim calls this.
 func finish_story() -> void:
 	ending_seen = true
+	finished = next_mission >= StoryData.MISSIONS.size()
 	last_save = save_data()
 	if next_mission < StoryData.MISSIONS.size():
 		# A chapter's end, not the story's: the save has the next chapter's first mission next.
@@ -476,6 +491,8 @@ func _apply(game: GameSim, fx: Dictionary, next_step: int = -1, priority: bool =
 	if fx.has("stop_timer") and timers.has(fx["stop_timer"]):
 		timers.erase(fx["stop_timer"])
 		ev("timer", {"id": fx["stop_timer"], "state": "stop"})
+	if fx.get("bridge", "") == "down":
+		_set_bridge(game, true)
 	if fx.get("gate", "") == "open":
 		game.world.gate["open"] = true
 		ev("gate_open")
@@ -539,6 +556,7 @@ func _fail(game: GameSim, reason: String) -> void:
 	if reason == "wrecked":
 		totals["wrecks"] += 1
 	_close_gate(game)
+	_set_bridge(game, false)
 	var r: Dictionary = StoryData.REASONS[reason]
 	var m := mission_data()
 	ev("mission_failed", {"mission": mission, "id": m["id"], "title": m["title"], "reason": reason, "text": r["text"]})

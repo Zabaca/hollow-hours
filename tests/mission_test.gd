@@ -160,7 +160,7 @@ func _test_script() -> void:
 		var sub := StoryData.subtitle(id)
 		if sub.contains("[") or sub.contains("]") or sub == "" or sub != sub.strip_edges():
 			bad_cue += 1
-	_check(n == 21 + StoryData.UNVOICED.size() and StoryData.UNVOICED.size() == 24, "the radio script has chapter 1's 21 lines and chapter 2's 24 so far, which wait for their voices", "lines=%d" % n)
+	_check(n == 21 + StoryData.UNVOICED.size() and StoryData.UNVOICED.size() == 29, "the radio script has chapter 1's 21 lines and chapter 2's 29, which wait for their voices", "lines=%d" % n)
 	_check(chars <= 1500, "chapter 1's voiced script stays inside the voice generator's 1,500 character limit", "chars with cue words=%d" % chars)
 	_check(bad_cue == 0, "every subtitle is the text without its cue words")
 	var missing: Array = []
@@ -598,6 +598,7 @@ func _test_save_file() -> void:
 	var all := _save_at("")
 	all["done"] = ["batteries", "pharmacist", "west_gate", "long_road", "dead_convoy", "floodlights", "lift_bridge"]
 	all["ending_seen"] = true
+	all["finished"] = true
 	SaveStore.write_save(all, path)
 	back = SaveStore.load_save(path)
 	_check(not back.is_empty() and back["next"] == "" and back["ending_seen"] == true, "and so does a save with every mission done")
@@ -643,7 +644,7 @@ func _test_cities_and_chapters() -> void:
 	ch = StoryData.chapters(story)
 	_check(ch.size() == 2 and ch[0] == {"city": "quarter", "first": 0, "last": 2} and ch[1] == {"city": "harbour", "first": 3, "last": 5}, "a story with three more missions in the second city is two chapters", str(ch))
 	_check(StoryData.ends_chapter(2, story) and not StoryData.ends_chapter(3, story) and StoryData.ends_chapter(5, story) and StoryData.ends_chapter(2) and not StoryData.ends_chapter(3) and StoryData.ends_chapter(6), "the third mission ends a chapter in both stories, the sixth ends the longer one, and the story's last (the seventh) ends its chapter")
-	_check(not StoryData.closes_story(2) and not StoryData.closes_story(6) and StoryData.closes_story(5, story) and not StoryData.closes_story(2, story), "only a last mission closes the story, and The Lift Bridge, as far as it is built, says it does not")
+	_check(not StoryData.closes_story(2) and not StoryData.closes_story(3) and StoryData.closes_story(6) and StoryData.closes_story(5, story) and not StoryData.closes_story(2, story), "only a last mission closes the story: The Lift Bridge does, The Long Road (not last) does not")
 	_check(StoryData.city_after(0, story) == "quarter" and StoryData.city_after(2, story) == "quarter" and StoryData.city_after(3, story) == "harbour" and StoryData.city_after(6, story) == "harbour" and StoryData.city_after(3) == "harbour" and StoryData.city_after(2) == "quarter", "the city a player is in follows the next mission, the last one's when the story is over")
 	_check(StoryData.mission_city(4, story) == "harbour", "a mission's city is read from its row")
 

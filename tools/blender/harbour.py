@@ -358,29 +358,38 @@ def build_river():
         # the creatures wait on the east bank's sidewalk, a few metres from the bridge's end, out of the headlights
         C.LAYOUT["ambush_spots"].append(dict(id="bridge_%d" % k, x=round(x1 + 8.0, 1), y=round(yc + P.RW / 2 + 1.5, 1), count=P.AMBUSH_COUNT, near="bridge_%d" % k))
         C.LAYOUT["bridges"].append(dict(id="bridge_%d" % k, kind="fixed", x=round((x0 + x1) / 2, 2), y=round(yc, 2), length=x1 - x0, width=P.RW, axis="x"))
-    # the lift bridge, drawn raised: towers on both banks, a deck hung between them at 13 m, the road cut at the quays
+    # the lift bridge, drawn raised: towers on both banks, the road's quay edges flush with the road, a deck hung between the
+    # towers at 13 m. The deck (`lift_deck`) and its cables (`lift_cables`) are their own pieces of the model, so the game can
+    # lower the deck 13.2 m onto the road and stretch the cables with it (BridgeView).
     l0, l1 = lift
     closers = []
     for (xa, xb) in ((x0, x0 + 3.0), (x1 - 3.0, x1)):
-        C.box(g, "concrete", xa, l0, -1.6, xb, l1, 0.3)
-        C.box(g, "trim", xa, l0, 0.3, xb, l1, 0.6)
+        C.box(g, "concrete", xa, l0, -1.6, xb, l1, -0.3)
+        C.box(g, "asphalt", xa, l0, -0.3, xb, l1, 0.0)
         C.collider(xa, l0, xb, l1, "fence")
         closers.append(dict(x0=xa, y0=l0, x1=xb, y1=l1))
         for ty in (l0 + 0.2, l1 - 1.6):
-            C.box(g, "metal", xa, ty, 0.6, xb, ty + 1.4, 24.0)
+            C.box(g, "metal", xa, ty, 0.0, xb, ty + 1.4, 24.0)
             C.box(g, "trim", xa - 0.1, ty - 0.1, 24.0, xb + 0.1, ty + 1.5, 24.4)
     C.box(g, "rust", x0, l0, 23.2, x1, l0 + 1.4, 24.0)
     C.box(g, "rust", x0, l1 - 1.4, 23.2, x1, l1, 24.0)
-    C.box(g, "asphalt", x0 + 3.0, l0 + 0.3, 12.4, x1 - 3.0, l1 - 0.3, 13.2)
-    C.box(g, "concrete", x0 + 3.0, l0 + 0.3, 11.6, x1 - 3.0, l1 - 0.3, 12.4)
+    d = "lift_deck"
+    C.box(d, "concrete", x0 + 3.0, l0 + 0.3, 12.2, x1 - 3.0, l1 - 0.3, 13.0)
+    C.box(d, "asphalt", x0 + 3.0, l0 + 0.3, 13.0, x1 - 3.0, l1 - 0.3, 13.2)
+    yc = (l0 + l1) / 2
+    for xx in range(int(x0) + 6, int(x1) - 5, 4):
+        C.flat(d, "marking_y", xx, yc - 0.1, xx + 2.0, yc + 0.1, 13.212)
+    for sy in (l0 + 0.3, l1 - 0.7):
+        C.box(d, "concrete", x0 + 3.0, sy, 13.2, x1 - 3.0, sy + 0.4, 14.0)
+    c = "lift_cables"
     for cx in (x0 + 7.0, (x0 + x1) / 2, x1 - 7.0):
         for cy in (l0 + 0.5, l1 - 0.5):
-            C.box(g, "metal", cx - 0.05, cy - 0.05, 13.2, cx + 0.05, cy + 0.05, 23.2)
+            C.box(c, "metal", cx - 0.05, cy - 0.05, 13.2, cx + 0.05, cy + 0.05, 23.2)
     for lx in (x0 + 3.5, x1 - 3.5):
         for ly in (l0 + 1.8, l1 - 1.8):
             C.box(g, "beacon", lx - 0.3, ly - 0.3, 24.4, lx + 0.3, ly + 0.3, 25.0)
     C.LAYOUT["bridges"].append(dict(id="lift_bridge", kind="lift", up=True, x=round((x0 + x1) / 2, 2), y=round(P.YS[P.LIFT_ROW], 2), length=x1 - x0, width=P.RW, axis="x",
-                                      closers=closers, deck_up_z=12.4))
+                                      closers=closers, deck_up_z=13.2, cable_top_z=23.2))
     C.LAYOUT["river"] = dict(x0=x0, x1=x1, y0=bot, y1=top, quay_thickness=3.0)
 
 

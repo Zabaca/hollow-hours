@@ -12,7 +12,8 @@ extends Node3D
 var game: GameSim
 var city: City
 var city_id := Cities.QUARTER  # which city is loaded (Cities)
-var gate_view: GateView
+var gate_view: GateView  # the quarter's west gate (null in a city whose way out is a bridge)
+var bridge_view: BridgeView  # the harbour city's lift bridge (null elsewhere)
 var atmos: Atmosphere
 var car_view: CarView
 var cam: ChaseCamera
@@ -107,9 +108,15 @@ func _ready() -> void:
 	city = City.new()
 	add_child(city)
 	city.build(Cities.layout(city_id), Cities.model_path(city_id))
-	gate_view = GateView.new()
-	add_child(gate_view)
-	gate_view.setup(game.world)
+	if game.world.lift_closers.is_empty():
+		gate_view = GateView.new()
+		add_child(gate_view)
+		gate_view.setup(game.world)
+	else:
+		# The harbour city's way out is the lift bridge: no gate leaves, lamps or searchlights on its far bank.
+		bridge_view = BridgeView.new()
+		add_child(bridge_view)
+		bridge_view.setup(city, Cities.layout(city_id))
 	atmos = Atmosphere.new()
 	add_child(atmos)
 	car_view = CarView.new()
@@ -156,11 +163,18 @@ func _ready() -> void:
 	prev_pos = game.car.body.position
 	prev_angle = game.car.body.angle
 	fx.fade_to(0.0)
-	if debug_gate == "open":
+	if gate_view != null and debug_gate == "open":
 		game.world.gate["open"] = true
 		gate_view.set_open(true, true)
-	elif debug_gate == "opening":
+	elif gate_view != null and debug_gate == "opening":
 		get_tree().create_timer(1.5).timeout.connect(func() -> void: gate_view.set_open(true))
+	elif bridge_view != null and debug_gate != "":
+		game.set_bridge(true)  # --gate=open|opening in the harbour city: the bridge down, or coming down 1.5 s in
+		bridge_view.set_down(false, true)
+		if debug_gate == "open":
+			bridge_view.set_down(true, true)
+		else:
+			get_tree().create_timer(1.5).timeout.connect(func() -> void: bridge_view.set_down(true))
 	if presenter != null:
 		atmos.set_dawn(story_dawn)
 		fx.dawn = story_dawn * 0.6
@@ -200,7 +214,8 @@ func _make_game() -> GameSim:
 
 ## The leaves rolling, heard from the gate.
 func _gate_leaves_sound() -> void:
-	audio.play_at("gate_leaves", gate_view.centre + Vector3(-2.0, 2.0, 0.0), 2.0, 1.0, 140.0)
+	if gate_view != null:
+		audio.play_at("gate_leaves", gate_view.centre + Vector3(-2.0, 2.0, 0.0), 2.0, 1.0, 140.0)
 
 
 ## --screen=map|fail|complete|ending: open that story screen over the mission, for a screenshot. The ending
@@ -221,13 +236,23 @@ func _story_screen() -> void:
 			}
 			presenter.begin_chapter_card()
 		"ending":
+			# The car at the gate with it open, driven out as reaching it would: the quarter's west gate, or the far bank's
+			# gate with the harbour city's bridge down. --mission=7 in the harbour city shows the story's end (its lines).
+			var gpos: Vector2 = game.world.gate["pos"]
+			var gdir: Vector2 = game.world.gate["dir"]
 			game.world.gate["open"] = true
-			gate_view.set_open(true, true)
-			game.place_car(Vector2(-62.0, 0.0), PI, GameSim.MAX_HULL)
-			game.car.body.velocity = Vector2(-14.0, 0.0)
+			if gate_view != null:
+				gate_view.set_open(true, true)
+			if bridge_view != null:
+				game.set_bridge(true)
+				bridge_view.set_down(true, true)
+				game.mission.next_mission = StoryData.MISSIONS.size()  # as if the last mission had been finished: the story ends
+			game.place_car(gpos - gdir * 8.0, gdir.angle(), GameSim.MAX_HULL)
+			game.car.body.velocity = gdir * 14.0
 			presenter.radio.clear()  # the mission's opening call is still queued in a run that skips the mission
 			game.escape()
-			for id in StoryData.ENDING_LINES:
+			var closing: Array = StoryData.ENDING_LINES_2 if bridge_view != null else StoryData.ENDING_LINES
+			for id in closing:
 				presenter.on_event({"type": "line", "id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": true})
 			presenter.on_event({"type": "escaped"})
 	if Session.shot_path != "":
@@ -329,7 +354,10 @@ func _reset_views() -> void:
 	for id in views:
 		views[id].queue_free()
 	views.clear()
-	gate_view.set_open(bool(game.world.gate["open"]), true)
+	if gate_view != null:
+		gate_view.set_open(bool(game.world.gate["open"]), true)
+	if bridge_view != null:
+		bridge_view.set_down(game.world.lift_down, true)
 	fx.desat = 0.0
 	fx.dawn = 0.0
 	fx.fade = 0.6
@@ -371,10 +399,12 @@ func _process(delta: float) -> void:
 	var ending := presenter != null and presenter.in_ending_view()
 	if ending:
 		cam.update_pullback(pos, ang, car_view.ground, presenter.pullback_progress())
-		gate_view.track(GM.to3(pos, 1.2))
+		if gate_view != null:
+			gate_view.track(GM.to3(pos, 1.2))
 	else:
 		cam.update_camera(delta, pos, ang, car.body.velocity, car_view.ground, car.boosting)
-		gate_view.track(Vector3.INF)
+		if gate_view != null:
+			gate_view.track(Vector3.INF)
 	if debug_cam_side > 0.0:
 		var side_dir := Vector2.from_angle(ang + PI / 2.0)
 		cam.look_at_from_position(GM.to3(pos + side_dir * 7.0, debug_cam_side), GM.to3(pos, 0.7), Vector3.UP)
@@ -583,14 +613,30 @@ func _on_event(e: Dictionary) -> void:
 		"dawn":
 			audio.play("thunder", -8.0, 1.0, "Ambience")
 		"gate_open":
-			gate_view.set_open(true)
-			audio.play("gate_klaxon", -4.0, 1.0, "SFX")
-			_gate_leaves_sound()
+			if gate_view != null:
+				gate_view.set_open(true)
+				audio.play("gate_klaxon", -4.0, 1.0, "SFX")
+				_gate_leaves_sound()
 		"gate_closed":
 			# A restart or retry has already put the leaves shut (world_reset): no sound for what was not seen.
-			if gate_view.open_amount > 0.05:
-				_gate_leaves_sound()
-			gate_view.set_open(false)
+			if gate_view != null:
+				if gate_view.open_amount > 0.05:
+					_gate_leaves_sound()
+				gate_view.set_open(false)
+		"bridge":
+			# Stand-ins from the sounds we have (slice 5 buys the bridge's own): the gate's klaxon for the horn, the
+			# gate's rolling leaves for the motors, a slam for the deck meeting the road.
+			if bridge_view != null:
+				var at := bridge_view.centre + Vector3(0.0, 6.0, 0.0)
+				if e["state"] == "down":
+					bridge_view.set_down(true)
+					audio.play_at("gate_klaxon", at, 4.0, 0.8, 200.0)
+					audio.play_at("gate_leaves", at, 3.0, 0.6, 160.0)
+					get_tree().create_timer(BridgeView.LOWER_SECONDS * 0.92).timeout.connect(func() -> void: audio.play_at("slam", at, 2.0, 0.5, 160.0))
+				else:
+					bridge_view.set_down(false)
+					audio.play_at("gate_klaxon", at, 4.0, 0.8, 200.0)
+					audio.play_at("gate_leaves", at, 3.0, 0.6, 160.0)
 
 
 ## --audio-log: how long from the start of the physics tick that found the crash to the play()

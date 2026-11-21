@@ -31,6 +31,8 @@ extends RefCounted
 ##   ambush_spots     [{id, x, y, count, near}]  optional: where `count` creatures wait in the dark beside a roadblock, a
 ##                    squeeze or a bridge. The story arms the ones on a leg's route (effect `ambush`); an armed spot
 ##                    places its creatures, already hunting, when the car comes within the release distance.
+##   bridges          [{id, kind, ..., closers: [{x0,y0,x1,y1}]}]  optional: a `lift` bridge's `closers` are boxes (also in
+##                    `boxes`) that shut its road while it is raised; set_lift(true) takes them out, set_lift(false) puts them back.
 ##   stalled_hunters  [{x, y, release}]  optional: a creature waiting in a stalled car at (x, y), placed (already
 ##                    hunting) when the car comes within `release` metres. The story arms them (effect `stalled`).
 ##   player_start     {x, y, angle}  where Survive the Night begins.
@@ -57,6 +59,8 @@ var roads: Array = []  # {axis,c,width,from,to}
 var lights: Array = []  # layout lights: {x,y,z,energy,range,kind,...}
 var spawns: Array = []  # Vector2 hiding places for the creatures
 var ambush_spots: Array = []  # [{id, pos: Vector2, count}] (the layout's ambush_spots)
+var lift_closers: Array = []  # [{x0,y0,x1,y1}] the lift bridge's colliders, in `boxes` while it is raised
+var lift_down := false
 var stalled: Array = []  # [{pos: Vector2, release: float}] creatures waiting in stalled cars (the layout's stalled_hunters)
 var player_start := {"x": -30.0, "y": -2.5, "angle": 0.0}
 ## The way out: a gap in an arena wall (the quarter's is at the avenue's west end). `pos` is the middle
@@ -100,6 +104,10 @@ static func from_layout(data: Dictionary) -> SimWorld:
 		w.spawns.append(Vector2(float(s["x"]), float(s["y"])))
 	for sp in data.get("ambush_spots", []):
 		w.ambush_spots.append({"id": str(sp["id"]), "pos": Vector2(float(sp["x"]), float(sp["y"])), "count": int(sp["count"])})
+	for br in data.get("bridges", []):
+		if str(br.get("kind", "")) == "lift":
+			for c in br.get("closers", []):
+				w.lift_closers.append({"x0": float(c["x0"]), "y0": float(c["y0"]), "x1": float(c["x1"]), "y1": float(c["y1"])})
 	for h in data.get("stalled_hunters", []):
 		w.stalled.append({"pos": Vector2(float(h["x"]), float(h["y"])), "release": float(h["release"])})
 	var ps: Dictionary = data["player_start"]
@@ -150,6 +158,28 @@ func _set_gate(pos: Vector2, width: float, side: String) -> void:
 
 
 # ----------------------------------------------------------------------------- the buckets
+
+
+## Lower the lift bridge (its closing colliders leave `boxes`) or raise it (they come back). False and nothing to do in a
+## city without one. The caller rebuilds any path grid it holds (GameSim.set_bridge does).
+func set_lift(down: bool) -> void:
+	if down == lift_down or lift_closers.is_empty():
+		return
+	lift_down = down
+	if down:
+		var keep: Array = []
+		for b in boxes:
+			var is_closer := false
+			for c in lift_closers:
+				if is_equal_approx(b["x0"], c["x0"]) and is_equal_approx(b["y0"], c["y0"]) and is_equal_approx(b["x1"], c["x1"]) and is_equal_approx(b["y1"], c["y1"]):
+					is_closer = true
+			if not is_closer:
+				keep.append(b)
+		boxes = keep
+	else:
+		for c in lift_closers:
+			boxes.append({"x0": c["x0"], "y0": c["y0"], "x1": c["x1"], "y1": c["y1"], "kind": "fence"})
+	reindex()
 
 
 ## Sort the boxes, posts, lights and blocks into cells again. from_layout does it; call it after

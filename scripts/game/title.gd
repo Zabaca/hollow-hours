@@ -129,6 +129,9 @@ func _build_menu() -> void:
 		cont.note = "Mission %d" % (StoryData.mission_index(str(save["next"])) + 1)
 	if (not save.is_empty() and bool(save["ending_seen"])) or SaveStore.survive_unlocked(Session.save_path):
 		_item("Survive the Night", _survive)
+		# Once chapter 2 is finished the round is offered in the harbour city too.
+		if SaveStore.harbour_unlocked(Session.save_path) or (not save.is_empty() and bool(save.get("finished", false))):
+			_item("Survive the Night: Harbour City", _survive_harbour)
 	_item("Settings", _open_settings)
 	_item("Credits", _open_credits)
 	_item("Quit", func() -> void: get_tree().quit())
@@ -293,6 +296,7 @@ func _start_story(from_save: Dictionary) -> void:
 	Session.mode = "story"
 	Session.continue_save = from_save
 	Session.mission_flag = 0
+	Session.city = ""
 	_enter_game(true)
 
 
@@ -301,6 +305,15 @@ func _survive() -> void:
 	Session.mode = "survival"
 	Session.continue_save = {}
 	Session.mission_flag = 0
+	Session.city = ""
+	_enter_game(true)
+
+
+func _survive_harbour() -> void:
+	Session.mode = "survival"
+	Session.continue_save = {}
+	Session.mission_flag = 0
+	Session.city = Cities.HARBOUR
 	_enter_game(true)
 
 

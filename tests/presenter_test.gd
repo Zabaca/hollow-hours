@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_unlock_outlives_the_save()
 	_test_ending_returns_to_the_title()
 	_test_chapter_ending_cuts_to_the_next_city()
+	_test_story_ending_holds_its_lines()
 	_test_gate_open_line_does_not_play_after_the_closing_lines()
 	_clean()
 	print("")
@@ -591,6 +592,32 @@ func _test_chapter_ending_cuts_to_the_next_city() -> void:
 	_clean()
 
 
+## The end of the story, at the lift bridge: its closing lines wait for the car to stop on the far bank, as chapter 1's did,
+## then the credits roll; and finishing it opens Survive the Night in the harbour city (chapter 1's end does not).
+func _test_story_ending_holds_its_lines() -> void:
+	quits = 0
+	_clean()
+	var r := _rig("west_gate")
+	var p := r.presenter
+	for id in StoryData.ENDING_LINES_2:
+		p.on_event({"type": "line", "id": id, "speaker": StoryData.LINES[id]["speaker"], "priority": true})
+	_check("lb_end_1" not in p.radio.queued_ids() and p.radio.current.get("id", "") != "lb_end_1", "the story's closing lines wait for the car to stop", str(p.radio.queued_ids()))
+	p.on_event({"type": "mission_complete", "title": "THE LIFT BRIDGE", "id": "lift_bridge", "mission": 6, "final": true, "chapter_end": false})
+	p.on_event({"type": "escaped"})
+	p.on_event({"type": "story_complete"})
+	_check(p.ending == "pullback" and (p.radio.queued_ids() == ["lb_end_1", "lb_end_2"] or p.radio.current.get("id", "") == "lb_end_1"), "then Vera and Ruck speak in order", str(p.radio.queued_ids()))
+	_check(SaveStore.survive_unlocked(SAVE) and SaveStore.harbour_unlocked(SAVE), "and Survive the Night is open in both cities")
+	p.update(StoryPresenter.PULLBACK_SECONDS + 0.1, Vector2.ZERO, 0.0)
+	_check(p.ending == "roll" and p.credits_roll.playing, "and the credits roll, after the pull-back")
+	_drop(r)
+	_clean()
+	var chapter := _rig("west_gate")
+	chapter.presenter.on_event({"type": "chapter_complete", "next": "long_road", "city": "harbour"})
+	_check(SaveStore.survive_unlocked(SAVE) and not SaveStore.harbour_unlocked(SAVE), "while the end of chapter 1 opens only the quarter's")
+	_drop(chapter)
+	_clean()
+
+
 ## The ending: the car goes through the gate (first light), stops (the camera draws back), the credits
 ## roll, it fades to black and the title comes back. Nothing is a card and nothing waits on a key.
 func _test_ending_returns_to_the_title() -> void:
@@ -649,9 +676,17 @@ func _test_ending_returns_to_the_title() -> void:
 	f = FileAccess.open(SAVE, FileAccess.WRITE)
 	f.store_string(JSON.stringify(done))
 	f.close()
-	var roam_title := _make_title()
-	_check(roam_title.menu_rows[1].enabled and roam_title.menu_rows[1].note == "Free roam", "once every built mission is done, with nothing after it yet, Continue says Free roam", roam_title.menu_rows[1].note)
-	roam_title.queue_free()
+	var legacy := _make_title()
+	_check(legacy.menu_rows[1].enabled and legacy.menu_rows[1].note == "Mission 7", "a save made when The Lift Bridge was only built as far as the control house (no finished flag) reads as that mission still to play", legacy.menu_rows[1].note)
+	legacy.queue_free()
+	done["finished"] = true
+	f = FileAccess.open(SAVE, FileAccess.WRITE)
+	f.store_string(JSON.stringify(done))
+	f.close()
+	var end_title := _make_title()
+	var end_rows: Array = end_title.menu_rows.map(func(x: MenuRow) -> String: return "%s:%s" % [x.text, "on" if x.enabled else "off"])
+	_check(end_title.menu_rows[1].note == "The end" and end_rows[1] == "Continue:off" and "Survive the Night:on" in end_rows and "Survive the Night: Harbour City:on" in end_rows, "once the story is finished Continue is greyed and says The end, and Survive the Night is offered in both cities", str(end_rows))
+	end_title.queue_free()
 
 
 ## The reviewer's sequence: the gate opens (Ruck's "Gate's open" is queued behind the opening squelch), the

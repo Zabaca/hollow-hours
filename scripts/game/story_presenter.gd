@@ -73,6 +73,7 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 	add_child(map_screen)
 	hud.radar.set_city(game.city_id)
 	map_screen.view.set_city(game.city_id)
+	map_screen.set_tall(Cities.route_grid(game.city_id).is_empty())  # the harbour city's map leaves the subtitles clear
 	credits_roll = CreditsRoll.new()
 	add_child(credits_roll)
 	credits_roll.finished.connect(_on_roll_finished)
@@ -142,7 +143,7 @@ func on_event(e: Dictionary) -> void:
 			hud.show_card("Mission %d" % int(e["number"]), String(e["title"]))
 		"line":
 			# The closing lines wait for the car to stop: first light, a quiet moment, then Vera and Ruck.
-			if String(e["id"]) in StoryData.ENDING_LINES and not _ending_over():
+			if StoryData.is_ending_line(String(e["id"])) and not _ending_over():
 				_held_lines.append(e)
 			else:
 				radio.on_event(e)
@@ -150,7 +151,10 @@ func on_event(e: Dictionary) -> void:
 			has_checkpoint = true
 			hud.notice("Checkpoint")
 		"gate_open":
-			hud.notice("The gate is open")
+			if game.world.lift_closers.is_empty():
+				hud.notice("The gate is open")
+		"bridge":
+			hud.notice("The bridge is coming down" if e["state"] == "down" else "The bridge is rising")
 		"escaped":
 			radio.drop_ordinary()  # nothing stale plays into the ending; the held closing lines are not in the queue
 			ending = "rollout"
@@ -185,6 +189,7 @@ func on_event(e: Dictionary) -> void:
 			_held_lines = []
 		"story_complete":
 			SaveStore.unlock_survive(save_path)  # outlives the save: starting over must not hide Survive the Night
+			SaveStore.unlock_survive_harbour(save_path)  # finishing chapter 2 opens it in the harbour city too
 			ending = "pullback"
 			_ending_t = 0.0
 			for held in _held_lines:

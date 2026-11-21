@@ -24,6 +24,11 @@ const HINTS := {
 		],
 		"chicane": {"waypoints": [Vector2(8.0, 0.4), Vector2(3.0, -0.4), Vector2(-14.0, -0.4)], "car_east_of": -12.0, "goal_west_of": -20.0},
 	},
+	# The harbour city's squeezes (a 4 m gap, like the chicane) are for the grid to see, not a hint: its own grid
+	# is 1 m cells with the car's half width plus a hand's breadth, which leaves a cell in every 4 m gap.
+	# `tight` slows the car where a wall, wreck or kerb is within `gap` metres of the way ahead (the toll lanes, a
+	# squeeze, a jam's free lane), as a driver would.
+	"harbour": {"nav": {"clearance": 1.0, "cell": 1.0, "halo": 3.0}, "tight": {"gap": 2.4, "speed": 11.0}},
 }
 const CAR_CLEARANCE := 2.4  # metres from a wall to a cell the car may be routed through
 ## Where it drives on a street: a lane's width off the street's centre line, so it does not run down the
@@ -68,8 +73,9 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 	var car := game.car
 	if nav == null or nav_world != game.world:
 		nav_world = game.world
-		nav = NavGrid.new(game.world, CAR_CLEARANCE)
 		hints = HINTS.get(game.city_id, {})
+		var grid: Dictionary = hints.get("nav", {})
+		nav = NavGrid.new(game.world, float(grid.get("clearance", CAR_CLEARANCE)), float(grid.get("cell", NavGrid.CELL)), float(grid.get("halo", 0.0)))
 		tour = _places_to_tour(game.city_id)
 		route_i = 0
 	var obj := {}
@@ -134,9 +140,26 @@ func controls(game: GameSim, delta: float) -> Dictionary:
 			path_t = 0.4
 			path_goal = target
 			nav_path = nav.path(car.body.position, target)
+		var fallback := Vector2.INF
+		var found := false
 		for p in nav_path:
-			if p.distance_to(car.body.position) > 7.0 and game.world.line_clear(car.body.position, p, 1.2):
-				aim = p
+			if p.distance_to(car.body.position) > 7.0:
+				if fallback == Vector2.INF:
+					fallback = p
+				if game.world.line_clear(car.body.position, p, 1.2):
+					aim = p
+					found = true
+					break
+		# Hugging a wall, no point of the route has a line clear by the usual margin: the city that has squeezes
+		# follows its route anyway (a straight line at the far goal is the way into the wall).
+		if not found and fallback != Vector2.INF and not hints.get("tight", {}).is_empty():
+			aim = fallback
+	var tight: Dictionary = hints.get("tight", {})
+	if not tight.is_empty() and not stop:
+		var ahead_dir := (aim - car.body.position).normalized()
+		for d in [6.0, 12.0, 18.0, 24.0]:
+			if game.world.wall_gap(car.body.position + ahead_dir * d, float(tight["gap"])) < float(tight["gap"]):
+				cap_speed = minf(cap_speed, float(tight["speed"]))
 				break
 	var want := (aim - car.body.position).angle()
 	var err := angle_difference(car.body.angle, want)

@@ -15,12 +15,15 @@ extends Node
 signal quit_to_menu
 signal ending_started  # the car is through the gate: first light, the HUD gives way
 signal world_reset  # a retry, restart or revert moved the car: reset the camera, the creature views, the effects
+signal chapter_changed(save: Dictionary)  # the chapter's card has been shown: load the next chapter's city from this save
 
 const FAIL_DELAY_WRECKED := 1.4  # seconds to see the wreck before the menu
 const FAIL_DELAY := 0.6
 const REVERT_DELAY := 2.8  # a wreck in free roam: seconds before it goes back to the last save
 const PULLBACK_SECONDS := 11.0  # the slow pull-back from the stopped car
 const FADE_SECONDS := 2.6  # to black, after the credits
+const CARD_HOLD := 3.4  # how long the next chapter's card stays up, once it has faded in
+const CARD_FADE_IN := 0.9
 
 var game: GameSim
 var hud: StoryHud
@@ -34,8 +37,14 @@ var fail_text := ""
 var _fail_in := -1.0
 var _revert_in := -1.0
 ## The ending, in order: "" (not yet), "rollout" (the car rolls out of the gate), "pullback" (it has
-## stopped; the camera draws back), "roll" (the credits), "fade" (to black), then back to the title.
+## stopped; the camera draws back), then either "roll" (the credits), "fade" (to black) and back to the
+## title; or, at the end of a chapter that is not the story's, "chapter_fade" (to black), "chapter_card"
+## (the next chapter's card) and then `chapter_changed`, which main.gd answers by loading the next city.
 var ending := ""
+var chapter_card := CanvasLayer.new()
+var _card_kicker: Label
+var _card_title: Label
+var _chapter_next := ""  # the id of the next chapter's first mission while a chapter ending plays
 var credits_roll: CreditsRoll
 var blackout := CanvasLayer.new()
 var _black := ColorRect.new()
@@ -70,6 +79,22 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	blackout.add_child(_black)
 	add_child(blackout)
+	# The next chapter's card, over the black (its own layer: the HUD has faded out by then).
+	chapter_card.layer = MenuStyle.LAYER_BLACKOUT + 1
+	chapter_card.process_mode = Node.PROCESS_MODE_ALWAYS
+	chapter_card.visible = false
+	var cbox := VBoxContainer.new()
+	cbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	cbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card_kicker = MenuStyle.label("", 22, MenuStyle.DIM, 600, 12)
+	_card_kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_card_title = MenuStyle.label("", 72, MenuStyle.BONE, 300, 14)
+	_card_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cbox.add_child(_card_kicker)
+	cbox.add_child(_card_title)
+	chapter_card.add_child(cbox)
+	add_child(chapter_card)
 	radio = Radio.new()
 	add_child(radio)
 	hud.subtitle_source = radio
@@ -78,7 +103,12 @@ func setup(g: GameSim, with_hud: bool = true) -> void:
 ## True while something the presenter shows holds the world still: no pause menu on top of it.
 func blocks_pause() -> bool:
 	# Nothing opens over the credits, the fade or the way back to the title.
-	return fail_menu.is_open or map_screen.is_open or ending in ["roll", "fade", "done"]
+	return fail_menu.is_open or map_screen.is_open or ending in ["roll", "fade", "chapter_fade", "chapter_card", "done"]
+
+
+## Is the ending's own view up (the camera draws back from the stopped car)?
+func in_ending_view() -> bool:
+	return ending in ["pullback", "roll", "fade", "chapter_fade", "chapter_card", "done"]
 
 
 ## How light the sky should be: the mission's own, and first light in full once the car is through the gate.
@@ -90,7 +120,7 @@ func dawn_target() -> float:
 func pullback_progress() -> float:
 	if ending == "pullback":
 		return clampf(_ending_t / PULLBACK_SECONDS, 0.0, 1.0)
-	return 1.0 if ending in ["roll", "fade", "done"] else 0.0
+	return 1.0 if ending in ["roll", "fade", "chapter_fade", "chapter_card", "done"] else 0.0
 
 
 ## How far the music has been hushed for the ending, 0 to 1.
@@ -125,8 +155,8 @@ func on_event(e: Dictionary) -> void:
 			hud.hide_card()
 			ending_started.emit()
 		"mission_complete":
-			# The last mission's completion is the ending itself, not a card.
-			if not bool(e.get("final", false)):
+			# The last mission of the story or of a chapter has its ending, not a card.
+			if not bool(e.get("final", false)) and not bool(e.get("chapter_end", false)):
 				hud.show_card("Mission complete", String(e["title"]))
 		"mission_failed":
 			radio.drop_ordinary()
@@ -141,6 +171,14 @@ func on_event(e: Dictionary) -> void:
 			_held_lines = []
 			radio.clear()
 			hud.hide_card()
+		"chapter_complete":
+			SaveStore.unlock_survive(save_path)  # escaping the quarter unlocks Survive the Night, as before
+			_chapter_next = String(e["next"])
+			ending = "pullback"
+			_ending_t = 0.0
+			for held in _held_lines:
+				radio.on_event(held)
+			_held_lines = []
 		"story_complete":
 			SaveStore.unlock_survive(save_path)  # outlives the save: starting over must not hide Survive the Night
 			ending = "pullback"
@@ -185,7 +223,7 @@ func update(delta: float, pos: Vector2, angle: float) -> void:
 
 
 func _ending_over() -> bool:
-	return ending in ["pullback", "roll", "fade", "done"]
+	return ending in ["pullback", "roll", "fade", "chapter_fade", "chapter_card", "done"]
 
 
 func _step_ending(delta: float) -> void:
@@ -193,14 +231,51 @@ func _step_ending(delta: float) -> void:
 		"pullback":
 			_ending_t += delta
 			if _ending_t >= PULLBACK_SECONDS:
-				ending = "roll"
-				credits_roll.start()
+				if _chapter_next != "":
+					ending = "chapter_fade"
+					_ending_t = 0.0
+				else:
+					ending = "roll"
+					credits_roll.start()
+		"chapter_fade":
+			_ending_t += delta
+			_black.color.a = clampf(_ending_t / FADE_SECONDS, 0.0, 1.0)
+			if _ending_t >= FADE_SECONDS + 0.4:
+				begin_chapter_card()
+		"chapter_card":
+			_ending_t += delta
+			var a := clampf(_ending_t / CARD_FADE_IN, 0.0, 1.0)
+			_card_kicker.modulate.a = a
+			_card_title.modulate.a = a
+			if _ending_t >= CARD_FADE_IN + CARD_HOLD:
+				ending = "done"
+				chapter_changed.emit(game.mission.last_save.duplicate(true))
 		"fade":
 			_ending_t += delta
 			_black.color.a = clampf(_ending_t / FADE_SECONDS, 0.0, 1.0)
 			if _ending_t >= FADE_SECONDS + 0.6:
 				ending = "done"
 				quit_to_menu.emit()
+
+
+## Show the next chapter's card over black (the ending does this after its fade; --screen=chapter jumps here).
+func begin_chapter_card() -> void:
+	if _chapter_next == "":
+		_chapter_next = String(StoryData.MISSIONS[3]["id"])
+	var n := StoryData.mission_index(_chapter_next)
+	var number := 2
+	var chapters := StoryData.chapters()
+	for i in chapters.size():
+		if n >= int(chapters[i]["first"]) and n <= int(chapters[i]["last"]):
+			number = i + 1
+	ending = "chapter_card"
+	_ending_t = 0.0
+	_black.color.a = 1.0
+	_card_kicker.text = "CHAPTER %d" % number
+	_card_title.text = String(StoryData.CHAPTER_TITLES[clampi(number - 1, 0, StoryData.CHAPTER_TITLES.size() - 1)]).to_upper()
+	_card_kicker.modulate.a = 0.0
+	_card_title.modulate.a = 0.0
+	chapter_card.visible = true
 
 
 func _on_roll_finished() -> void:

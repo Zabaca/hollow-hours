@@ -67,6 +67,6 @@ func _drive(seed_in: int, held: bool) -> Dictionary:
 					done += 1
 				"mission_failed":
 					return {"ok": false, "why": "failed %s (%s) at %d s" % [e["id"], e["reason"], int(sim.time)]}
-				"story_complete":
+				"story_complete", "chapter_complete":
 					return {"ok": true, "why": ""}
 	return {"ok": false, "why": why % done}

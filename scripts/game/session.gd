@@ -10,7 +10,7 @@ extends RefCounted
 ## then save a frame of that screen and quit.
 ##
 ## Story flags: `--story` starts a new story, `--continue` continues from the save, `--mission=N` (1 to 3)
-## starts mission N directly, with the car at its start; all skip the menus. `--city=ID` loads that city (a
+## starts mission N directly (1 to 4), with the car at its start (4 is The Long Road, on the highway in the harbour city); all skip the menus. `--city=ID` loads that city (a
 ## Cities id) instead of the one the story is in, or the quarter for Survive the Night. `--gate=open` or
 ## `--gate=opening` (opens 1.5 s in) shows the west gate open, for screenshots.
 ##
@@ -20,10 +20,10 @@ extends RefCounted
 
 const GAME_FLAGS := [
 	"--demo", "--shot", "--shot-at", "--shot-game", "--shot-speed", "--low", "--start", "--drive",
-	"--cam-log", "--audio-log", "--no-hud", "--story", "--mission", "--continue", "--city",
+	"--cam-log", "--audio-log", "--no-hud", "--story", "--mission", "--continue", "--city", "--perf", "--shot-city",
 ]
 ## Screens that live in the story: the game scene opens them over a mission.
-const STORY_SCREENS := ["map", "fail", "complete", "ending"]
+const STORY_SCREENS := ["map", "fail", "complete", "ending", "chapter"]
 ## Where a story run started by a flag keeps its save when no `--save=` says otherwise.
 const SCRATCH_SAVE_PATH := "user://dev_save.json"
 const MAIN_SCENE := "res://scenes/main.tscn"

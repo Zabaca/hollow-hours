@@ -66,6 +66,10 @@ func _test_files() -> void:
 	var longest := 0.0
 	for id in StoryData.LINES:
 		var path := Radio.file_for(id)
+		if id in StoryData.UNVOICED:
+			if id in voiced or ResourceLoader.exists(path):
+				missing.append(id + " (has audio but is listed as unvoiced)")
+			continue
 		if id not in voiced or not ResourceLoader.exists(path):
 			missing.append(id)
 			continue
@@ -77,13 +81,13 @@ func _test_files() -> void:
 		longest = maxf(longest, secs)
 		if secs < 1.0 or secs > 12.0:
 			lengths_ok = false
-	_check(missing.is_empty(), "every story line has an audio file", str(missing))
+	_check(missing.is_empty(), "every story line has an audio file, except the ones listed as unvoiced, which have none", str(missing))
 	var orphans: Array = []
 	for id in voiced:
 		if not StoryData.LINES.has(id):
 			orphans.append(id)
 	_check(orphans.is_empty(), "no audio file is an orphan (every file is a story line)", str(orphans))
-	_check(voiced.size() == StoryData.LINES.size(), "the audio files and the story lines are the same set", "files=%d lines=%d" % [voiced.size(), StoryData.LINES.size()])
+	_check(voiced.size() + StoryData.UNVOICED.size() == StoryData.LINES.size(), "the audio files and the story lines are the same set, less the unvoiced lines", "files=%d unvoiced=%d lines=%d" % [voiced.size(), StoryData.UNVOICED.size(), StoryData.LINES.size()])
 	_check(unloadable.is_empty() and lengths_ok, "every file loads and runs between 1 and 12 seconds", "unloadable=%s longest=%.1fs" % [str(unloadable), longest])
 	_check(ResourceLoader.exists(Radio.SQUELCH_IN) and ResourceLoader.exists(Radio.STATIC_OUT), "the squelch and the closing static exist")
 

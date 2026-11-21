@@ -5,6 +5,11 @@ extends Node3D
 ## burning barrels, wrecks with a headlamp still on) and the fire particles.
 
 const GROUND_SHADER := preload("res://shaders/wet_ground.gdshader")
+## A city made of many pieces (the harbour city's blocks and highway chunks, named blk_ and hw_) is drawn only
+## where it can be seen: a piece further from the camera than the fog lets anything show is not drawn at all.
+const PIECE_PREFIXES := ["blk_", "hw_"]
+const CULL_RANGE := 170.0  # metres from the camera to the nearest of a piece, beyond which it is not drawn (its half size is added to the range)
+const CULL_MARGIN := 40.0  # the dithered fade-out begins this far inside it
 const KEEP_AS_IS := ["lit_", "neon_", "headlamp", "lamp_head", "beacon", "fire", "tail_red"]
 
 var layout: Dictionary
@@ -13,6 +18,7 @@ var noise_tex: ImageTexture
 var ground_mats := {}
 var time := 0.0
 var rng := RandomNumberGenerator.new()
+var pieces := 0  # how many parts of the model are culled by distance (zero for the quarter, which is one small piece per block)
 
 
 func build(layout_data: Dictionary, model_path: String) -> void:
@@ -24,6 +30,7 @@ func build(layout_data: Dictionary, model_path: String) -> void:
 	root.name = "CityMesh"
 	add_child(root)
 	_restyle(root)
+	_cull_pieces(root)
 	_add_lights()
 	_add_fires()
 
@@ -56,6 +63,21 @@ func _ground_material(kind: String) -> ShaderMaterial:
 		m.set_shader_parameter("ripple_strength", 0.4)
 	ground_mats[kind] = m
 	return m
+
+
+func _cull_pieces(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mi: MeshInstance3D = node
+		for prefix in PIECE_PREFIXES:
+			if String(mi.name).begins_with(prefix):
+				var reach := mi.get_aabb().size.length() * 0.5
+				mi.visibility_range_end = CULL_RANGE + reach
+				mi.visibility_range_end_margin = CULL_MARGIN
+				mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+				pieces += 1
+				break
+	for c in node.get_children():
+		_cull_pieces(c)
 
 
 func _restyle(node: Node) -> void:

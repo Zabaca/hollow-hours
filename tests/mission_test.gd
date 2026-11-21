@@ -155,12 +155,13 @@ func _test_script() -> void:
 	var bad_cue := 0
 	for id in StoryData.LINES:
 		n += 1
-		chars += String(StoryData.LINES[id]["text"]).length()
+		if id not in StoryData.UNVOICED:
+			chars += String(StoryData.LINES[id]["text"]).length()
 		var sub := StoryData.subtitle(id)
 		if sub.contains("[") or sub.contains("]") or sub == "" or sub != sub.strip_edges():
 			bad_cue += 1
-	_check(n == 21, "the radio script has 21 lines", "lines=%d" % n)
-	_check(chars <= 1500, "the script stays inside the voice generator's 1,500 character limit", "chars with cue words=%d" % chars)
+	_check(n == 21 + StoryData.UNVOICED.size() and StoryData.UNVOICED.size() == 5, "the radio script has chapter 1's 21 lines and The Long Road's 5, which wait for their voices", "lines=%d" % n)
+	_check(chars <= 1500, "chapter 1's voiced script stays inside the voice generator's 1,500 character limit", "chars with cue words=%d" % chars)
 	_check(bad_cue == 0, "every subtitle is the text without its cue words")
 	var missing: Array = []
 	for id in StoryData.line_ids_used():
@@ -595,11 +596,11 @@ func _test_save_file() -> void:
 	var back := SaveStore.load_save(path)
 	_check(back["totals"]["kills"] == 7 and back["totals"]["seconds"] == 311.5 and back["done"] == ["batteries"], "a good save round trips with its totals")
 	var all := _save_at("")
-	all["done"] = ["batteries", "pharmacist", "west_gate"]
+	all["done"] = ["batteries", "pharmacist", "west_gate", "long_road"]
 	all["ending_seen"] = true
 	SaveStore.write_save(all, path)
 	back = SaveStore.load_save(path)
-	_check(not back.is_empty() and back["next"] == "" and back["ending_seen"] == true, "and so does a finished story")
+	_check(not back.is_empty() and back["next"] == "" and back["ending_seen"] == true, "and so does a save with every mission done")
 	# Overwriting an existing save replaces it whole.
 	SaveStore.write_save(ok, path)
 	_check(SaveStore.load_save(path)["next"] == "pharmacist", "a second write replaces the first")
@@ -610,7 +611,7 @@ func _test_save_file() -> void:
 
 ## The story as it will be with a second chapter: today's three missions, then three in another city.
 func _two_chapters() -> Array:
-	var out: Array = StoryData.MISSIONS.duplicate()
+	var out: Array = StoryData.MISSIONS.slice(0, 3)
 	for k in 3:
 		out.append({"id": "later_%d" % (k + 1), "title": "LATER %d" % (k + 1), "city": "harbour", "start": "", "dawn": 0.3, "begin": {}, "end": {}, "steps": []})
 	return out
@@ -637,12 +638,13 @@ func _test_cities_and_chapters() -> void:
 	_check(StoryData.safe_start_id(Cities.QUARTER) == "safe_start" and StoryData.start_place_id(StoryData.MISSIONS[0]) == "safe_start" and StoryData.start_place_id(StoryData.MISSIONS[1]) == "shop", "a mission with no start place starts at its city's safe start")
 	_check(Cities.layout(Cities.QUARTER) == CityLayout.DATA and Cities.model_path(Cities.QUARTER).ends_with("city.glb") and not Cities.has("nowhere"), "the registry hands out the quarter's layout and model")
 	var ch := StoryData.chapters()
-	_check(ch.size() == 1 and ch[0] == {"city": Cities.QUARTER, "first": 0, "last": 2}, "today's story is one chapter in the quarter", str(ch))
+	_check(ch.size() == 2 and ch[0] == {"city": Cities.QUARTER, "first": 0, "last": 2} and ch[1] == {"city": Cities.HARBOUR, "first": 3, "last": 3}, "the story is two chapters: the quarter's three missions, then the harbour city's", str(ch))
 	var story := _two_chapters()
 	ch = StoryData.chapters(story)
-	_check(ch.size() == 2 and ch[0] == {"city": "quarter", "first": 0, "last": 2} and ch[1] == {"city": "harbour", "first": 3, "last": 5}, "a story with three missions in a second city is two chapters", str(ch))
-	_check(StoryData.ends_chapter(2, story) and not StoryData.ends_chapter(3, story) and StoryData.ends_chapter(5, story) and StoryData.ends_chapter(2), "the third mission ends a chapter in both stories, the sixth ends the story")
-	_check(StoryData.city_after(0, story) == "quarter" and StoryData.city_after(2, story) == "quarter" and StoryData.city_after(3, story) == "harbour" and StoryData.city_after(6, story) == "harbour" and StoryData.city_after(3) == "quarter", "the city a player is in follows the next mission, the last one's when the story is over")
+	_check(ch.size() == 2 and ch[0] == {"city": "quarter", "first": 0, "last": 2} and ch[1] == {"city": "harbour", "first": 3, "last": 5}, "a story with three more missions in the second city is two chapters", str(ch))
+	_check(StoryData.ends_chapter(2, story) and not StoryData.ends_chapter(3, story) and StoryData.ends_chapter(5, story) and StoryData.ends_chapter(2) and StoryData.ends_chapter(3), "the third mission ends a chapter in both stories, the sixth ends the longer one, and the story's last (the fourth) ends its chapter")
+	_check(not StoryData.closes_story(2) and not StoryData.closes_story(3) and StoryData.closes_story(5, story) and not StoryData.closes_story(2, story), "only a last mission closes the story, and The Long Road says it does not")
+	_check(StoryData.city_after(0, story) == "quarter" and StoryData.city_after(2, story) == "quarter" and StoryData.city_after(3, story) == "harbour" and StoryData.city_after(6, story) == "harbour" and StoryData.city_after(3) == "harbour" and StoryData.city_after(2) == "quarter", "the city a player is in follows the next mission, the last one's when the story is over")
 	_check(StoryData.mission_city(4, story) == "harbour", "a mission's city is read from its row")
 
 
@@ -650,19 +652,25 @@ func _test_save_across_chapters() -> void:
 	var story := _two_chapters()
 	var path := DIR + "/chapters.json"
 	var three := ["batteries", "pharmacist", "west_gate"]
+	# A save made before chapter 2 existed: chapter 1 finished, its ending seen, nothing next.
 	var finished := {"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": three, "ending_seen": true, "totals": {"kills": 4, "wrecks": 1, "seconds": 600.0}}
-	_check(SaveStore.valid_save(finished) and SaveStore.upgraded(finished) == finished, "a save that finished the story is good as it is while the story has three missions")
-	_check(SaveStore.valid_save(finished, story), "and once a second chapter exists it is still a good save, not a damaged one")
-	var up := SaveStore.upgraded(finished, story)
-	_check(up["next"] == "later_1" and up["done"] == three and up["ending_seen"] == true and up["totals"]["kills"] == 4, "it reads as chapter 2 next: the next mission is chapter 2's first, and what was done, seen and counted stays", str(up))
-	_check(SaveStore.city_of(finished, story) == "harbour" and SaveStore.city_of(up, story) == "harbour", "so Continue would open the second city")
+	_check(SaveStore.valid_save(finished) and SaveStore.valid_save(finished, story), "a save that finished chapter 1 as the story was is a good save, not a damaged one, now and with a longer story")
+	var up := SaveStore.upgraded(finished)
+	_check(up["next"] == "long_road" and up["done"] == three and up["ending_seen"] == true and up["totals"]["kills"] == 4, "it reads as chapter 2 next: The Long Road is next, and what was done, seen and counted stays", str(up))
+	_check(SaveStore.upgraded(finished, story)["next"] == "later_1", "and against a longer story, that story's next mission")
+	_check(SaveStore.city_of(finished) == "harbour" and SaveStore.city_of(up) == "harbour", "so Continue opens the harbour city")
 	_check(SaveStore.city_of(_save_at("pharmacist")) == "quarter" and SaveStore.city_of(_save_at("pharmacist"), story) == "quarter", "a save in the middle of chapter 1 still opens the quarter")
-	# Saves a chapter-2 story writes.
+	# The save the end of chapter 1 writes (The Long Road next) and the ones chapter 2 writes.
+	var written := {"version": SaveStore.VERSION, "saved_at": 0, "next": "long_road", "done": three, "ending_seen": true, "totals": {"kills": 4, "wrecks": 1, "seconds": 600.0}}
+	_check(SaveStore.valid_save(written) and SaveStore.upgraded(written) == written and SaveStore.city_of(written) == "harbour", "the save at the end of chapter 1 is good as it is, and in the harbour city")
+	var roam := {"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": three + ["long_road"], "ending_seen": true, "totals": {"kills": 4, "wrecks": 1, "seconds": 700.0}}
+	_check(SaveStore.valid_save(roam) and SaveStore.city_of(roam) == "harbour", "and so is the one after The Long Road, where the story has no next mission yet")
+	# Saves a longer chapter-2 story writes.
 	var mid := {"version": SaveStore.VERSION, "saved_at": 0, "next": "later_2", "done": three + ["later_1"], "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}}
 	var over := {"version": SaveStore.VERSION, "saved_at": 0, "next": "", "done": three + ["later_1", "later_2", "later_3"], "ending_seen": true, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}}
-	_check(SaveStore.valid_save(mid, story) and SaveStore.valid_save(over, story), "a save between chapter 2's missions and one at the end of the story are good")
+	_check(SaveStore.valid_save(mid, story) and SaveStore.valid_save(over, story), "a save between a longer chapter 2's missions and one at the end of that story are good")
 	_check(SaveStore.city_of(mid, story) == "harbour" and SaveStore.city_of(over, story) == "harbour", "and both are in the second city")
-	_check(not SaveStore.valid_save(mid) and not SaveStore.valid_save(over), "against today's three missions they are not (they name missions that do not exist)")
+	_check(not SaveStore.valid_save(mid) and not SaveStore.valid_save(over), "against the story as it is they are not (they name missions that do not exist)")
 	# What is still damaged.
 	var cases := {
 		"empty next after one mission": {"next": "", "done": ["batteries"], "ending_seen": true},
@@ -675,15 +683,14 @@ func _test_save_across_chapters() -> void:
 	for name in cases:
 		var d: Dictionary = {"version": SaveStore.VERSION, "saved_at": 0, "totals": {"kills": 0, "wrecks": 0, "seconds": 0.0}}
 		d.merge(cases[name])
-		_check(not SaveStore.valid_save(d, story), "a save with %s is still damaged with a second chapter" % name)
+		_check(not SaveStore.valid_save(d, story) and not SaveStore.valid_save(d), "a save with %s is still damaged with a second chapter" % name)
 	# Through the file: the upgrade is made on loading, the file is not set aside.
 	_clean()
 	SaveStore.write_save(finished, path)
-	var back := SaveStore.load_save(path, story)
-	_check(back["next"] == "later_1" and FileAccess.file_exists(path) and _files_starting(DIR, "chapters.json.bad").is_empty(), "a finished save on disk loads as chapter 2 next and stays where it is")
-	_check(SaveStore.load_save(path)["next"] == "", "and read against today's story it is as it was written")
+	var back := SaveStore.load_save(path)
+	_check(back["next"] == "long_road" and FileAccess.file_exists(path) and _files_starting(DIR, "chapters.json.bad").is_empty(), "a chapter 1 save on disk loads as chapter 2 next and stays where it is")
 	SaveStore.write_save(up, path)
-	_check(SaveStore.load_save(path, story)["next"] == "later_1", "an upgraded save, written back, loads the same")
+	_check(SaveStore.load_save(path)["next"] == "long_road", "an upgraded save, written back, loads the same")
 	_clean()
 
 
@@ -719,8 +726,8 @@ func _test_gate_trigger() -> void:
 	_check(sim.world.gate["open"], "the gate is open")
 	var e := _toward_gate(sim, 3.0)
 	_check(_has(e, "escaped") and sim.phase == GameSim.Phase.ESCAPED, "reaching the gate while it is open is the escape", "phase=%d" % sim.phase)
-	_check(_has(e, "mission_complete") and _of(e, "mission_complete")[0]["final"] and "end_vera" in _lines(e) and "end_ruck" in _lines(e), "the last mission completes with Vera's and Ruck's closing lines", str(_lines(e)))
-	_check(not _has(e, "story_complete") and not _has(e, "save"), "the story is not over, and nothing is saved, until the car has rolled out")
+	_check(_has(e, "mission_complete") and _of(e, "mission_complete")[0]["chapter_end"] and not _of(e, "mission_complete")[0]["final"] and "end_vera" in _lines(e) and "end_ruck" in _lines(e), "the third mission completes, ending chapter 1 and not the story, with Vera's and Ruck's closing lines", str(_lines(e)))
+	_check(not _has(e, "story_complete") and not _has(e, "chapter_complete") and not _has(e, "save"), "the chapter is not over, and nothing is saved, until the car has rolled out")
 	var ending_prio := true
 	for l in _of(e, "line"):
 		if l["id"] in ["end_vera", "end_ruck"] and not l["priority"]:
@@ -731,7 +738,11 @@ func _test_gate_trigger() -> void:
 	_check(midway.mission.objective()["kind"] == "start" and midway.mission.objective()["place"] == "hut", "quitting during the roll-out resumes at mission 3's start, not in an empty roam")
 	e = _run(sim, GameSim.ESCAPE_MAX_TIME + 0.5)
 	var saves := _of(e, "save")
-	_check(_has(e, "story_complete") and saves.size() == 1 and saves[0]["data"]["ending_seen"] == true and saves[0]["data"]["next"] == "", "the story completes and asks for a final save", str(_of(e, "story_complete")))
+	_check(_has(e, "chapter_complete") and not _has(e, "story_complete") and saves.size() == 1 and saves[0]["data"]["ending_seen"] == true and saves[0]["data"]["next"] == "long_road", "the chapter completes (not the story) and asks for a save with The Long Road next", str(_of(e, "chapter_complete")))
+	_check(_of(e, "chapter_complete")[0]["city"] == "harbour" and _of(e, "chapter_complete")[0]["next"] == "long_road", "naming the next chapter's city and first mission")
+	var cont := GameSim.new(HarbourLayout.DATA, "bruiser", 7, true, "harbour")
+	cont.continue_story(saves[0]["data"])
+	_check(cont.mission.active() and cont.mission.mission_data()["id"] == "long_road" and cont.car.body.position.distance_to(StoryData.place_pos("highway_start")) < 1.0, "Continue from that save begins The Long Road at the highway checkpoint")
 	var rest: Vector2 = sim.car.body.position
 	_check(absf(rest.x - (float(sim.world.arena["left"]) - GameSim.ESCAPE_DISTANCE)) < 0.5 and absf(rest.y) < 0.5 and sim.car.speed() < 0.1, "the car has gone out through the gate to its resting place on the road outside", "at %s v=%.2f" % [str(rest), sim.car.speed()])
 	var fled := true
@@ -971,7 +982,7 @@ func _drive_story(seed_in: int, live: bool) -> void:
 						shutter_margin = left
 				"latch":
 					latches += 1
-				"story_complete":
+				"chapter_complete", "story_complete":
 					complete = true
 		if complete or failed:
 			break

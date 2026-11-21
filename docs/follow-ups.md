@@ -97,3 +97,14 @@ Nits and things to know:
 - The full map drew the west gate's gap 10 m wide, a number written into the map; it now draws the gate record's 8 m, which is the width of the wall's gap.
 - GateView, the atmosphere and the `--screen=ending` developer flag still assume the west gate and the quarter; the sim, the camera and the map do not. The harbour city's slice builds the lift bridge's view beside the gate's.
 - With the pack's director on, the autopilot finishes no story run, before or after (it is a proxy for the guard with the director off; 0 of 10 with the hull held in both). The pack's newcomers now come in 60 to 120 m out and ahead of the car, which is the change the option asked for.
+
+## From the chapter 2 slice 2 and 2b build (the harbour city, the cut, and The Long Road)
+
+Nits and things to know:
+- The autopilot is slower than a driver where the road is tight (11 m/s where a wall or a stalled car is within 2.4 m of its way) and, with the creatures in the stalled cars and the pack live and the hull NOT held, finishes The Long Road in 4 of 6 seeds (it is wrecked after the truck stop's east queue in the others). With the hull held all six finish. The creatures' number and spacing (`HUNTER_SPACING`, `HUNTER_RELEASE` in `harbour_plan.py`) and the pack of 2 are the levers; they are for the owner's hand play to set.
+- `City._cull_pieces` hides a block or highway chunk further than `CULL_RANGE` (170 m, plus half its size) from the camera. Godot's visibility range measures to the piece's own bounds, so a very tall piece could pop in late; none does today. The Mac's display caps frames at 120 fps, so `--perf` shows the cap, not the headroom: read the render's CPU time and the draw calls (the quarter about 1,300, the harbour city's centre about 2,600 on High).
+- The full map's frame (`map_frame`) shows the city and 150 m of highway; the car and the objective pin to its edge with the distance when they are out along the road. The place labels past the frame are not drawn. A route line (slice 3) will want the whole highway.
+- `StoryData.UNVOICED` lists The Long Road's five lines, which have subtitles and no audio; buying the voices empties it, and `radio_test` then wants every line voiced again.
+- The title's Continue says "Free roam" after The Long Road, the end of what is built; it says "The end" only when a story's last mission closes it (`closes_story`).
+- `GateView` still draws the west gate's leaves and searchlights at the harbour city's gate (the lift bridge's far end), which is where the sim's gate record puts them; the lift bridge's own view is slice 4's.
+- `Session`'s chapter cut reloads the main scene with the save the chapter's end wrote as `continue_save`; a developer run started by `--mission=3` uses the scratch save, so it never touches the player's.

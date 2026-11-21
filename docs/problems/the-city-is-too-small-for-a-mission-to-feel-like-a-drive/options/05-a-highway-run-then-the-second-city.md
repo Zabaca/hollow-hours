@@ -2,7 +2,7 @@
 problem: the-city-is-too-small-for-a-mission-to-feel-like-a-drive
 title: Chapter 2 opens with a night run down a dead highway, about 1.2 km, into the second city
 summary: Everything in option 04, plus the drive between the cities. After the card, chapter 2 opens at dusk on a highway that runs about 1.2 km into the harbour city: stalled traffic to weave through, a toll plaza, a fallen overpass with a way round through a truck stop. It is chapter 2's first mission (The Long Road), about 70 seconds at 60 km/h. The road and the city are one map, so there is still one cut at the gate. About 4 to 6 agent hours more than option 04 (23 to 32 in all, 27 to 38 with the detail pass) and about 4 more radio lines. A fast car outruns the pack on a clear road, so the road's danger comes from what is on it.
-status: proposed
+status: accepted
 ---
 
 ## Solution
@@ -73,3 +73,5 @@ As option 04, and: a road driven back to the quarter, height (the overpass is a 
 
 - Assumptions as option 04's, and: the highway is straight or turns at right angles, because walls square to the map are what the collisions handle.
 - **Open question for the owner:** which option? Recommended: 04, not this one, for this round; the road can follow it later without undoing anything, once the harbour city has been played.
+
+- **Accepted 2026-11-21.** The owner chose this option with the highway built now, not later ("lets go but do the long highway now as well"), and took the recommendations: the chapter 2 story as sketched, the harbour city at about three times the quarter, the voice spend up to 1,500 credits, the credits after the lift bridge, the detail pass last. Option 04 is accepted with it as the part this option builds on.

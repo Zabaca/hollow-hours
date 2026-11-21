@@ -2,7 +2,7 @@
 problem: the-city-is-too-small-for-a-mission-to-feel-like-a-drive
 title: Chapter 2. The west gate leads into a second, larger city, the harbour city, with three new radio-told missions whose legs are long drives
 summary: The quarter stays exactly as it is, as chapter 1. After the escape and first light a card reads "Chapter 2. The next night", and the game loads a second city built fresh from a kit of block types, about three times as wide and as tall as the quarter (about 400 by 300 m, 36 blocks; bigger later if wanted). Three new missions in the same voice (a rescue, a three-stop fuel run, an escape over a lift bridge) are aimed at legs of 300 to 560 m by road, about 20 to 35 seconds at 60 km/h. Danger goes where the car has to slow (roadblocks, squeezes, bridges, side-street ambushes) and the pack follows the car. One city is loaded at a time. The credits move to the end of chapter 2. About 24 new radio lines (about 750 credits expected, capped at 1,500, needing the owner's yes). Five slices, about 19 to 26 agent hours, plus an optional detail pass (4 to 6).
-status: proposed
+status: accepted
 ---
 
 ## Solution
